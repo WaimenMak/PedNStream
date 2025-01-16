@@ -4,6 +4,6 @@
 /__pycache__
 *.xlsx
 data/*
-/.DS_Store
+.DS_Store
 *.json
 /cache

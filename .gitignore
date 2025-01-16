@@ -1,1 +1,9 @@
 /.idea
+*.ipynb
+*.pyc
+/__pycache__
+*.xlsx
+data/*
+/.DS_Store
+*.json
+/cache

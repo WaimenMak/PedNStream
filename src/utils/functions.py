@@ -26,3 +26,11 @@ def cal_travel_time(link_length, density, v_max, k_critical, k_jam):
     if speed == 0:
         return float('inf')
     return link_length / speed 
+
+def cal_link_flow(density, v_f, k_jam, k_critical, shock_wave):
+    """Triangular fundamental diagram, return link flow
+    """
+    if density <= k_critical:
+        return v_f * density
+    else:
+        return shock_wave * (k_jam - density)

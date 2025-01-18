@@ -20,6 +20,7 @@ class Network:
         self.links = {}          #use dict to store link, key is tuple(start_node_id, end_node_id)
         self.link_params = link_params
         self.simulation_steps = link_params['simulation_steps']
+        self.unit_time = link_params['unit_time']
         self.init_nodes_and_links(od_nodes, origin_nodes)
 
     # TODO: update the turning fractions
@@ -32,16 +33,15 @@ class Network:
     #             else:
     #                 node.turning_fractions = new_turning_fractions
 
-    def generate_time_varying_demand(self, simulation_steps, peak_lambda=10, base_lambda=5):
+    def _generate_time_varying_demand(self, simulation_steps, params):
         """Generate a time-varying demand pattern with morning and evening peaks"""
         time = np.arange(simulation_steps)
-        # Morning peak (around 1/4 of simulation time)
+        peak_lambda = params.get('peak_lambda', 10)  # default value if not specified
+        base_lambda = params.get('base_lambda', 5)   # default value if not specified
+        
         morning_peak = peak_lambda * np.exp(-(time - simulation_steps/4)**2 / (2 * (simulation_steps/20)**2))
-        # Evening peak (around 3/4 of simulation time)
         evening_peak = peak_lambda * np.exp(-(time - 3*simulation_steps/4)**2 / (2 * (simulation_steps/20)**2))
-        # Combine peaks with base demand
         lambda_t = base_lambda + morning_peak + evening_peak
-        # Generate Poisson demand based on time-varying lambda
         demand = np.random.poisson(lam=lambda_t)
         
         return demand
@@ -80,7 +80,7 @@ class Network:
             node._create_virtual_link(node_id, "in", is_incoming=True, params=self.link_params)
             node._create_virtual_link(node_id, "out", is_incoming=False, params=self.link_params)
             if node_id in origin_nodes:
-                node.demand = self.generate_time_varying_demand(self.simulation_steps)
+                node.demand = self._generate_time_varying_demand(self.simulation_steps, self.link_params)
             else:
                 node.demand = np.zeros(self.simulation_steps) # no demand for destination nodes
         
@@ -103,7 +103,7 @@ class Network:
         """
         # update density
         for link in self.links.values():
-            link.update_density(time_step)
+            link.update_link_density_flow(time_step)
         # update speed
         for link in self.links.values():
             link.update_speeds(time_step)

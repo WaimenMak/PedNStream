@@ -1,5 +1,5 @@
 import numpy as np
-from src.utils.functions import cal_travel_speed, cal_free_flow_speed
+from src.utils.functions import cal_travel_speed, cal_free_flow_speed, cal_link_flow
 
 class BaseLink:
     """Base class for all link types"""
@@ -27,37 +27,53 @@ class BaseLink:
 
 class Link(BaseLink):
     """Physical link with full traffic dynamics"""
-    def __init__(self, link_id, start_node, end_node, length, width, 
-                 free_flow_speed, k_critical, k_jam, unit_time, simulation_steps):
-        super().__init__(link_id, start_node, end_node, simulation_steps)
+    def __init__(self, link_id, start_node, end_node, **kwargs):
+        """
+        Initialize a Link with parameters from kwargs
+        :param link_id: ID of the link
+        :param start_node: Starting node
+        :param end_node: Ending node
+        :param kwargs: Keyword arguments including:
+            - length: Length of the link
+            - width: Width of the link
+            - free_flow_speed: Free flow speed
+            - k_critical: Critical density
+            - k_jam: Jam density
+            - unit_time: Time step size
+            - simulation_steps: Number of simulation steps
+            - gamma: Optional, default 2e-2
+        """
+        super().__init__(link_id, start_node, end_node, kwargs['simulation_steps'])
         
         # Physical attributes
-        self.length = length
-        self.width = width
-        self.area = length * width
-        self.free_flow_speed = free_flow_speed
-        self.capacity = self.free_flow_speed * k_critical
-        self.k_jam = k_jam
-        self.k_critical = k_critical
+        self.length = kwargs['length']
+        self.width = kwargs['width']
+        self.area = self.length * self.width
+        self.free_flow_speed = kwargs['free_flow_speed']
+        self.capacity = self.free_flow_speed * kwargs['k_critical']
+        self.k_jam = kwargs['k_jam']
+        self.k_critical = kwargs['k_critical']
         self.shockwave_speed = self.capacity / (self.k_jam - self.k_critical)
-        self.current_speed = free_flow_speed
-        self.travel_time = length / free_flow_speed
-        self.unit_time = unit_time
-        self.free_flow_tau = round(self.travel_time / unit_time)
+        self.current_speed = self.free_flow_speed
+        self.travel_time = self.length / self.free_flow_speed
+        self.unit_time = kwargs['unit_time']
+        self.free_flow_tau = round(self.travel_time / self.unit_time)
 
         # Additional dynamic attributes
-        self.num_pedestrians = np.zeros(simulation_steps)
-        self.density = np.zeros(simulation_steps)
-        self.speed = np.zeros(simulation_steps)
-        self.outflow_buffer = dict()
-        self.gamma = 2e-2
+        self.num_pedestrians = np.zeros(kwargs['simulation_steps'])
+        self.density = np.zeros(kwargs['simulation_steps'])
+        self.speed = np.zeros(kwargs['simulation_steps'])
+        self.link_flow = np.zeros(kwargs['simulation_steps'])
+        # self.gamma = kwargs.get('gamma', 2e-2)  # Default value if not provided, diffusion coefficient
         self.receiving_flow = []
         self.reverse_link = None
 
-    def update_density(self, time_step: int):
+    def update_link_density_flow(self, time_step: int):
         num_peds = self.inflow[time_step] - self.outflow[time_step]
         self.num_pedestrians[time_step] = self.num_pedestrians[time_step - 1] + num_peds
         self.density[time_step] = self.num_pedestrians[time_step] / self.area
+        self.link_flow[time_step] = cal_link_flow(self.density[time_step], self.free_flow_speed,
+                                                   self.k_jam, self.k_critical, self.shockwave_speed)
 
     def update_speeds(self, time_step: int):
         """

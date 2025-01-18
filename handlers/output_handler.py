@@ -11,14 +11,17 @@ import pandas as pd
 from datetime import datetime
 
 class OutputHandler:
-    def __init__(self, base_dir="outputs"):
+    def __init__(self, base_dir="outputs", simulation_dir=None):
         """
         Initialize output handler
         :param base_dir: Base directory for outputs
         """
         self.base_dir = base_dir
         self.timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        self.simulation_dir = os.path.join(base_dir, f"sim_{self.timestamp}")
+        if simulation_dir is not None:
+            self.simulation_dir = os.path.join(base_dir, simulation_dir)
+        else:
+            self.simulation_dir = os.path.join(base_dir, f"sim_{self.timestamp}")
         
         # Create output directories if they don't exist
         os.makedirs(self.simulation_dir, exist_ok=True)
@@ -32,6 +35,7 @@ class OutputHandler:
         for (u, v), link in network.links.items():
             link_data[f"{u}-{v}"] = {
                 'density': link.density.tolist(),
+                'link_flow': link.link_flow.tolist(),
                 'speed': link.speed.tolist(),
                 'inflow': link.inflow.tolist(),
                 'outflow': link.outflow.tolist(),

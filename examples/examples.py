@@ -566,7 +566,7 @@
 from src.LTM.network import Network
 import numpy as np
 import matplotlib.pyplot as plt
-from src.handlers.output_handler import OutputHandler
+from handlers.output_handler import OutputHandler
 
 if __name__ == "__main__":
     # Network configuration
@@ -599,7 +599,7 @@ if __name__ == "__main__":
     }
 
     # Initialize and run simulation
-    network_env = Network(adj, params, od_nodes=[5, 4], origin_nodes=[5])
+    network_env = Network(adj, params, od_nodes=[5], origin_nodes=[5])
     network_env.visualize()
 
     # Run simulation
@@ -615,7 +615,7 @@ for link_id in path:
 plt.show()
 
 # save the network state
-output_handler = OutputHandler(base_dir="outputs")
+output_handler = OutputHandler(base_dir="../outputs", simulation_dir="test")
 output_handler.save_network_state(network_env)
 
 

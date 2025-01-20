@@ -42,6 +42,8 @@ class Network:
         morning_peak = peak_lambda * np.exp(-(time - simulation_steps/4)**2 / (2 * (simulation_steps/20)**2))
         evening_peak = peak_lambda * np.exp(-(time - 3*simulation_steps/4)**2 / (2 * (simulation_steps/20)**2))
         lambda_t = base_lambda + morning_peak + evening_peak
+        seed = params.get('seed', 42)
+        np.random.seed(seed)
         demand = np.random.poisson(lam=lambda_t)
         
         return demand
@@ -86,6 +88,12 @@ class Network:
         
 
         for node in self.nodes:
+            has_virtual_links = node.virtual_incoming_link is not None
+            is_dead_end = (len(node.incoming_links) == 1 or len(node.outgoing_links) == 1) and not has_virtual_links
+            
+            if is_dead_end:
+                raise AssertionError(f"No Dead End, Please! Detected at node {node.node_id}")
+
             if len(node.outgoing_links) == 2 and len(node.incoming_links) == 2:
                 node.__class__ = OneToOneNode
             else:
@@ -99,7 +107,8 @@ class Network:
     def update_link_states(self, time_step: int):
         """
         Cannot be in the same loop as network_loading, 
-        because the density and speed are updated based on the previous time step
+        because the density and speed are updated based on the previous time step,
+        so we have to update the density first and then update the speed
         """
         # update density
         for link in self.links.values():

@@ -563,10 +563,18 @@
 #         plt.show()
 
 
-from src.LTM.network import Network
+import os
+import sys
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(project_root)
+
 import numpy as np
 import matplotlib.pyplot as plt
 from handlers.output_handler import OutputHandler
+
+# Now you can import using the project structure
+from src.utils.visualizer import NetworkVisualizer
+from src.LTM.network import Network
 
 if __name__ == "__main__":
     # Network configuration
@@ -606,18 +614,26 @@ if __name__ == "__main__":
     for t in range(1, params['simulation_steps']):
         network_env.network_loading(t)
     
-# Plot inflow and outflow
-plt.figure(1)
-path = [(5, 4), (4, 3), (3, 2), (2, 1), (1, 0)]
-for link_id in path:
-    plt.plot(network_env.links[link_id].inflow, label=f'inflow{link_id}')
-    plt.legend()
-plt.show()
+    # Plot inflow and outflow
+    plt.figure(1)
+    path = [(5, 4), (4, 3), (3, 2), (2, 1), (1, 0)]
+    for link_id in path:
+        plt.plot(network_env.links[link_id].inflow, label=f'inflow{link_id}')
+        plt.legend()
+    plt.show()
 
-# save the network state
-output_handler = OutputHandler(base_dir="../outputs", simulation_dir="test")
-output_handler.save_network_state(network_env)
+    # Construct paths relative to the project root
+    output_dir = os.path.join("..", "outputs")
 
+    # Use the constructed paths
+    output_handler = OutputHandler(base_dir=output_dir, simulation_dir="test")
+    output_handler.save_network_state(network_env)
+
+    import matplotlib
+    matplotlib.use('macosx')
+    visualizer = NetworkVisualizer(simulation_dir=os.path.join(output_dir, "test"))
+    ani = visualizer.animate_network(start_time=0, end_time=200, interval=100, edge_property='flow')
+    plt.show()
 
 # # Plot density and speed
 # plt.figure(2)

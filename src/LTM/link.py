@@ -13,7 +13,8 @@ class BaseLink:
         self.outflow = np.zeros(simulation_steps)
         self.cumulative_inflow = np.zeros(simulation_steps)
         self.cumulative_outflow = np.zeros(simulation_steps)
-
+        self.sending_flow = 0
+        self.receiving_flow = 0
     def update_cum_outflow(self, q_j: float, time_step: int):
         self.outflow[time_step] = q_j
         self.cumulative_outflow[time_step] = self.cumulative_outflow[time_step - 1] + q_j
@@ -101,18 +102,22 @@ class Link(BaseLink):
         self.travel_time = self.length / speed if speed > 0 else float('inf')
 
     def cal_sending_flow(self, time_step: int) -> float:
-        if self.travel_time == float('inf'):
-            return 0
+        if self.travel_time == float('inf'): # for fully jam stage
+            # self.sending_flow = 0
+            self.sending_flow = np.random.uniform(0, 10)
+            return self.sending_flow
 
         tau = round(self.travel_time / self.unit_time)
-        if time_step - tau < 0:
-            sending_flow = 0
-        else:
+        if time_step - tau < 0: # for the initial stage
+            self.sending_flow = 0
+            return self.sending_flow
+        else:                  # for the normal stage and the congestion stage
             sending_flow_boundary = self.cumulative_inflow[time_step - tau] - self.cumulative_outflow[time_step - 1]
             sending_flow_max = self.k_critical * self.free_flow_speed * self.unit_time
-            sending_flow = min(sending_flow_boundary, sending_flow_max)
+            self.sending_flow = min(sending_flow_boundary, sending_flow_max)
+            # TODO: add diffusion flow to the sending flow
 
-        return max(0, sending_flow)
+        return max(0, self.sending_flow)
 
     def cal_receiving_flow(self, time_step: int) -> float:
         if time_step - round(self.length/(self.shockwave_speed * self.unit_time)) < 0:
@@ -122,9 +127,8 @@ class Link(BaseLink):
                               + self.k_jam * self.length - self.cumulative_inflow[time_step - 1])
 
         receiving_flow_max = self.k_critical * self.free_flow_speed * self.unit_time
-        receiving_flow = min(receiving_flow_boundary, receiving_flow_max)
+        self.receiving_flow = min(receiving_flow_boundary, receiving_flow_max)
         # if receiving_flow < 30:
         #     print(receiving_flow, receiving_flow_boundary, receiving_flow_max, time_step)
 
-        self.receiving_flow.append(receiving_flow)
-        return receiving_flow
+        return self.receiving_flow

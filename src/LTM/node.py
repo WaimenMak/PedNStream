@@ -172,7 +172,8 @@ class Node:
             if hasattr(self, 'virtual_outgoing_link') and l == self.virtual_outgoing_link:
                 r[j] = self.M
             else:
-                r[j] = l.cal_receiving_flow(time_step)
+                #reverse link sending flow
+                r[j] = max(0, l.cal_receiving_flow(time_step) - l.reverse_link.num_pedestrians[time_step]) # consider the flow from the reverse link
         
         self.solve(s, r)
         self.update_links(time_step)

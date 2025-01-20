@@ -93,12 +93,15 @@ class NetworkVisualizer:
                     value = link.speed[time_step]
                 G.add_edge(u, v, value=value)
         
-        # Draw the network
-        pos = nx.spring_layout(G)
+        # Initialize the position if not already set
+        if self.pos is None:
+            # Set random seed for reproducible layout
+            seed = 42  # You can change this seed value
+            self.pos = nx.spring_layout(G, k=1, iterations=50, seed=seed)
         
         # Draw nodes
         node_sizes = [G.nodes[node]['size'] * 100 + 500 for node in G.nodes()]
-        nx.draw_networkx_nodes(G, pos, node_size=node_sizes,
+        nx.draw_networkx_nodes(G, self.pos, node_size=node_sizes,
                              node_color='lightblue',
                              ax=ax)  # Specify the axis
         
@@ -106,7 +109,7 @@ class NetworkVisualizer:
         edges = list(G.edges())
         for u, v in edges:
             width = G[u][v]['value'] * 5
-            arrowsize = G[u][v]['value'] * 20 + 0
+            arrowsize = G[u][v]['value'] * 20 + 10
             
             # Set value range based on property type
             if edge_property == 'density':
@@ -138,7 +141,7 @@ class NetworkVisualizer:
                                      arrowsize=arrowsize,
                                      ax=ax)
         # Draw labels
-        nx.draw_networkx_labels(G, pos, ax=ax)  # Specify the axis
+        nx.draw_networkx_labels(G, self.pos, ax=ax)  # Specify the axis
         
         # Add title
         ax.set_title(f'Network State at Time Step {time_step}')
@@ -187,7 +190,9 @@ class NetworkVisualizer:
                     temp_G.add_node(node.node_id)
                 for (u, v) in self.network.links:
                     temp_G.add_edge(u, v)
-            self.pos = nx.spring_layout(temp_G, k=1, iterations=50)
+            
+            seed = 42  # You can change this seed value
+            self.pos = nx.spring_layout(temp_G, k=1, iterations=50, seed=seed)
         
         def update(frame):
             fig.clear()  # Clear the entire figure
@@ -363,7 +368,7 @@ if __name__ == "__main__":
     import matplotlib
     matplotlib.use('TkAgg')
     # Example usage
-    simulation_dir = "/Users/mmai/Devs/Crowd-Control/outputs/test" # Replace with actual timestamp
+    simulation_dir = "/Users/mmai/Devs/Crowd-Control/outputs/long_corridor" # Replace with actual timestamp
     visualizer = NetworkVisualizer(simulation_dir=simulation_dir)
-    ani = visualizer.animate_network(start_time=0, end_time=200, interval=100, edge_property='flow')
+    ani = visualizer.animate_network(start_time=0, interval=100, edge_property='speed')
     plt.show()

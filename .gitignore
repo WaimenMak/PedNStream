@@ -8,3 +8,4 @@ data/*
 *.json
 /cache
 *.mp4
+/outputs

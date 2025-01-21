@@ -24,4 +24,4 @@ project_root/
 
 ## Vsiualization of the simulation
 
-![network_animation](/Users/mmai/Devs/Crowd-Control/README.assets/network_animation.gif)
+<img src="./README.assets/network_animation.gif" alt="network_animation" style="zoom: 67%;" />

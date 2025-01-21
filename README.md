@@ -21,3 +21,7 @@ project_root/
 │   └── simple_network.py
 └── LTM.py
 ```
+
+## Vsiualization of the simulation
+
+![network_animation](/Users/mmai/Devs/Crowd-Control/README.assets/network_animation.gif)

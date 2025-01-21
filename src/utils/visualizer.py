@@ -4,6 +4,7 @@ import matplotlib.animation as animation
 import json
 import pandas as pd
 import os
+from tqdm import tqdm
 
 class NetworkVisualizer:
     def __init__(self, network=None, simulation_dir=None):
@@ -305,6 +306,7 @@ class NetworkVisualizer:
                                     interval=interval,
                                     repeat=True,
                                     blit=False)
+
         
         return ani
 
@@ -363,6 +365,13 @@ class NetworkVisualizer:
         
         plt.tight_layout()
         plt.show()
+
+def progress_callback(current_frame, total_frames):
+    if not hasattr(progress_callback, 'pbar'):
+        progress_callback.pbar = tqdm(total=total_frames, desc='Saving animation')
+    progress_callback.pbar.update(1)
+    if current_frame == total_frames - 1:
+        progress_callback.pbar.close()
 
 if __name__ == "__main__":
     import matplotlib

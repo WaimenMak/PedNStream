@@ -125,18 +125,19 @@ class Link(BaseLink):
             return self.sending_flow
 
         tau = round(self.travel_time / self.unit_time)
-        if time_step - tau < 0:
-            # for the initial stage
-            if time_step - self.free_flow_tau < 0:
-                self.sending_flow = 0
-            # else: # for the highly congested stage
-            #     self.sending_flow = self.link_flow[time_step - 1] * self.unit_time
+        # if time_step - tau < 0:
+        if time_step < self.free_flow_tau:  # for the initial stage
+            self.sending_flow = 0
+            return self.sending_flow
+        elif time_step - tau < 0:           # for the highly congested stage
+            self.sending_flow = self.link_flow[time_step - 1] * self.unit_time
             return self.sending_flow
         else:                  # for the normal stage and the congestion stage
             sending_flow_boundary = self.cumulative_inflow[time_step - tau] - self.cumulative_outflow[time_step - 1]
             sending_flow_max = self.k_critical * self.free_flow_speed * self.unit_time
             self.sending_flow = min(sending_flow_boundary, sending_flow_max)
             # TODO: add diffusion flow to the sending flow
+
             if (self.sending_flow < 0) and (self.speed[time_step - 1] < 0.2):       # it means the link is a bit congested, 0.2 m/s is a threshold
                 # diffusion_flow = self.get_outflow(time_step)
                 # with a certain probability, the diffusion flow will be the sending flow

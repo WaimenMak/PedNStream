@@ -214,13 +214,15 @@ class RegularNode(Node):
         c = -1 * np.ones(self.edge_num) # variables for the flow
         c = np.concatenate((c, w))
         b_ub = np.concatenate((s, r))
-        bounds = [(0, None)] * self.edge_num
+        # Create bounds for all variables (flows and penalty terms)
+        # bounds = [(0, None)] * self.edge_num + [(None, None)] * (2 * self.edge_num)  # Flow variables >= 0, penalty terms unbounded
 
         if self.A_eq is not None:
-            res = linprog(c, A_ub=self.A_ub, A_eq=self.A_eq, b_ub=b_ub, b_eq=np.zeros(self.edge_num), bounds=bounds)
+            # res = linprog(c, A_ub=self.A_ub, A_eq=self.A_eq, b_ub=b_ub, b_eq=np.zeros(self.edge_num), bounds=bounds)
+            res = linprog(c, A_ub=self.A_ub, A_eq=self.A_eq, b_ub=b_ub, b_eq=np.zeros(self.edge_num))
         else:
-            res = linprog(c, A_ub=self.A_ub, b_ub=b_ub, bounds=bounds)
-    
+            # res = linprog(c, A_ub=self.A_ub, b_ub=b_ub, bounds=bounds)
+            res = linprog(c, A_ub=self.A_ub, b_ub=b_ub)
         if res.success:
             flows = self.A_ub @ res.x
             # Ensure non-negative flows and round down to nearest integer

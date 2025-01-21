@@ -7,3 +7,5 @@ data/*
 .DS_Store
 *.json
 /cache
+*.gif
+*.mp4

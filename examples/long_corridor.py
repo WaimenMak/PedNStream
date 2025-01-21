@@ -83,7 +83,7 @@ if __name__ == "__main__":
     anim = visualizer.animate_network(start_time=0, end_time=params["simulation_steps"],
                                     interval=100, edge_property='density')
 
-    # # Set up the writer
+    # GIf
     # writer = PillowWriter(fps=15, metadata=dict(artist='Me'))
 
     # # Save the animation with progress tracking
@@ -92,13 +92,14 @@ if __name__ == "__main__":
     #           progress_callback=progress_callback)
 
     # plt.show()
-
-    writer = matplotlib.animation.FFMpegWriter(fps=15, metadata=dict(artist='Me'), 
-                                             bitrate=2000)
-
-    # Save the animation as MP4
-    anim.save(os.path.join(output_dir, "long_corridor", "network_animation.mp4"),
-              writer=writer,
-              progress_callback=progress_callback)
+    
+    # MP4
+    # writer = matplotlib.animation.FFMpegWriter(fps=15, metadata=dict(artist='Me'),
+    #                                          bitrate=2000)
+    #
+    # # Save the animation as MP4
+    # anim.save(os.path.join(output_dir, "long_corridor", "network_animation.mp4"),
+    #           writer=writer,
+    #           progress_callback=progress_callback)
 
     plt.show()

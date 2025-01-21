@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 from handlers.output_handler import OutputHandler
 
 # Now you can import using the project structure
-from src.utils.visualizer import NetworkVisualizer
+from src.utils.visualizer import NetworkVisualizer, progress_callback
 from src.LTM.network import Network
 
 if __name__ == "__main__":
@@ -36,9 +36,9 @@ if __name__ == "__main__":
         'k_critical': 2,
         'k_jam': 10,
         'unit_time': 10,
-        'peak_lambda': 10,
+        'peak_lambda': 15,
         'base_lambda': 5,
-        'simulation_steps': 500,
+        'simulation_steps': 800,
     }
 
     # Initialize and run simulation
@@ -51,9 +51,17 @@ if __name__ == "__main__":
 
     # # Plot inflow and outflow
     # plt.figure(1)
-    # path = [(5, 4), (4, 3), (3, 2), (2, 1), (1, 0)]
+    # path = [(2, 3)]
     # for link_id in path:
     #     plt.plot(network_env.links[link_id].inflow, label=f'inflow{link_id}')
+    #     plt.plot(network_env.links[link_id].outflow, label=f'outflow{link_id}')
+    #     plt.legend()
+    # plt.show()
+
+    # plt.figure(2)
+    # for link_id in path:
+    #     plt.plot(network_env.links[link_id].cumulative_inflow, label=f'cumulative_inflow{link_id}')
+    #     plt.plot(network_env.links[link_id].cumulative_outflow, label=f'cumulative_outflow{link_id}')
     #     plt.legend()
     # plt.show()
 
@@ -65,7 +73,32 @@ if __name__ == "__main__":
     output_handler.save_network_state(network_env)
 
     import matplotlib
+    import matplotlib.pyplot as plt
+    from matplotlib.animation import PillowWriter
+    from tqdm import tqdm
     matplotlib.use('macosx')
+
+    # Create the visualization
     visualizer = NetworkVisualizer(simulation_dir=os.path.join(output_dir, "long_corridor"))
-    ani = visualizer.animate_network(start_time=0, end_time=params["simulation_steps"], interval=100, edge_property='density')
+    anim = visualizer.animate_network(start_time=0, end_time=params["simulation_steps"],
+                                    interval=100, edge_property='density')
+
+    # # Set up the writer
+    # writer = PillowWriter(fps=15, metadata=dict(artist='Me'))
+
+    # # Save the animation with progress tracking
+    # anim.save(os.path.join(output_dir, "long_corridor", "network_animation.gif"),
+    #           writer=writer,
+    #           progress_callback=progress_callback)
+
+    # plt.show()
+
+    writer = matplotlib.animation.FFMpegWriter(fps=15, metadata=dict(artist='Me'), 
+                                             bitrate=2000)
+
+    # Save the animation as MP4
+    anim.save(os.path.join(output_dir, "long_corridor", "network_animation.mp4"),
+              writer=writer,
+              progress_callback=progress_callback)
+
     plt.show()

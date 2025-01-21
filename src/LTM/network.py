@@ -33,19 +33,26 @@ class Network:
     #             else:
     #                 node.turning_fractions = new_turning_fractions
 
+    def update_turning_fractions_per_node(self, node_ids: list, new_turning_fractions: np.array):
+        for i, n in enumerate(node_ids):
+            node = self.nodes[n]
+            node.update_matrix_A_eq(new_turning_fractions[i])
+
     def _generate_time_varying_demand(self, simulation_steps, params):
         """Generate a time-varying demand pattern with morning and evening peaks"""
         time = np.arange(simulation_steps)
         peak_lambda = params.get('peak_lambda', 10)  # default value if not specified
         base_lambda = params.get('base_lambda', 5)   # default value if not specified
-        
-        morning_peak = peak_lambda * np.exp(-(time - simulation_steps/4)**2 / (2 * (simulation_steps/20)**2))
-        evening_peak = peak_lambda * np.exp(-(time - 3*simulation_steps/4)**2 / (2 * (simulation_steps/20)**2))
+
+        t = 300
+        morning_peak = peak_lambda * np.exp(-(time - t/4)**2 / (2 * (t/20)**2))
+        evening_peak = peak_lambda * np.exp(-(time - 3*t/4)**2 / (2 * (t/20)**2))
         lambda_t = base_lambda + morning_peak + evening_peak
         seed = params.get('seed', 42)
         np.random.seed(seed)
+        # after a certian time, the demand is decreasing
         demand = np.random.poisson(lam=lambda_t)
-        
+        demand[time > 500] = 0
         return demand
 
     def init_nodes_and_links(self, od_nodes: list, origin_nodes: list):
@@ -122,7 +129,8 @@ class Network:
             if node.turning_fractions is None:
                 phi = 1/(node.dest_num - 1) # the number of edges from the different source-destination pair
                 turning_fractions = np.ones(node.edge_num) * phi
-                node.update_turning_fractions(turning_fractions)
+                # node.update_turning_fractions(turning_fractions)
+                node.turning_fractions = turning_fractions
             else:
                 # TODO: update the turning fractions
                 # node.update_turning_fractions(new_turning_fractions)
@@ -131,7 +139,8 @@ class Network:
             if isinstance(node, OneToOneNode):
                 node.assign_flows(time_step)
             else:
-                node.get_matrix_A()  # only for RegularNode and OriginNode with multiple outgoing links
+                if node.A_ub is None:
+                    node.get_matrix_A() # only for RegularNode and OriginNode with multiple outgoing links
                 node.assign_flows(time_step)
             
         self.update_link_states(time_step)

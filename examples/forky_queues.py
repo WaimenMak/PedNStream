@@ -21,7 +21,7 @@ if __name__ == "__main__":
     # Network configuration
 
     adj = np.array([[0, 1, 0, 0, 0],
-                    [1, 1, 1, 0, 1],
+                    [1, 0, 1, 0, 1],
                     [0, 1, 0, 1, 0],
                     [0, 0, 1, 0, 0],
                     [0, 1, 0, 0, 0],
@@ -35,7 +35,7 @@ if __name__ == "__main__":
         'k_critical': 2,
         'k_jam': 10,
         'unit_time': 10,
-        'peak_lambda': 25,
+        'peak_lambda': 10,
         'base_lambda': 5,
         'simulation_steps': 500,
     }
@@ -47,6 +47,9 @@ if __name__ == "__main__":
     # Run simulation
     for t in range(1, params['simulation_steps']):
         network_env.network_loading(t)
+        if t == 100:
+            network_env.update_turning_fractions_per_node(node_ids=[1],
+                                                          new_turning_fractions=np.array([[0, 1, 0.5, 0.5, 1, 0]]))
 
     # Construct paths relative to the project root
     output_dir = os.path.join("..", "outputs")

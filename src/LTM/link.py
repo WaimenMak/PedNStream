@@ -1,5 +1,5 @@
 import numpy as np
-from src.utils.functions import cal_travel_speed, cal_free_flow_speed, cal_link_flow
+from src.utils.functions import cal_travel_speed, cal_free_flow_speed, cal_link_flow_fd, cal_link_flow_kv
 
 class BaseLink:
     """Base class for all link types"""
@@ -15,6 +15,7 @@ class BaseLink:
         self.cumulative_outflow = np.zeros(simulation_steps)
         self.sending_flow = 0
         self.receiving_flow = 0
+
     def update_cum_outflow(self, q_j: float, time_step: int):
         self.outflow[time_step] = q_j
         self.cumulative_outflow[time_step] = self.cumulative_outflow[time_step - 1] + q_j
@@ -59,22 +60,24 @@ class Link(BaseLink):
         self.travel_time = self.length / self.free_flow_speed
         self.unit_time = kwargs['unit_time']
         self.free_flow_tau = round(self.travel_time / self.unit_time)
+        self.congestion_tau = round(self.length / (0.8 * self.unit_time)) # assume the average congestion speed is 0.8 m/s
 
         # Additional dynamic attributes
         self.num_pedestrians = np.zeros(kwargs['simulation_steps'])
         self.density = np.zeros(kwargs['simulation_steps'])
         self.speed = np.zeros(kwargs['simulation_steps'])
         self.link_flow = np.zeros(kwargs['simulation_steps'])
-        # self.gamma = kwargs.get('gamma', 2e-2)  # Default value if not provided, diffusion coefficient
-        self.receiving_flow = []
+        self.gamma = kwargs.get('gamma', 2e-2)  # Default value if not provided, diffusion coefficient
+        # self.receiving_flow = []
         self.reverse_link = None
 
     def update_link_density_flow(self, time_step: int):
         num_peds = self.inflow[time_step] - self.outflow[time_step]
         self.num_pedestrians[time_step] = self.num_pedestrians[time_step - 1] + num_peds
         self.density[time_step] = self.num_pedestrians[time_step] / self.area
-        self.link_flow[time_step] = cal_link_flow(self.density[time_step], self.free_flow_speed,
-                                                   self.k_jam, self.k_critical, self.shockwave_speed)
+        # self.link_flow[time_step] = cal_link_flow_fd(self.density[time_step], self.free_flow_speed,
+        #                                            self.k_jam, self.k_critical, self.shockwave_speed)
+        # self.link_flow[time_step] = cal_link_flow_kv(self.density[time_step], self.speed[time_step])
 
     def update_speeds(self, time_step: int):
         """
@@ -100,23 +103,46 @@ class Link(BaseLink):
         # Update travel time and speed
         self.speed[time_step] = speed
         self.travel_time = self.length / speed if speed > 0 else float('inf')
+        self.link_flow[time_step] = cal_link_flow_kv(self.density[time_step], self.speed[time_step])
+
+    def get_outflow(self, time_step: int) -> int:
+        """
+        Get outflow with diffusion behavior
+        """
+        # tau = self.congestion_tau if self.speed[time_step] < self.free_flow_speed else self.free_flow_tau
+        tau = self.congestion_tau
+        travel_time = self.length / 0.8
+        F = 1/ (1 + self.gamma * travel_time)
+        sending_flow = (F * self.inflow[time_step - tau] + F * (1 - F) * self.inflow[time_step - tau - 1] +
+                        F * (1 - F) ** 2 * self.inflow[time_step - tau - 2] +
+                        F * (1 - F) ** 3 * self.inflow[time_step - tau - 3])
+        return np.ceil(sending_flow)
 
     def cal_sending_flow(self, time_step: int) -> float:
         if self.travel_time == float('inf'): # for fully jam stage
             # self.sending_flow = 0
-            self.sending_flow = np.random.uniform(0, 10)
+            self.sending_flow = np.random.randint(0, 10)
             return self.sending_flow
 
         tau = round(self.travel_time / self.unit_time)
-        if time_step - tau < 0: # for the initial stage
-            self.sending_flow = 0
+        if time_step - tau < 0:
+            # for the initial stage
+            if time_step - self.free_flow_tau < 0:
+                self.sending_flow = 0
+            # else: # for the highly congested stage
+            #     self.sending_flow = self.link_flow[time_step - 1] * self.unit_time
             return self.sending_flow
         else:                  # for the normal stage and the congestion stage
             sending_flow_boundary = self.cumulative_inflow[time_step - tau] - self.cumulative_outflow[time_step - 1]
             sending_flow_max = self.k_critical * self.free_flow_speed * self.unit_time
             self.sending_flow = min(sending_flow_boundary, sending_flow_max)
             # TODO: add diffusion flow to the sending flow
-
+            if (self.sending_flow < 0) and (self.speed[time_step - 1] < 0.2):       # it means the link is a bit congested, 0.2 m/s is a threshold
+                # diffusion_flow = self.get_outflow(time_step)
+                # with a certain probability, the diffusion flow will be the sending flow
+                # if np.random.rand() < 0.5:
+                #     self.sending_flow = diffusion_flow
+                self.sending_flow = self.link_flow[time_step - 1] * self.unit_time
         return max(0, self.sending_flow)
 
     def cal_receiving_flow(self, time_step: int) -> float:

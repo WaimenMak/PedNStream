@@ -8,7 +8,7 @@ class Node:
         self.node_id = node_id
         self.incoming_links = []
         self.outgoing_links = []
-        self.turning_fractions = None
+        self.turning_fractions = None # 1D array, the length is the number of edges
         self.mask = None
         self.q = None
         self.w = 1e-2
@@ -58,46 +58,48 @@ class Node:
         #     # self.dest_num = 1
         #     self.edge_num = self.source_num * 1
 
-    def update_turning_fractions(self, turning_fractions: np.array):
-        """
-        turning_fractions is a 1D array, the length is the number of edges
-        """
-        self.turning_fractions = turning_fractions
-        # self.turning_fractions = self.turning_fractions * self.mask # mask the turning fractions for the edges from the same source-destination pair
+    # def update_turning_fractions(self, turning_fractions: np.array):
+    #     """
+    #     turning_fractions is a 1D array, the length is the number of edges
+    #     """
+    #     self.turning_fractions = turning_fractions
+    #     # self.turning_fractions = self.turning_fractions * self.mask # mask the turning fractions for the edges from the same source-destination pair
                 
     def get_matrix_A(self):
-        if self.edge_num > 1:
-            row_num = self.source_num + self.dest_num
-            self.A_ub = np.zeros((row_num, self.edge_num + self.source_num + 2 * self.edge_num)) # - source_num for the link from the same source-destination pair
+        """
+        Get the matrix A_ub for the linear programming problem
+        """
+        row_num = self.source_num + self.dest_num
+        self.A_ub = np.zeros((row_num, self.edge_num + self.source_num + 2 * self.edge_num)) # - source_num for the link from the same source-destination pair
 
-            # set the constraints for the source node
-            # e = np.ones(self.dest_num - 1)
-            for i in range(self.source_num): # S[i]
-                e = np.ones(self.dest_num)
-                e[i] = 0
-                self.A_ub[i, i * (self.dest_num) : (i+1) * (self.dest_num)] = e
+        # set the constraints for the source node
+        # e = np.ones(self.dest_num - 1)
+        for i in range(self.source_num): # S[i]
+            e = np.ones(self.dest_num)
+            e[i] = 0
+            self.A_ub[i, i * (self.dest_num) : (i+1) * (self.dest_num)] = e
 
-            # set the constraints for the destination node
-            for j in range(self.dest_num): # R[j]
-                for k in range(self.source_num):
-                    if k != j:
-                        self.A_ub[self.source_num + j, j + k * (self.dest_num)] = 1 # consider the flow on
-                    else:
-                        self.A_ub[self.source_num + j, j + k * self.dest_num] = 0
+        # set the constraints for the destination node
+        for j in range(self.dest_num): # R[j]
+            for k in range(self.source_num):
+                if k != j:
+                    self.A_ub[self.source_num + j, j + k * (self.dest_num)] = 1 # consider the flow on
+                else:
+                    self.A_ub[self.source_num + j, j + k * self.dest_num] = 0
 
-            # remove the columns for the flow from the same source-destination pair
-            start_idx = [i * self.dest_num + i for i in range(self.source_num)]
-            self.A_ub = np.delete(self.A_ub, start_idx, axis=1)
-
-
+        # remove the columns for the flow from the same source-destination pair
+        start_idx = [i * self.dest_num + i for i in range(self.source_num)]
+        self.A_ub = np.delete(self.A_ub, start_idx, axis=1)
 
 
-            # turning fractions constraints
-            # if self.A_eq is not None:
-            self.update_matrix_A_eq(self.turning_fractions) # first init is equal probability
-            # remove the columns with all zeros
-            # self.A_ub = self.A_ub[:, np.any(self.A_ub != 0, axis=0)]
-            # self.A_eq = self.A_eq[:, np.any(self.A_eq != 0, axis=0)]
+
+
+        # turning fractions constraints
+        # if self.A_eq is not None:
+        self.update_matrix_A_eq(self.turning_fractions) # first init is equal probability
+        # remove the columns with all zeros
+        # self.A_ub = self.A_ub[:, np.any(self.A_ub != 0, axis=0)]
+        # self.A_eq = self.A_eq[:, np.any(self.A_eq != 0, axis=0)]
 
     def update_matrix_A_eq(self, turning_fractions: np.array):
         """
@@ -152,11 +154,11 @@ class Node:
             outflow = self.q[self.source_num + m]
             link.update_cum_inflow(outflow, time_step)
             # link.update_speeds(time_step)
-    
-    def solve(self, s, r):
-        return
 
     def assign_flows(self, time_step: int):
+        """
+        Get the sending and receiving flows constraints.
+        """
         s = np.zeros(self.source_num)
         r = np.zeros(self.dest_num)
         
@@ -166,6 +168,9 @@ class Node:
                 s[i] = self.demand[time_step]
             else:
                 s[i] = l.cal_sending_flow(time_step)
+                if l.link_id == "2_3":
+                    print(f'{time_step}:link {l.link_id} num peds: {l.link_flow[time_step-1]}')
+                    print(f'{time_step}:link {l.link_id} num peds: {l.sending_flow}')
         
         # Calculate receiving flows
         for j, l in enumerate(self.outgoing_links):
@@ -178,6 +183,8 @@ class Node:
         self.solve(s, r)
         self.update_links(time_step)
 
+    def solve(self, s, r):
+        return
 
 class OneToOneNode(Node):
     def __init__(self, node_id):
@@ -187,8 +194,14 @@ class OneToOneNode(Node):
         """
         q = [S0, S1, R0, R1], S1 and R1 are virtual links
         """
+        # Ensure non-negative flows by using maximum of 0 and the minimum flow
         self.q = np.array([np.min([s[0],r[1]]), np.min([s[1],r[0]]),
                             np.min([s[1],r[0]]), np.min([s[0],r[1]])])
+        self.q = np.where(self.q < 0, 0, self.q)
+        # self.q = np.array([max(0, np.min([s[0],r[1]])), 
+        #             max(0, np.min([s[1],r[0]])),
+        #             max(0, np.min([s[1],r[0]]),
+        #             max(0, np.min([s[0],r[1]])))])
         return
 
 class RegularNode(Node):
@@ -201,14 +214,15 @@ class RegularNode(Node):
         c = -1 * np.ones(self.edge_num) # variables for the flow
         c = np.concatenate((c, w))
         b_ub = np.concatenate((s, r))
+        bounds = [(0, None)] * self.edge_num
 
         if self.A_eq is not None:
-            res = linprog(c, A_ub=self.A_ub, A_eq=self.A_eq, b_ub=b_ub, b_eq=np.zeros(self.edge_num))
+            res = linprog(c, A_ub=self.A_ub, A_eq=self.A_eq, b_ub=b_ub, b_eq=np.zeros(self.edge_num), bounds=bounds)
         else:
-            res = linprog(c, A_ub=self.A_ub, b_ub=b_ub)
-
+            res = linprog(c, A_ub=self.A_ub, b_ub=b_ub, bounds=bounds)
+    
         if res.success:
             flows = self.A_ub @ res.x
-            # flows[np.arange(min(self.source_num, self.dest_num)) * (self.dest_num + 1)] = 0
-            self.q = np.floor(flows)
+            # Ensure non-negative flows and round down to nearest integer
+            self.q = np.maximum(0, np.floor(flows))
         return

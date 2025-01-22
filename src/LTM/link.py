@@ -130,7 +130,7 @@ class Link(BaseLink):
             self.sending_flow = 0
             return self.sending_flow
         elif time_step - tau < 0:           # for the highly congested stage
-            self.sending_flow = self.link_flow[time_step - 1] * self.unit_time
+            self.sending_flow = max(1, np.floor(self.link_flow[time_step - 1] * self.unit_time)) # ensure when congested, the number of peds going through is at least 1
             return self.sending_flow
         else:                  # for the normal stage and the congestion stage
             sending_flow_boundary = self.cumulative_inflow[time_step - tau] - self.cumulative_outflow[time_step - 1]
@@ -143,7 +143,7 @@ class Link(BaseLink):
                 # with a certain probability, the diffusion flow will be the sending flow
                 # if np.random.rand() < 0.5:
                 #     self.sending_flow = diffusion_flow
-                self.sending_flow = self.link_flow[time_step - 1] * self.unit_time
+                self.sending_flow = max(1, np.floor(self.link_flow[time_step - 1] * self.unit_time))
         return max(0, self.sending_flow)
 
     def cal_receiving_flow(self, time_step: int) -> float:

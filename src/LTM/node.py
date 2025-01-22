@@ -11,7 +11,7 @@ class Node:
         self.turning_fractions = None # 1D array, the length is the number of edges
         self.mask = None
         self.q = None
-        self.w = 1e-2
+        self.w = 1e-2 # penalty term for turning fractions
         self.source_num = None
         self.dest_num = None
         self.edge_num = None
@@ -168,9 +168,9 @@ class Node:
                 s[i] = self.demand[time_step]
             else:
                 s[i] = l.cal_sending_flow(time_step)
-                if l.link_id == "2_3":
-                    print(f'{time_step}:link {l.link_id} num peds: {l.link_flow[time_step-1]}')
-                    print(f'{time_step}:link {l.link_id} num peds: {l.sending_flow}')
+                # if l.link_id == "2_3":
+                #     print(f'{time_step}:link {l.link_id} num peds: {l.link_flow[time_step-1]}')
+                #     print(f'{time_step}:link {l.link_id} num peds: {l.sending_flow}')
         
         # Calculate receiving flows
         for j, l in enumerate(self.outgoing_links):
@@ -179,6 +179,8 @@ class Node:
             else:
                 #reverse link sending flow
                 r[j] = max(0, l.cal_receiving_flow(time_step) - l.reverse_link.num_pedestrians[time_step]) # consider the flow from the reverse link
+                # if l.link_id == "2_3": # simulate bottleneck
+                #     r[j] = 5
         
         self.solve(s, r)
         self.update_links(time_step)
@@ -197,11 +199,9 @@ class OneToOneNode(Node):
         # Ensure non-negative flows by using maximum of 0 and the minimum flow
         self.q = np.array([np.min([s[0],r[1]]), np.min([s[1],r[0]]),
                             np.min([s[1],r[0]]), np.min([s[0],r[1]])])
-        self.q = np.where(self.q < 0, 0, self.q)
-        # self.q = np.array([max(0, np.min([s[0],r[1]])), 
-        #             max(0, np.min([s[1],r[0]])),
-        #             max(0, np.min([s[1],r[0]]),
-        #             max(0, np.min([s[0],r[1]])))])
+        # self.q = np.where(self.q < 0, 0, self.q)
+        # min_val = 1 # ensure when congested, the number of peds going through is at least 1
+        # self.q = np.where(self.q > 0, np.maximum(min_val, np.floor(self.q)), 0)
         return
 
 class RegularNode(Node):
@@ -224,7 +224,7 @@ class RegularNode(Node):
             # res = linprog(c, A_ub=self.A_ub, b_ub=b_ub, bounds=bounds)
             res = linprog(c, A_ub=self.A_ub, b_ub=b_ub)
         if res.success:
-            flows = self.A_ub @ res.x
+            flows = self.A_ub @ np.floor(res.x)
             # Ensure non-negative flows and round down to nearest integer
-            self.q = np.maximum(0, np.floor(flows))
+            self.q = np.maximum(0, flows)
         return

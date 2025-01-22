@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 from handlers.output_handler import OutputHandler
 
 # Now you can import using the project structure
-from src.utils.visualizer import NetworkVisualizer
+from src.utils.visualizer import NetworkVisualizer, progress_callback
 from src.LTM.network import Network
 
 if __name__ == "__main__":
@@ -35,7 +35,7 @@ if __name__ == "__main__":
         'k_critical': 2,
         'k_jam': 10,
         'unit_time': 10,
-        'peak_lambda': 20,
+        'peak_lambda': 25,
         'base_lambda': 5,
         'simulation_steps': 800,
     }
@@ -49,7 +49,7 @@ if __name__ == "__main__":
         network_env.network_loading(t)
         if t == 100:
             network_env.update_turning_fractions_per_node(node_ids=[1],
-                                                          new_turning_fractions=np.array([[1, 0, 0.5, 0.5, 0, 1]]))
+                                                          new_turning_fractions=np.array([[1, 0, 0.5, 0.5, 0, 1]])) #[1_2, 1_4, 1_0, 1_4, 1_0, 1_2]
 
     # Construct paths relative to the project root
     output_dir = os.path.join("..", "outputs")
@@ -61,5 +61,13 @@ if __name__ == "__main__":
     import matplotlib
     matplotlib.use('macosx')
     visualizer = NetworkVisualizer(simulation_dir=os.path.join(output_dir, "forky_queues"))
-    ani = visualizer.animate_network(start_time=0, end_time=params["simulation_steps"], interval=100, edge_property='density')
+    anim = visualizer.animate_network(start_time=0, end_time=params["simulation_steps"], interval=100, edge_property='density')
+    # MP4
+    writer = matplotlib.animation.FFMpegWriter(fps=15, metadata=dict(artist='Me'),
+                                             bitrate=2000)
+
+    # Save the animation as MP4
+    anim.save(os.path.join(output_dir, "forky_queues", "forky_queues_cong.mp4"),
+              writer=writer,
+              progress_callback=progress_callback)
     plt.show()

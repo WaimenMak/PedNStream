@@ -52,7 +52,14 @@ class Network:
         np.random.seed(seed)
         # after a certian time, the demand is decreasing
         demand = np.random.poisson(lam=lambda_t)
-        demand[time > 500] = 0
+        # create a spike at from t == 400 to t == 410
+        # if t == 400:
+        # demand[0:10] = 100
+        # demand[350:400] = 100
+        # demand[time > 10] = 0
+        # demand[time > 300] = 0
+        demand = np.ones(simulation_steps) * 1
+        demand[time > 300] = 0
         return demand
 
     def init_nodes_and_links(self, od_nodes: list, origin_nodes: list):

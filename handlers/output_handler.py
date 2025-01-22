@@ -40,6 +40,8 @@ class OutputHandler:
                 'inflow': link.inflow.tolist(),
                 'outflow': link.outflow.tolist(),
                 'num_pedestrians': link.num_pedestrians.tolist(),
+                'cumulative_inflow': link.cumulative_inflow.tolist(),
+                'cumulative_outflow': link.cumulative_outflow.tolist(),
                 'parameters': {
                     'length': link.length,
                     'width': link.width,
@@ -85,7 +87,9 @@ class OutputHandler:
                     'speed': link.speed[t],
                     'inflow': link.inflow[t],
                     'outflow': link.outflow[t],
-                    'num_pedestrians': link.num_pedestrians[t]
+                    'num_pedestrians': link.num_pedestrians[t],
+                    'cumulative_inflow': link.cumulative_inflow[t],
+                    'cumulative_outflow': link.cumulative_outflow[t]
                 })
         
         # Save to CSV

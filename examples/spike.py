@@ -56,7 +56,8 @@ if __name__ == "__main__":
     }
 
     # Initialize and run simulation
-    network_env = Network(adj, params, od_nodes=[5], origin_nodes=[5])
+    # network_env = Network(adj, params, od_nodes=[5], origin_nodes=[5])
+    network_env = Network(adj, params, origin_nodes=[5])
     network_env.visualize()
 
     # Run simulation
@@ -82,10 +83,10 @@ if __name__ == "__main__":
     output_handler = OutputHandler(base_dir=output_dir, simulation_dir=simulation_dir)
     output_handler.save_network_state(network_env)
 
-    # import matplotlib
-    # matplotlib.use('macosx')
-    # visualizer = NetworkVisualizer(simulation_dir=os.path.join(output_dir, simulation_dir))
-    # anim = visualizer.animate_network(start_time=0, interval=100, edge_property='density')
+    import matplotlib
+    matplotlib.use('macosx')
+    visualizer = NetworkVisualizer(simulation_dir=os.path.join(output_dir, simulation_dir))
+    anim = visualizer.animate_network(start_time=0, interval=100, edge_property='density')
     # #  # MP4
     # writer = matplotlib.animation.FFMpegWriter(fps=15, metadata=dict(artist='Me'),
     #                                          bitrate=2000)
@@ -94,7 +95,7 @@ if __name__ == "__main__":
     # anim.save(os.path.join(output_dir, simulation_dir, f"{simulation_dir}.mp4"),
     #           writer=writer,
     #           progress_callback=progress_callback)
-    # plt.show()
+    plt.show()
 
 
 # # Plot density and speed

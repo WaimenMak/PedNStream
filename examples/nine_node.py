@@ -44,7 +44,7 @@ if __name__ == "__main__":
     }
 
     # Initialize network with origin at node 0 and destination at node 8
-    network_env = Network(adj, params, od_nodes=[0, 8], origin_nodes=[0, 8])
+    network_env = Network(adj, params, origin_nodes=[4]) # if set destination node, just set the demand to be 0
     network_env.visualize()
 
     # Run simulation
@@ -59,10 +59,10 @@ if __name__ == "__main__":
     # Create animation
     matplotlib.use('macosx')
     visualizer = NetworkVisualizer(simulation_dir=os.path.join(output_dir, "nine_node"))
-    anim = visualizer.animate_network(start_time=0, 
+    anim = visualizer.animate_network(start_time=0,
                                     end_time=params["simulation_steps"],
-                                    interval=100, 
+                                    interval=100,
                                     edge_property='density')
-    
+
     plt.show()
 

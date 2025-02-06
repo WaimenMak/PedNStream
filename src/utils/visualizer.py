@@ -7,7 +7,7 @@ import os
 from tqdm import tqdm
 
 class NetworkVisualizer:
-    def __init__(self, network=None, simulation_dir=None):
+    def __init__(self, network=None, simulation_dir=None, pos=None):
         """
         Initialize visualizer with either a network instance or simulation data
         :param network: Direct network object (optional)
@@ -19,11 +19,12 @@ class NetworkVisualizer:
         elif simulation_dir is not None:
             self.load_simulation_data(simulation_dir)
             self.from_saved = True
+            self.network = None
         else:
             raise ValueError("Either network object or simulation_dir must be provided")
         
         # Initialize fixed position for nodes
-        self.pos = None
+        self.pos = pos
 
     def load_simulation_data(self, simulation_dir):
         """Load saved simulation data"""
@@ -94,7 +95,7 @@ class NetworkVisualizer:
                     value = link.speed[time_step]
                 G.add_edge(u, v, value=value)
         
-        # Initialize the position if not already set
+        # # Initialize the position if not already set
         if self.pos is None:
             # Set random seed for reproducible layout
             seed = 42  # You can change this seed value
@@ -161,7 +162,7 @@ class NetworkVisualizer:
         
         return fig, ax
 
-    def animate_network(self, start_time=0, end_time=None, interval=50, edge_property='density'):
+    def animate_network(self, start_time=0, end_time=None, interval=50, figsize=(10, 8), edge_property='density'):
         """
         Create an animation of the network evolution
         :param edge_property: Property to visualize ('density', 'flow', or 'speed')
@@ -173,27 +174,28 @@ class NetworkVisualizer:
                 end_time = self.network.simulation_steps
         
         # Create initial figure
-        fig, ax = plt.subplots(figsize=(10, 8))
+        fig, ax = plt.subplots(figsize=figsize)
         G = nx.DiGraph()
         
         # Initialize the position if not already set
         if self.pos is None:
             # Create temporary graph for initial layout
-            temp_G = nx.DiGraph()
+            G = nx.DiGraph()
             if self.from_saved:
                 for node_id in self.node_data:
-                    temp_G.add_node(node_id)
+                    G.add_node(node_id)
                 for link_id in self.link_data:
                     u, v = link_id.split('-')
-                    temp_G.add_edge(u, v)
+                    G.add_edge(u, v)
             else:
                 for node in self.network.nodes:
-                    temp_G.add_node(node.node_id)
+                    G.add_node(node.node_id)
                 for (u, v) in self.network.links:
-                    temp_G.add_edge(u, v)
+                    G.add_edge(u, v)
             
             seed = 42  # You can change this seed value
-            self.pos = nx.spring_layout(temp_G, k=1, iterations=50, seed=seed)
+            self.pos = nx.spring_layout(G, k=1, iterations=50, seed=seed)
+            # print(self.pos)
         
         def update(frame):
             fig.clear()  # Clear the entire figure
@@ -201,6 +203,8 @@ class NetworkVisualizer:
             
             # Create network for current frame
             if self.from_saved:
+                # print("aaa")
+                G = nx.DiGraph()
                 # Add nodes from saved data
                 for node_id, node_info in self.node_data.items():
                     if hasattr(self, 'time_series'):
@@ -240,7 +244,9 @@ class NetworkVisualizer:
             
             # Draw nodes
             node_sizes = [G.nodes[node]['size'] * 100 + 100 for node in G.nodes()]
-            nx.draw_networkx_nodes(G, self.pos, node_size=node_sizes,
+            # print(self.pos)
+            # self.pos = nx.spring_layout(G, k=1, iterations=50, seed=42)
+            nx.draw_networkx_nodes(G, pos=self.pos, node_size=node_sizes,
                                  node_color='lightblue',
                                  ax=ax)
             

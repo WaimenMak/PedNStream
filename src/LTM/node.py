@@ -179,20 +179,21 @@ class Node:
             else:
                 #reverse link sending flow
                 r[j] = max(0, l.cal_receiving_flow(time_step) - l.reverse_link.num_pedestrians[time_step]) # consider the flow from the reverse link
-                # if l.link_id == "2_3": # simulate bottleneck
-                #     r[j] = 5
+                # debug forky_queues example
+                # if l.link_id == "2_3" and time_step < 400: # simulate bottleneck
+                #     r[j] = 1
         
-        self.solve(s, r)
+        self.solve(s, r, type='classic')
         self.update_links(time_step)
 
-    def solve(self, s, r):
+    def solve(self, s, r, type='classic'):
         return
 
 class OneToOneNode(Node):
     def __init__(self, node_id):
         super().__init__(node_id)
 
-    def solve(self, s, r):
+    def solve(self, s, r, type='classic'):
         """
         q = [S0, S1, R0, R1], S1 and R1 are virtual links
         """
@@ -208,23 +209,45 @@ class RegularNode(Node):
     def __init__(self, node_id):
         super().__init__(node_id)
 
-    def solve(self, s, r):
-        # solve the linear programming problem
-        w = self.w * np.ones(2 * self.edge_num)  # variables for the penalty term
-        c = -1 * np.ones(self.edge_num) # variables for the flow
-        c = np.concatenate((c, w))
-        b_ub = np.concatenate((s, r))
-        # Create bounds for all variables (flows and penalty terms)
-        # bounds = [(0, None)] * self.edge_num + [(None, None)] * (2 * self.edge_num)  # Flow variables >= 0, penalty terms unbounded
+    def solve(self, s, r, type='classic'):
+        if type == 'optimal':
+            # solve the linear programming problem
+            w = self.w * np.ones(2 * self.edge_num)  # variables for the penalty term
+            c = -1 * np.ones(self.edge_num) # variables for the flow
+            c = np.concatenate((c, w))
+            # assert isinstance(c, np.ndarray) and c.ndim == 1
+            assert self.edge_num > 0
+            b_ub = np.concatenate((s, r))
+            # Create bounds for all variables (flows and penalty terms)
+            # bounds = [(0, None)] * self.edge_num + [(None, None)] * (2 * self.edge_num)  # Flow variables >= 0, penalty terms unbounded
 
-        if self.A_eq is not None:
-            # res = linprog(c, A_ub=self.A_ub, A_eq=self.A_eq, b_ub=b_ub, b_eq=np.zeros(self.edge_num), bounds=bounds)
-            res = linprog(c, A_ub=self.A_ub, A_eq=self.A_eq, b_ub=b_ub, b_eq=np.zeros(self.edge_num))
-        else:
-            # res = linprog(c, A_ub=self.A_ub, b_ub=b_ub, bounds=bounds)
-            res = linprog(c, A_ub=self.A_ub, b_ub=b_ub)
-        if res.success:
-            flows = self.A_ub @ np.floor(res.x)
-            # Ensure non-negative flows and round down to nearest integer
+            if self.A_eq is not None:
+                # res = linprog(c, A_ub=self.A_ub, A_eq=self.A_eq, b_ub=b_ub, b_eq=np.zeros(self.edge_num), bounds=bounds)
+                res = linprog(c, A_ub=self.A_ub, A_eq=self.A_eq, b_ub=b_ub, b_eq=np.zeros(self.edge_num))
+            else:
+                # res = linprog(c, A_ub=self.A_ub, b_ub=b_ub, bounds=bounds)
+                res = linprog(c, A_ub=self.A_ub, b_ub=b_ub)
+            if res.success:
+                flows = self.A_ub @ np.floor(res.x)
+                # Ensure non-negative flows and round down to nearest integer
+                self.q = np.maximum(0, flows)
+            return
+        if type == 'classic':
+            # use the update method originally from LTM paper
+            mask = np.ones([self.source_num, self.source_num], dtype=bool)
+            np.fill_diagonal(mask, False)
+            s_tiled = np.tile(s, (self.source_num, 1))
+            p = self.turning_fractions.reshape(self.dest_num, self.source_num - 1)
+            weighted_s = np.sum(s_tiled[mask].reshape(self.source_num, self.source_num - 1) * p, axis=1)
+            weighted_sr = r / (weighted_s + 1e-5)
+            flows_list = []
+            for i in range(self.edge_num):
+                source_idx = i // (self.dest_num - 1)
+                g_ij = self.turning_fractions[i] * np.min([s[source_idx], np.min(weighted_sr[mask[source_idx, :]] * s[source_idx])])
+                flows_list.append(g_ij)
+            flows = self.A_ub[:,:self.edge_num] @ np.floor(np.array(flows_list))
             self.q = np.maximum(0, flows)
-        return
+            return
+        else:
+            raise ValueError(f"Invalid type: {type}")
+        

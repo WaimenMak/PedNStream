@@ -20,6 +20,14 @@ from src.LTM.network import Network
 if __name__ == "__main__":
     # Network configuration
 
+    # adj = np.array([[0, 1, 0, 0, 0, 1],
+    #                 [1, 0, 1, 0, 1, 0],
+    #                 [0, 1, 0, 1, 0, 0],
+    #                 [0, 0, 1, 0, 0, 0],
+    #                 [0, 1, 0, 0, 0, 0],
+    #                 [1, 0, 0, 0, 0, 0],
+    #                 ])
+
     adj = np.array([[0, 1, 0, 0, 0],
                     [1, 0, 1, 0, 1],
                     [0, 1, 0, 1, 0],
@@ -37,11 +45,12 @@ if __name__ == "__main__":
         'unit_time': 10,
         'peak_lambda': 25,
         'base_lambda': 5,
-        'simulation_steps': 800,
+        'simulation_steps': 700,
     }
 
     # Initialize and run simulation
-    network_env = Network(adj, params, od_nodes=[0, 3, 4], origin_nodes=[0, 4]) # no dead end
+    # network_env = Network(adj, params, origin_nodes=[5, 4]) # no dead end
+    network_env = Network(adj, params, origin_nodes=[0, 4]) # no dead end
     network_env.visualize()
 
     # Run simulation
@@ -63,11 +72,11 @@ if __name__ == "__main__":
     visualizer = NetworkVisualizer(simulation_dir=os.path.join(output_dir, "forky_queues"))
     anim = visualizer.animate_network(start_time=0, end_time=params["simulation_steps"], interval=100, edge_property='density')
     # MP4
-    writer = matplotlib.animation.FFMpegWriter(fps=15, metadata=dict(artist='Me'),
-                                             bitrate=2000)
-
-    # Save the animation as MP4
-    anim.save(os.path.join(output_dir, "forky_queues", "forky_queues_cong.mp4"),
-              writer=writer,
-              progress_callback=progress_callback)
+    # writer = matplotlib.animation.FFMpegWriter(fps=15, metadata=dict(artist='Me'),
+    #                                          bitrate=2000)
+    #
+    # # Save the animation as MP4
+    # anim.save(os.path.join(output_dir, "forky_queues", "forky_queues_cong.mp4"),
+    #           writer=writer,
+    #           progress_callback=progress_callback)
     plt.show()

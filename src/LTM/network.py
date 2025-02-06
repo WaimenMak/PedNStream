@@ -11,7 +11,7 @@ A Link Transmission Model for the Pedestrian Traffic
 
 class Network:
     def __init__(self, adjacency_matrix: np.array, link_params: dict,
-                 od_nodes: list, origin_nodes: list):
+                 origin_nodes: list, od_nodes: list = None, pos: dict = None):
         """
         Initialize the network, with nodes and links according to the adjacency matrix
         """
@@ -21,7 +21,9 @@ class Network:
         self.link_params = link_params
         self.simulation_steps = link_params['simulation_steps']
         self.unit_time = link_params['unit_time']
-        self.init_nodes_and_links(od_nodes, origin_nodes)
+        self.od_nodes = od_nodes
+        self.init_nodes_and_links(origin_nodes)
+        self.pos = pos
 
     # TODO: update the turning fractions
     # def update_turning_fractions(self, new_turning_fractions):
@@ -55,14 +57,14 @@ class Network:
         # create a spike at from t == 400 to t == 410
         # if t == 400:
         # demand[0:10] = 100
-        # demand[350:400] = 100
+        demand[250:260] = 100
         # demand[time > 10] = 0
         # demand[time > 300] = 0
-        demand = np.ones(simulation_steps) * 1
-        demand[time > 300] = 0
+        # demand = np.ones(simulation_steps) * 1
+        demand[time > 400] = 0
         return demand
 
-    def init_nodes_and_links(self, od_nodes: list, origin_nodes: list):
+    def init_nodes_and_links(self, origin_nodes: list):
         """
         Initialize nodes and links based on the adjacency matrix.
         For a complete graph, excluding self-loops.
@@ -91,25 +93,30 @@ class Network:
                         reverse_link.reverse_link = link
 
         # assign the OD node manually
-        for node_id in od_nodes:
+        for node_id in origin_nodes:
             node = self.nodes[node_id]
             node._create_virtual_link(node_id, "in", is_incoming=True, params=self.link_params)
             node._create_virtual_link(node_id, "out", is_incoming=False, params=self.link_params)
             if node_id in origin_nodes:
                 node.demand = self._generate_time_varying_demand(self.simulation_steps, self.link_params)
-            else:
-                node.demand = np.zeros(self.simulation_steps) # no demand for destination nodes
         
 
         for node in self.nodes:
             has_virtual_links = node.virtual_incoming_link is not None
             is_dead_end = (len(node.incoming_links) == 1 or len(node.outgoing_links) == 1) and not has_virtual_links
             
-            if is_dead_end:
-                raise AssertionError(f"No Dead End, Please! Detected at node {node.node_id}")
+            if is_dead_end: # if it is dead end treat it as destination node
+                # print(f"Dead End Detected at node {node.node_id}")
+                # raise AssertionError(f"No Dead End, Please! Detected at node {node.node_id}")
+                node._create_virtual_link(node.node_id, "in", is_incoming=True, params=self.link_params)
+                node._create_virtual_link(node.node_id, "out", is_incoming=False, params=self.link_params)
+                node.demand = np.zeros(self.simulation_steps) # no demand for destination nodes
 
             if len(node.outgoing_links) == 2 and len(node.incoming_links) == 2:
                 node.__class__ = OneToOneNode
+            # elif len(node.outgoing_links) == 0 or len(node.incoming_links) == 0:
+            #     #remove the node from the list
+            #     self.nodes.remove(node)
             else:
                 # Regular node
                 node.__class__ = RegularNode
@@ -152,45 +159,63 @@ class Network:
             
         self.update_link_states(time_step)
 
-    def visualize(self):
+    def visualize(self, figsize=(15, 15), node_size=30, edge_width=1, 
+                 show_labels=False, label_font_size=6, alpha=0.8):
         """Visualizes the network using networkx and matplotlib."""
         graph = nx.DiGraph()
 
-        # Add nodes
+        # Add nodes and edges as before
         for node in self.nodes:
             graph.add_node(node.node_id)
-
-        # Add edges (links) with labels
         for (u, v), link in self.links.items():
             graph.add_edge(u, v, label=link.link_id)
 
-        # Drawing options (adjust as needed)
-        pos = nx.spring_layout(graph, seed=42)  # For consistent layout
-        node_options = {"node_size": 700, "node_color": "skyblue"}
+        # Create figure with specified size
+        plt.figure(figsize=figsize)
         
-        # Draw nodes and labels separately
-        nx.draw_networkx_nodes(graph, pos, **node_options)
-        nx.draw_networkx_labels(graph, pos, font_size=15, font_weight="bold")
+        # Drawing options
+        if self.pos is None:
+            self.pos = nx.spring_layout(graph, k=1, iterations=50)  # k=1 increases spacing
+        
+        # Draw nodes with transparency
+        nx.draw_networkx_nodes(graph, self.pos, 
+                             node_size=node_size, 
+                             node_color='blue',
+                             alpha=alpha)
+        
+        # Draw edges with different styles for bidirectional vs unidirectional
+        # Separate bidirectional and unidirectional edges
+        bidirectional_edges = [(u, v) for (u, v) in graph.edges() 
+                             if (v, u) in graph.edges()]
+        unidirectional_edges = [(u, v) for (u, v) in graph.edges() 
+                               if (v, u) not in graph.edges()]
+        
+        # Draw bidirectional edges
+        nx.draw_networkx_edges(graph, self.pos, 
+                             edgelist=bidirectional_edges,
+                             arrows=True, 
+                             arrowsize=2,
+                             edge_color='lightblue',
+                             width=edge_width,
+                             alpha=alpha,
+                             connectionstyle=f"arc3,rad=0.2")
+        
+        # Draw unidirectional edges
+        nx.draw_networkx_edges(graph, self.pos, 
+                             edgelist=unidirectional_edges,
+                             arrows=True, 
+                             arrowsize=2,
+                             edge_color='blue',
+                             width=edge_width,
+                             alpha=alpha)
 
-        # Draw edges with offset for bidirectional edges
-        for (u, v) in graph.edges():
-            # If edge is bidirectional, add offset
-            if (v, u) in graph.edges():
-                # Draw edge with positive offset
-                nx.draw_networkx_edges(graph, pos, edgelist=[(u, v)], 
-                                     arrows=True, arrowsize=20,
-                                     edge_color='b',
-                                     width=1,
-                                     connectionstyle=f"arc3,rad=0.2")
-            else:
-                # Draw normal edge
-                nx.draw_networkx_edges(graph, pos, edgelist=[(u, v)], 
-                                     arrows=True, arrowsize=20)
+        # Optionally draw labels
+        if show_labels:
+            nx.draw_networkx_labels(graph, self.pos, 
+                                  font_size=label_font_size,
+                                  alpha=alpha+0.2)  # Labels slightly more visible than edges
 
-        # Draw edge labels with adjusted positions
-        edge_labels = nx.get_edge_attributes(graph, 'label')
-        nx.draw_networkx_edge_labels(graph, pos, edge_labels=edge_labels, 
-                                    font_size=10, label_pos=0.3)
-
+        # plt.title("Network Visualization", pad=20)
+        plt.axis('off')  # Turn off axis
         plt.tight_layout()
         plt.show()

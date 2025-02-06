@@ -9,7 +9,10 @@ def cal_travel_speed(density, v_f, k_critical, k_jam):
     if density <= k_critical:
         return v_f
     elif k_critical < density:
-        return max(0, v_f * (1 - density / k_jam))
+        noise = 0
+        # if np.random.rand() < 0.5:
+        #     noise = np.random.normal(0, 0.1)
+        return max(0, v_f * (1 - density / k_jam) + noise)
 
 def cal_free_flow_speed(density_i, density_j, v_f):
     """Calculate the travel speed based on densities"""

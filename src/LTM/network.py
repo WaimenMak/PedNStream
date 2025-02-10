@@ -3,6 +3,8 @@ import networkx as nx
 import matplotlib.pyplot as plt
 from .node import Node, OneToOneNode, RegularNode
 from .link import Link
+from .od_manager import ODManager
+from .path_finder import PathFinder
 
 
 """
@@ -11,7 +13,7 @@ A Link Transmission Model for the Pedestrian Traffic
 
 class Network:
     def __init__(self, adjacency_matrix: np.array, link_params: dict,
-                 origin_nodes: list, od_nodes: list = None, pos: dict = None):
+                 origin_nodes: list, destination_nodes: list = None, od_ratios: dict = None, pos: dict = None):
         """
         Initialize the network, with nodes and links according to the adjacency matrix
         """
@@ -21,9 +23,69 @@ class Network:
         self.link_params = link_params
         self.simulation_steps = link_params['simulation_steps']
         self.unit_time = link_params['unit_time']
-        self.od_nodes = od_nodes
+        self.destination_nodes = destination_nodes
+        self.origin_nodes = origin_nodes
         self.init_nodes_and_links(origin_nodes)
         self.pos = pos
+
+        # Initialize managers
+        self.od_manager = ODManager(link_params['simulation_steps'])
+        self.od_manager.init_od_ratios(origin_nodes, destination_nodes, od_ratios)
+        
+        self.path_finder = PathFinder(self)
+        self.path_finder.find_od_paths(self.od_manager.od_ratios.keys())
+
+    def get_od_ratio(self, origin: int, destination: int, time_step: int) -> float:
+        """Get the OD ratio for a specific origin-destination pair at a time step."""
+        return self.od_ratios.get((origin, destination), 
+                                np.zeros(self.simulation_steps))[time_step]
+
+    def verify_od_ratios(self):
+        """Verify that ratios sum to 1 for each origin at each time step."""
+        origins = set(o for o, _ in self.od_ratios.keys())
+        
+        for o in origins:
+            ratio_sum = sum(self.od_ratios[(o, d)] 
+                          for d in set(d for o_, d in self.od_ratios.keys() if o_ == o))
+            if not np.allclose(ratio_sum, 1.0, rtol=1e-5):
+                raise ValueError(f"OD ratios for origin {o} do not sum to 1 at all time steps")
+
+    def init_od_ratios(self, origin_nodes: list, destination_nodes: list, od_ratios: dict = None):
+        """
+        Initialize time-dependent OD ratios with user-defined values.
+        
+        Args:
+            origin_nodes: List of origin node IDs
+            destination_nodes: List of destination node IDs
+            od_ratios: Dictionary of predefined ratios {(o,d): array or float}
+                      If float is provided, it will be expanded to array
+        """
+        if od_ratios is None:
+            # Use uniform distribution if no ratios provided
+            for o in origin_nodes:
+                valid_dests = [d for d in destination_nodes if d != o]
+                default_ratio = 1.0 / len(valid_dests)
+                for d in valid_dests:
+                    self.od_ratios[(o, d)] = np.ones(self.simulation_steps) * default_ratio
+        else:
+            # Use provided ratios and verify them
+            for o in origin_nodes:
+                # Get all destinations for this origin
+                o_dests = [d for (o_, d), ratio in od_ratios.items() if o_ == o]
+                
+                for d in o_dests:
+                    ratio = od_ratios.get((o, d))
+                    if ratio is not None:
+                        # Convert float to array if necessary
+                        if isinstance(ratio, (int, float)):
+                            self.od_ratios[(o, d)] = np.ones(self.simulation_steps) * ratio
+                        else:
+                            # Ensure array length matches simulation steps
+                            if len(ratio) != self.simulation_steps:
+                                raise ValueError(f"OD ratio array length for ({o},{d}) must match simulation_steps")
+                            self.od_ratios[(o, d)] = np.array(ratio)
+        
+            self.verify_od_ratios()      
 
     # TODO: update the turning fractions
     # def update_turning_fractions(self, new_turning_fractions):

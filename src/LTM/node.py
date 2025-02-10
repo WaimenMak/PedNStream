@@ -208,6 +208,8 @@ class OneToOneNode(Node):
 class RegularNode(Node):
     def __init__(self, node_id):
         super().__init__(node_id)
+        self.mask = np.ones([self.source_num, self.source_num], dtype=bool)
+        np.fill_diagonal(self.mask, False)
 
     def solve(self, s, r, type='classic'):
         if type == 'optimal':
@@ -234,16 +236,14 @@ class RegularNode(Node):
             return
         if type == 'classic':
             # use the update method originally from LTM paper
-            mask = np.ones([self.source_num, self.source_num], dtype=bool)
-            np.fill_diagonal(mask, False)
             s_tiled = np.tile(s, (self.source_num, 1))
             p = self.turning_fractions.reshape(self.dest_num, self.source_num - 1)
-            weighted_s = np.sum(s_tiled[mask].reshape(self.source_num, self.source_num - 1) * p, axis=1)
+            weighted_s = np.sum(s_tiled[self.mask].reshape(self.source_num, self.source_num - 1) * p, axis=1)
             weighted_sr = r / (weighted_s + 1e-5)
             flows_list = []
             for i in range(self.edge_num):
                 source_idx = i // (self.dest_num - 1)
-                g_ij = self.turning_fractions[i] * np.min([s[source_idx], np.min(weighted_sr[mask[source_idx, :]] * s[source_idx])])
+                g_ij = self.turning_fractions[i] * np.min([s[source_idx], np.min(weighted_sr[self.mask[source_idx, :]] * s[source_idx])])
                 flows_list.append(g_ij)
             flows = self.A_ub[:,:self.edge_num] @ np.floor(np.array(flows_list))
             self.q = np.maximum(0, flows)

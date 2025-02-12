@@ -13,79 +13,28 @@ A Link Transmission Model for the Pedestrian Traffic
 
 class Network:
     def __init__(self, adjacency_matrix: np.array, link_params: dict,
-                 origin_nodes: list, destination_nodes: list = None, od_ratios: dict = None, pos: dict = None):
+                 origin_nodes: list, destination_nodes: list = [], od_flows: dict = None, pos: dict = None):
         """
         Initialize the network, with nodes and links according to the adjacency matrix
         """
         self.adjacency_matrix = adjacency_matrix
-        self.nodes = []
+        self.nodes = {}
         self.links = {}          #use dict to store link, key is tuple(start_node_id, end_node_id)
         self.link_params = link_params
         self.simulation_steps = link_params['simulation_steps']
         self.unit_time = link_params['unit_time']
         self.destination_nodes = destination_nodes
         self.origin_nodes = origin_nodes
-        self.init_nodes_and_links(origin_nodes)
+        self.init_nodes_and_links()
         self.pos = pos
 
         # Initialize managers
-        self.od_manager = ODManager(link_params['simulation_steps'])
-        self.od_manager.init_od_ratios(origin_nodes, destination_nodes, od_ratios)
+        if destination_nodes:
+            self.od_manager = ODManager(link_params['simulation_steps'])
+            self.od_manager.init_od_flows(origin_nodes, destination_nodes, od_flows)
         
-        self.path_finder = PathFinder(self)
-        self.path_finder.find_od_paths(self.od_manager.od_ratios.keys())
-
-    def get_od_ratio(self, origin: int, destination: int, time_step: int) -> float:
-        """Get the OD ratio for a specific origin-destination pair at a time step."""
-        return self.od_ratios.get((origin, destination), 
-                                np.zeros(self.simulation_steps))[time_step]
-
-    def verify_od_ratios(self):
-        """Verify that ratios sum to 1 for each origin at each time step."""
-        origins = set(o for o, _ in self.od_ratios.keys())
-        
-        for o in origins:
-            ratio_sum = sum(self.od_ratios[(o, d)] 
-                          for d in set(d for o_, d in self.od_ratios.keys() if o_ == o))
-            if not np.allclose(ratio_sum, 1.0, rtol=1e-5):
-                raise ValueError(f"OD ratios for origin {o} do not sum to 1 at all time steps")
-
-    def init_od_ratios(self, origin_nodes: list, destination_nodes: list, od_ratios: dict = None):
-        """
-        Initialize time-dependent OD ratios with user-defined values.
-        
-        Args:
-            origin_nodes: List of origin node IDs
-            destination_nodes: List of destination node IDs
-            od_ratios: Dictionary of predefined ratios {(o,d): array or float}
-                      If float is provided, it will be expanded to array
-        """
-        if od_ratios is None:
-            # Use uniform distribution if no ratios provided
-            for o in origin_nodes:
-                valid_dests = [d for d in destination_nodes if d != o]
-                default_ratio = 1.0 / len(valid_dests)
-                for d in valid_dests:
-                    self.od_ratios[(o, d)] = np.ones(self.simulation_steps) * default_ratio
-        else:
-            # Use provided ratios and verify them
-            for o in origin_nodes:
-                # Get all destinations for this origin
-                o_dests = [d for (o_, d), ratio in od_ratios.items() if o_ == o]
-                
-                for d in o_dests:
-                    ratio = od_ratios.get((o, d))
-                    if ratio is not None:
-                        # Convert float to array if necessary
-                        if isinstance(ratio, (int, float)):
-                            self.od_ratios[(o, d)] = np.ones(self.simulation_steps) * ratio
-                        else:
-                            # Ensure array length matches simulation steps
-                            if len(ratio) != self.simulation_steps:
-                                raise ValueError(f"OD ratio array length for ({o},{d}) must match simulation_steps")
-                            self.od_ratios[(o, d)] = np.array(ratio)
-        
-            self.verify_od_ratios()      
+            self.path_finder = PathFinder(self)
+            self.path_finder.find_od_paths(self.od_manager.od_ratios.keys())
 
     # TODO: update the turning fractions
     # def update_turning_fractions(self, new_turning_fractions):
@@ -126,63 +75,136 @@ class Network:
         demand[time > 400] = 0
         return demand
 
-    def init_nodes_and_links(self, origin_nodes: list):
-        """
-        Initialize nodes and links based on the adjacency matrix.
-        For a complete graph, excluding self-loops.
-        """
-        num_nodes = self.adjacency_matrix.shape[0]
+    # def init_nodes_and_links(self, origin_nodes: list):
+    #     """
+    #     Initialize nodes and links based on the adjacency matrix.
+    #     For a complete graph, excluding self-loops.
+    #     """
+    #     num_nodes = self.adjacency_matrix.shape[0]
 
-        # Create nodes
-        for i in range(num_nodes):
-            self.nodes.append(Node(node_id=i))
+    #     # Create nodes
+    #     for i in range(num_nodes):
+    #         self.nodes.append(Node(node_id=i))
 
-        # Create links (excluding self-loops)
-        for i in range(num_nodes):
-            for j in range(num_nodes):
-                # Skip self-loops
-                if i != j and self.adjacency_matrix[i, j] == 1:
-                    link_id = f"{i}_{j}"
-                    link = Link(link_id, self.nodes[i], self.nodes[j], **self.link_params)
-                    self.links[(i, j)] = link
-                    self.nodes[i].outgoing_links.append(link)
-                    self.nodes[j].incoming_links.append(link)
+    #     # Create links (excluding self-loops)
+    #     for i in range(num_nodes):
+    #         for j in range(num_nodes):
+    #             # Skip self-loops
+    #             if i != j and self.adjacency_matrix[i, j] == 1:
+    #                 link_id = f"{i}_{j}"
+    #                 link = Link(link_id, self.nodes[i], self.nodes[j], **self.link_params)
+    #                 self.links[(i, j)] = link
+    #                 self.nodes[i].outgoing_links.append(link)
+    #                 self.nodes[j].incoming_links.append(link)
                     
-                    # Connect reverse links
-                    if (j, i) in self.links:
-                        reverse_link = self.links[(j, i)]
-                        link.reverse_link = reverse_link
-                        reverse_link.reverse_link = link
+    #                 # Connect reverse links
+    #                 if (j, i) in self.links:
+    #                     reverse_link = self.links[(j, i)]
+    #                     link.reverse_link = reverse_link
+    #                     reverse_link.reverse_link = link
 
-        # assign the OD node manually
-        for node_id in origin_nodes:
-            node = self.nodes[node_id]
-            node._create_virtual_link(node_id, "in", is_incoming=True, params=self.link_params)
-            node._create_virtual_link(node_id, "out", is_incoming=False, params=self.link_params)
-            if node_id in origin_nodes:
-                node.demand = self._generate_time_varying_demand(self.simulation_steps, self.link_params)
+    #     # assign the OD node manually, for origin node, it has a virtual link in the in/out links list, but not present in the network's links
+    #     for node_id in origin_nodes:
+    #         node = self.nodes[node_id]
+    #         node._create_virtual_link(node_id, "in", is_incoming=True, params=self.link_params)
+    #         node._create_virtual_link(node_id, "out", is_incoming=False, params=self.link_params)
+    #         if node_id in origin_nodes:
+    #             node.demand = self._generate_time_varying_demand(self.simulation_steps, self.link_params)
         
 
-        for node in self.nodes:
-            has_virtual_links = node.virtual_incoming_link is not None
-            is_dead_end = (len(node.incoming_links) == 1 or len(node.outgoing_links) == 1) and not has_virtual_links
+    #     for node in self.nodes:
+    #         has_virtual_links = node.virtual_incoming_link is not None
+    #         is_dead_end = (len(node.incoming_links) == 1 or len(node.outgoing_links) == 1) and not has_virtual_links
             
-            if is_dead_end: # if it is dead end treat it as destination node
-                # print(f"Dead End Detected at node {node.node_id}")
-                # raise AssertionError(f"No Dead End, Please! Detected at node {node.node_id}")
-                node._create_virtual_link(node.node_id, "in", is_incoming=True, params=self.link_params)
-                node._create_virtual_link(node.node_id, "out", is_incoming=False, params=self.link_params)
-                node.demand = np.zeros(self.simulation_steps) # no demand for destination nodes
+    #         if is_dead_end: # if it is dead end treat it as destination node
+    #             # print(f"Dead End Detected at node {node.node_id}")
+    #             # raise AssertionError(f"No Dead End, Please! Detected at node {node.node_id}")
+    #             node._create_virtual_link(node.node_id, "in", is_incoming=True, params=self.link_params)
+    #             node._create_virtual_link(node.node_id, "out", is_incoming=False, params=self.link_params)
+    #             node.demand = np.zeros(self.simulation_steps) # no demand for destination nodes
 
-            if len(node.outgoing_links) == 2 and len(node.incoming_links) == 2:
-                node.__class__ = OneToOneNode
-            # elif len(node.outgoing_links) == 0 or len(node.incoming_links) == 0:
-            #     #remove the node from the list
-            #     self.nodes.remove(node)
+    #         if len(node.outgoing_links) == 2 and len(node.incoming_links) == 2:
+    #             node.__class__ = OneToOneNode
+    #         # elif len(node.outgoing_links) == 0 or len(node.incoming_links) == 0:
+    #         #     #remove the node from the list
+    #         #     self.nodes.remove(node)
+    #         else:
+    #             # Regular node
+    #             node.__class__ = RegularNode
+    #         node.init_node() #Initialize the node after determine the type
+    def _create_origin_destination(self, node):
+        node._create_virtual_link(node.node_id, "in", is_incoming=True, params=self.link_params)
+        node._create_virtual_link(node.node_id, "out", is_incoming=False, params=self.link_params)
+        if node.node_id in self.origin_nodes:
+            node.demand = self._generate_time_varying_demand(self.simulation_steps, self.link_params)
+        else:
+            node.demand = np.zeros(self.simulation_steps)
+
+    def _create_nodes(self, node_id: int):
+            # Count incoming and outgoing connections from adjacency matrix
+        incoming_count = np.sum(self.adjacency_matrix[:, node_id])
+        outgoing_count = np.sum(self.adjacency_matrix[node_id, :])
+        
+        # Determine node type
+        if incoming_count == 2 and outgoing_count == 2:
+            if node_id in self.origin_nodes or node_id in self.destination_nodes:
+                node = RegularNode(node_id=node_id)
+                self._create_origin_destination(node)
             else:
-                # Regular node
-                node.__class__ = RegularNode
-            node.init_node() #Initialize the node after determine the type
+                node = OneToOneNode(node_id=node_id)
+            
+        elif incoming_count == 1 and outgoing_count == 1: # dead end
+            node = OneToOneNode(node_id=node_id)
+            self._create_origin_destination(node)
+        else:   # regular node
+            node = RegularNode(node_id=node_id)
+            if node_id in self.origin_nodes or node_id in self.destination_nodes:
+                self._create_origin_destination(node)
+        return node
+
+    def init_nodes_and_links(self):
+        """
+        Initialize nodes and links based on the adjacency matrix.
+        """
+        num_nodes = self.adjacency_matrix.shape[0]
+        created_nodes = []
+
+        # Create nodes with proper type from the beginning
+        for i in range(num_nodes):
+            if i in created_nodes:
+                node = self.nodes[i]
+            else:
+                node = self._create_nodes(i)
+                created_nodes.append(i)
+                self.nodes[i] = node
+            #add outgoing and incoming links of current node
+            for j in range(i+1, num_nodes):
+                if self.adjacency_matrix[i, j] == 1: # symmetric adjacency matrix
+                    link_id = f"{i}_{j}"
+                    if j in created_nodes:
+                        link = Link(link_id, node, self.nodes[j], **self.link_params)
+                    else:
+                        # create node j
+                        node_j = self._create_nodes(j)
+                        created_nodes.append(j)
+                        self.nodes[j] = node_j
+                        link = Link(link_id, node, node_j, **self.link_params)
+                    node.outgoing_links.append(link)
+                    self.nodes[j].incoming_links.append(link)
+                    self.links[(i, j)] = link
+                # if self.adjacency_matrix[j, i] == 1:
+                    link_id = f"{j}_{i}"
+                    link = Link(link_id, self.nodes[j], node, **self.link_params)
+                    node.incoming_links.append(link)
+                    self.nodes[j].outgoing_links.append(link)
+                    self.links[(j, i)] = link
+
+                    # reverse links
+                    self.links[(j, i)].reverse_link = self.links[(i, j)]
+                    self.links[(i, j)].reverse_link = self.links[(j, i)]
+
+            node.init_node()
+
 
     def update_transition_probability(self, new_turning_fractions_matrix):
         pass
@@ -201,7 +223,7 @@ class Network:
             link.update_speeds(time_step)
 
     def network_loading(self, time_step: int):
-        for node in self.nodes:
+        for node_id, node in self.nodes.items():
             if node.turning_fractions is None:
                 phi = 1/(node.dest_num - 1) # the number of edges from the different source-destination pair
                 turning_fractions = np.ones(node.edge_num) * phi
@@ -227,8 +249,8 @@ class Network:
         graph = nx.DiGraph()
 
         # Add nodes and edges as before
-        for node in self.nodes:
-            graph.add_node(node.node_id)
+        for node_id, node in self.nodes.items():
+            graph.add_node(node_id)
         for (u, v), link in self.links.items():
             graph.add_edge(u, v, label=link.link_id)
 

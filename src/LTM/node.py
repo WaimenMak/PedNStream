@@ -21,6 +21,7 @@ class Node:
         self.virtual_outgoing_link = None
         self.M = 1e6 # for destination node, large constant for receiving flow
         self.demand = None # for origin node
+        self.mask = None # for regular node, classic update method
 
     def _create_virtual_link(self, node_id, direction, is_incoming, params: dict):
         """Helper method to create virtual links for origin and destination nodes"""
@@ -44,6 +45,8 @@ class Node:
         self.source_num = len(self.incoming_links)
         self.dest_num = len(self.outgoing_links)
         self.edge_num = self.dest_num * self.source_num - self.source_num
+        self.mask = np.ones([self.source_num, self.source_num], dtype=bool)
+        np.fill_diagonal(self.mask, False)
         # self.mask = np.ones((self.source_num, self.dest_num))
         # np.fill_diagonal(self.mask, 0)
         # self.mask = self.mask.flatten()
@@ -180,8 +183,8 @@ class Node:
                 #reverse link sending flow
                 r[j] = max(0, l.cal_receiving_flow(time_step) - l.reverse_link.num_pedestrians[time_step]) # consider the flow from the reverse link
                 # debug forky_queues example
-                # if l.link_id == "2_3" and time_step < 400: # simulate bottleneck
-                #     r[j] = 1
+                if l.link_id == "2_3" and time_step < 400: # simulate bottleneck
+                    r[j] = 1
         
         self.solve(s, r, type='classic')
         self.update_links(time_step)
@@ -208,8 +211,6 @@ class OneToOneNode(Node):
 class RegularNode(Node):
     def __init__(self, node_id):
         super().__init__(node_id)
-        self.mask = np.ones([self.source_num, self.source_num], dtype=bool)
-        np.fill_diagonal(self.mask, False)
 
     def solve(self, s, r, type='classic'):
         if type == 'optimal':

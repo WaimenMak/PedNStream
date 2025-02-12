@@ -53,7 +53,7 @@ class OutputHandler:
         
         # Save node data
         node_data = {}
-        for node in network.nodes:
+        for node_id, node in network.nodes.items():
             node_data[node.node_id] = {
                 'demand': node.demand.tolist() if node.demand is not None else [],
                 'incoming_links': [link.link_id for link in node.incoming_links],

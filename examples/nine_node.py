@@ -44,7 +44,7 @@ if __name__ == "__main__":
     }
 
     # Initialize network with origin at node 0 and destination at node 8
-    network_env = Network(adj, params, origin_nodes=[4]) # if set destination node, just set the demand to be 0
+    network_env = Network(adj, params, origin_nodes=[0, 4]) # if set destination node, just set the demand to be 0
     network_env.visualize()
 
     # Run simulation

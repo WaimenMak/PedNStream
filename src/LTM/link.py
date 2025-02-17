@@ -135,10 +135,11 @@ class Link(BaseLink):
             return self.sending_flow
         elif time_step - tau < 0:
             # for the highly congested stage
-            if self.density[time_step - 1] > self.k_critical:
-                self.sending_flow = max(1, np.floor(self.link_flow[time_step - 1] * self.unit_time)) # ensure when congested, the number of peds going through is at least 1
-                if self.link_id == '1_0':
-                    print(self.num_pedestrians[time_step-1])
+            # if self.density[time_step - 1] > self.k_critical:
+            if self.density[time_step - 1] > self.k_jam - 2:
+                self.sending_flow = max(0, np.floor(self.link_flow[time_step - 1] * self.unit_time)) # ensure when congested, the number of peds going through is at least 1
+                # if self.link_id == '1_0':
+                #     print(self.num_pedestrians[time_step-1])
             else:
                 self.sending_flow = 0
 
@@ -149,9 +150,12 @@ class Link(BaseLink):
             self.sending_flow = min(sending_flow_boundary, sending_flow_max)
             # TODO: add diffusion flow to the sending flow
 
-            if (self.sending_flow < 0) and (self.speed[time_step - 1] < 0.2):
+            # if (self.sending_flow < 0) and (self.speed[time_step - 1] < 0.2):
+            if (self.sending_flow < 0) and (self.density[time_step - 1] > 4.5):
                 # it means the link is a bit congested, 0.2 m/s is a threshold
                 self.sending_flow = max(0, np.floor(self.link_flow[time_step - 1] * self.unit_time))
+                if self.link_id == '6_7':
+                    print(self.link_flow[time_step - 1], self.density[time_step - 1], self.speed[time_step - 1])
             # elif self.sending_flow > 0 and self.speed[time_step - 1] > 1.2:
             # elif self.sending_flow > 0 and self.inflow[time_step - 1] > 0 and self.speed[time_step - 1] > 1.2:
             #     # if the sending flow is positive, then use diffusion flow. outcome: the flow is propagated more slowly

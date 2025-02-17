@@ -22,6 +22,8 @@ class Node:
         self.M = 1e6 # for destination node, large constant for receiving flow
         self.demand = None # for origin node
         self.mask = None # for regular node, classic update method
+        # self.turns = None # for recording the probs of the turns of each node (upstream, downstream)
+        self.turns_in_ods = None # for recording the turns in which od pairs
 
     def _create_virtual_link(self, node_id, direction, is_incoming, params: dict):
         """Helper method to create virtual links for origin and destination nodes"""
@@ -183,10 +185,10 @@ class Node:
                 #reverse link sending flow
                 r[j] = max(0, l.cal_receiving_flow(time_step) - l.reverse_link.num_pedestrians[time_step]) # consider the flow from the reverse link
                 # debug forky_queues example
-                if l.link_id == "2_3" and time_step < 400: # simulate bottleneck
-                    r[j] = 1
+                # if l.link_id == "2_3" and time_step < 400: # simulate bottleneck
+                #     r[j] = 1
         
-        self.solve(s, r, type='classic')
+        self.solve(s, r, type='optimal')
         self.update_links(time_step)
 
     def solve(self, s, r, type='classic'):

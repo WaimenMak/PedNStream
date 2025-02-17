@@ -42,14 +42,14 @@ if __name__ == "__main__":
     }
 
     # Initialize and run simulation
-    network_env = Network(adj, params, origin_nodes=[5])
+    network_env = Network(adj, params, origin_nodes=[5, 0])
     network_env.visualize()
 
     # Run simulation
     for t in range(1, params['simulation_steps']):
         network_env.network_loading(t)
-        if t == 200:
-            network_env.nodes[0].demand[201:251] = np.random.poisson(lam=np.ones(50) * 10, size=50)
+        # if t == 200:
+        #     network_env.nodes[0].demand[201:251] = np.random.poisson(lam=np.ones(50) * 10, size=50)
 
     # # Plot inflow and outflow
     # plt.figure(1)

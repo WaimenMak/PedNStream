@@ -102,16 +102,29 @@ class NetworkVisualizer:
             self.pos = nx.spring_layout(G, k=1, iterations=50, seed=seed)
         
         # Draw nodes
-        node_sizes = [G.nodes[node]['size'] * 100 + 500 for node in G.nodes()]
+        # node_sizes = [G.nodes[node]['size'] * 100 + 500 for node in G.nodes()]
+        node_sizes = [G.nodes[node]['size'] * 50 + 100 for node in G.nodes()]
         nx.draw_networkx_nodes(G, self.pos, node_size=node_sizes,
                              node_color='lightblue',
                              ax=ax)  # Specify the axis
+        
+        # Get set of origin nodes from OD pairs
+        # origin_nodes = ['0', '8']
+        
+        # # Create node color list
+        # node_colors = ['red' if node in origin_nodes else 'lightblue' 
+        #                 for node in G.nodes()]
+        
+        # nx.draw_networkx_nodes(G, pos=self.pos, 
+        #                         node_size=node_sizes,
+        #                         node_color=node_colors,
+        #                         ax=ax)
         
         # Draw edges
         edges = list(G.edges())
         for u, v in edges:
             width = G[u][v]['value'] * 5
-            arrowsize = G[u][v]['value'] * 20 + 10
+            arrowsize = G[u][v]['value'] * 20 + 0
             
             # Set value range based on property type
             if edge_property == 'density':
@@ -143,24 +156,28 @@ class NetworkVisualizer:
                                      arrowsize=arrowsize,
                                      ax=ax)
         # Draw labels
-        nx.draw_networkx_labels(G, self.pos, ax=ax)  # Specify the axis
+        # nx.draw_networkx_labels(G, self.pos, ax=ax)  # Specify the axis
         
         # Add title
-        ax.set_title(f'Network State at Time Step {time_step}')
+        ax.set_title(f'Network State at Time Step {time_step}', 
+                    fontdict={'fontsize': 20, 'fontweight': 'bold'})
         
         # Update colorbar with same value range
         sm = plt.cm.ScalarMappable(cmap=plt.cm.RdYlGn_r,
                                   norm=plt.Normalize(vmin=vmin, vmax=vmax))
         sm.set_array([])
-        plt.colorbar(sm, ax=ax, label=edge_property.capitalize())
-        
+        # plt.colorbar(sm, ax=ax, label=edge_property.capitalize())
+        cbar = plt.colorbar(sm, ax=ax, label=edge_property.capitalize())
+        cbar.ax.tick_params(labelsize=12)  # Enlarge tick labels
+        cbar.set_label(edge_property.capitalize(), size=14)  # Enlarge colorbar label
         # Turn off axis
         ax.set_axis_off()
         
         # Adjust layout to prevent cutting off
         plt.tight_layout()
+        plt.show()
         
-        return fig, ax
+        # return fig, ax
 
     def animate_network(self, start_time=0, end_time=None, interval=50, figsize=(10, 8), edge_property='density'):
         """
@@ -293,7 +310,9 @@ class NetworkVisualizer:
             sm = plt.cm.ScalarMappable(cmap=plt.cm.RdYlGn_r,
                                       norm=plt.Normalize(vmin=vmin, vmax=vmax))
             sm.set_array([])
-            plt.colorbar(sm, ax=ax, label=edge_property.capitalize())
+            cbar = plt.colorbar(sm, ax=ax, label=edge_property.capitalize())
+            cbar.ax.tick_params(labelsize=12)  # Enlarge tick labels
+            cbar.set_label(edge_property.capitalize(), size=14)  # Enlarge colorbar label
             
             # Set title and turn off axis
             ax.set_title(f'Time Step: {frame}')

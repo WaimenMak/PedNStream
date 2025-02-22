@@ -6,6 +6,7 @@
 
 import os
 import sys
+
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(project_root)
 
@@ -44,7 +45,16 @@ if __name__ == "__main__":
     }
 
     # Initialize network with origin at node 0 and destination at node 8
-    network_env = Network(adj, params, origin_nodes=[0, 4]) # if set destination node, just set the demand to be 0
+    # network_env = Network(adj, params, origin_nodes=[0, 4]) # if set destination node, just set the demand to be 0
+    od_flows = {
+        (0, 8): 5,
+        (4, 8): 10,
+        (0, 3): 5,
+        (4, 3): 1,
+        (0, 1): 5,
+        (4, 1): 1,
+    }
+    network_env = Network(adj, params, origin_nodes=[0, 4], destination_nodes=[3, 8, 1], od_flows=od_flows)
     network_env.visualize()
 
     # Run simulation

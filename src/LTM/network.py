@@ -156,7 +156,7 @@ class Network:
         outgoing_count = np.sum(self.adjacency_matrix[node_id, :])  # Count connections going out from the node
 
         # Determine node type based on connection counts
-        if incoming_count == 2 and outgoing_count == 2:
+        if incoming_count == 2 and outgoing_count == 2:  # (2 edges)
         # If node has exactly 2 incoming and 2 outgoing connections
             if node_id in self.origin_nodes or node_id in self.destination_nodes:
             # If node is designated as origin or destination, create RegularNode
@@ -166,10 +166,10 @@ class Network:
             # Otherwise, create OneToOneNode for regular internal nodes
                 node = OneToOneNode(node_id=node_id)
             
-        elif incoming_count == 1 and outgoing_count == 1:
+        elif incoming_count == 1 and outgoing_count == 1: # (dead end)
             node = OneToOneNode(node_id=node_id)
             self._create_origin_destination(node)
-        else:   # regular node
+        else:   # (regular node)
             node = RegularNode(node_id=node_id)
             if node_id in self.origin_nodes or node_id in self.destination_nodes:
                 self._create_origin_destination(node)
@@ -246,9 +246,10 @@ class Network:
                 # TODO: update the turning fractions
                 # node.update_turning_fractions(new_turning_fractions)
                 pass
-            
-            # cal turning fractions for nodes in paths
-            self.path_finder.calculate_node_turning_fractions(time_step=time_step, od_manager=self.od_manager, node=node)
+
+            if self.destination_nodes:
+                # cal turning fractions for nodes in paths
+                self.path_finder.calculate_node_turning_fractions(time_step=time_step, od_manager=self.od_manager, node=node)
 
             if isinstance(node, OneToOneNode):
                 node.assign_flows(time_step)

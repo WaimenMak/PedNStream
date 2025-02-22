@@ -154,8 +154,8 @@ class Link(BaseLink):
             if (self.sending_flow < 0) and (self.density[time_step - 1] > 4.5):
                 # it means the link is a bit congested, 0.2 m/s is a threshold
                 self.sending_flow = max(0, np.floor(self.link_flow[time_step - 1] * self.unit_time))
-                if self.link_id == '6_7':
-                    print(self.link_flow[time_step - 1], self.density[time_step - 1], self.speed[time_step - 1])
+                # if self.link_id == '6_7':
+                #     print(self.link_flow[time_step - 1], self.density[time_step - 1], self.speed[time_step - 1])
             # elif self.sending_flow > 0 and self.speed[time_step - 1] > 1.2:
             # elif self.sending_flow > 0 and self.inflow[time_step - 1] > 0 and self.speed[time_step - 1] > 1.2:
             #     # if the sending flow is positive, then use diffusion flow. outcome: the flow is propagated more slowly

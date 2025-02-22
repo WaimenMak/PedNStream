@@ -2,6 +2,76 @@ import networkx as nx
 import numpy as np
 from collections import defaultdict
 
+def k_shortest_paths(graph, origin, dest, k=1):
+    """
+    Find k shortest paths using bidirectional search with path diversity
+    """
+    paths = []
+        
+        # Forward search from origin
+    forward_dists = nx.single_source_dijkstra_path_length(graph, origin, weight='weight')
+    forward_paths = nx.single_source_dijkstra_path(graph, origin, weight='weight')
+    
+    # Backward search from destination
+    backward_dists = nx.single_source_dijkstra_path_length(graph.reverse(), dest, weight='weight')
+    backward_paths = nx.single_source_dijkstra_path(graph.reverse(), dest, weight='weight')
+    
+    # Find meeting points and calculate path costs
+    candidates = []
+    for node in set(forward_dists.keys()) & set(backward_dists.keys()):
+        total_dist = forward_dists[node] + backward_dists[node]
+        # Get forward and backward paths through this node
+        forward_path = forward_paths[node]
+        backward_path = backward_paths[node][::-1]  # Reverse the backward path
+        full_path = forward_path[:-1] + backward_path
+        
+        # Add path diversity penalty
+        penalty = 0
+        for existing_path in paths:
+            common_nodes = set(full_path) & set(existing_path)
+            penalty += len(common_nodes) / len(full_path)  # Penalize overlap
+        
+        candidates.append((total_dist * (1 + 0.1 * penalty), full_path))
+    
+    # Sort by penalized distance and take k best paths
+    candidates.sort()
+    paths = [path for _, path in candidates[:k]]
+    
+    # If we don't have enough paths, try to find more by perturbing edge weights
+    while len(paths) < k:
+        # Temporarily increase weights on used edges
+        weight_multipliers = {}
+        for path in paths:
+            for i in range(len(path)-1):
+                u, v = path[i], path[i+1]
+                key = (u, v)
+                if key not in weight_multipliers:
+                    weight_multipliers[key] = 1.0
+                weight_multipliers[key] *= 1.1  # Increase weight by 10%
+        
+        # Apply weight multipliers
+        original_weights = {}
+        for (u, v), multiplier in weight_multipliers.items():
+            original_weights[(u,v)] = graph[u][v]['weight']
+            graph[u][v]['weight'] *= multiplier
+        
+        # Try to find a new path
+        try:
+            new_path = nx.shortest_path(graph, origin, dest, weight='weight')
+            if new_path not in paths:
+                paths.append(new_path)
+        except nx.NetworkXNoPath:
+            break
+        
+        # Restore original weights
+        for (u,v), weight in original_weights.items():
+            graph[u][v]['weight'] = weight
+        
+        # Break if we can't find more paths
+        if len(paths) == len(candidates):
+            break
+    
+    return paths[:k]
 
 class PathFinder:
     """Handles path finding and path-related operations"""
@@ -30,6 +100,7 @@ class PathFinder:
             try:
                 paths = list(nx.shortest_simple_paths(
                     self.graph, origin, dest, weight='weight'))[:k_paths]
+                # paths = k_shortest_paths(self.graph, origin, dest)
                 self.od_paths[(origin, dest)] = paths
                 
                 # Record which nodes are used in this OD pair
@@ -256,8 +327,6 @@ class PathFinder:
         """Calculate turning fractions using stored turn probabilities: node_turn_probs,
            Return turning_fractions: np.array
         """
-        n_upstream = node.source_num
-        n_downstream = node.dest_num
         turning_fractions = np.zeros(node.edge_num)
         # Update P(od|up) for each upstream node
         for up_node, od_pairs in node.up_od_probs.items():
@@ -385,7 +454,7 @@ class PathFinder:
                 self.check_fractions(node)
             
 
-class RouteChoice:
-    """Handles route choice and route-related operations"""
-    def __init__(self, path_finder):
-        self.path_finder = path_finder
+# class RouteChoice:
+#     """Handles route choice and route-related operations"""
+#     def __init__(self, path_finder):
+#         self.path_finder = path_finder

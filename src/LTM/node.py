@@ -188,7 +188,7 @@ class Node:
                 # if l.link_id == "2_3" and time_step < 400: # simulate bottleneck
                 #     r[j] = 1
         
-        self.solve(s, r, type='optimal')
+        self.solve(s, r, type='classic')
         self.update_links(time_step)
 
     def solve(self, s, r, type='classic'):

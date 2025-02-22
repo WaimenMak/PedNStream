@@ -34,6 +34,8 @@ if __name__ == "__main__":
         'base_lambda': 5,
         'simulation_steps': 500,
     }
+    # whether adj is adjacent matrix or not
+    # print(np.allclose(adj, adj.T))
     # Initialize network with origin at node 0 and destination at node 8
     network_env = Network(adj, params, origin_nodes=[0, 8], pos=pos)
     # network_env.visualize()
@@ -45,7 +47,7 @@ if __name__ == "__main__":
     # for t in range(1, params['simulation_steps']):
     #     network_env.network_loading(t)
 
-    # Save and visualize results
+    # # Save and visualize results
     output_dir = os.path.join("..", "outputs")
     # output_handler = OutputHandler(base_dir=output_dir, simulation_dir="delft")
     # output_handler.save_network_state(network_env)
@@ -53,10 +55,11 @@ if __name__ == "__main__":
     # Create animation
     matplotlib.use('macosx')
     visualizer = NetworkVisualizer(simulation_dir=os.path.join(output_dir, "delft"), pos=pos)
-    anim = visualizer.animate_network(start_time=0,
-                                    end_time=params["simulation_steps"],
-                                    interval=1,
-                                    figsize=(14, 12),
-                                    edge_property='density')
+    visualizer.visualize_network_state(time_step=10)
+    # anim = visualizer.animate_network(start_time=0,
+    #                                 end_time=params["simulation_steps"],
+    #                                 interval=1,
+    #                                 figsize=(14, 12),
+    #                                 edge_property='density')
 
     plt.show()

@@ -37,10 +37,10 @@ class ODManager:
 
     def get_od_flow(self, origin: int, destination: int, time_step: int) -> float:
         """Get flow for specific OD pair at time step"""
-        return self.od_flows.get((origin, destination), 
+        return self.od_flows.get((origin, destination),
                                np.zeros(self.simulation_steps))[time_step]
 
-    def get_total_origin_flow(self, origin: int, time_step: int) -> float:
-        """Get total outflow from an origin at time step"""
-        return sum(self.get_od_flow(origin, dest, time_step) 
-                  for dest in set(d for o, d in self.od_flows.keys() if o == origin)) 
+    # def get_total_origin_flow(self, origin: int, time_step: int) -> float:
+    #     """Get total outflow from an origin at time step"""
+    #     return sum(self.get_od_flow(origin, dest, time_step)
+    #               for dest in set(d for o, d in self.od_flows.keys() if o == origin))

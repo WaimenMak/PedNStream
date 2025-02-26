@@ -1,77 +1,105 @@
 import networkx as nx
 import numpy as np
 from collections import defaultdict
+from heapq import heappush, heappop
 
 def k_shortest_paths(graph, origin, dest, k=1):
     """
-    Find k shortest paths using bidirectional search with path diversity
+    Find k shortest paths using Yen's algorithm with priority queue
     """
-    paths = []
-        
-        # Forward search from origin
-    forward_dists = nx.single_source_dijkstra_path_length(graph, origin, weight='weight')
-    forward_paths = nx.single_source_dijkstra_path(graph, origin, weight='weight')
+    # Initialize
+    A = []  # List of shortest paths found
+    B = []  # Priority queue of candidate paths
+    candidate_paths = {}  # Store candidate paths by ID
+    next_path_id = 0  # Simple counter for path IDs
     
-    # Backward search from destination
-    backward_dists = nx.single_source_dijkstra_path_length(graph.reverse(), dest, weight='weight')
-    backward_paths = nx.single_source_dijkstra_path(graph.reverse(), dest, weight='weight')
-    
-    # Find meeting points and calculate path costs
-    candidates = []
-    for node in set(forward_dists.keys()) & set(backward_dists.keys()):
-        total_dist = forward_dists[node] + backward_dists[node]
-        # Get forward and backward paths through this node
-        forward_path = forward_paths[node]
-        backward_path = backward_paths[node][::-1]  # Reverse the backward path
-        full_path = forward_path[:-1] + backward_path
-        
-        # Add path diversity penalty
-        penalty = 0
-        for existing_path in paths:
-            common_nodes = set(full_path) & set(existing_path)
-            penalty += len(common_nodes) / len(full_path)  # Penalize overlap
-        
-        candidates.append((total_dist * (1 + 0.1 * penalty), full_path))
-    
-    # Sort by penalized distance and take k best paths
-    candidates.sort()
-    paths = [path for _, path in candidates[:k]]
-    
-    # If we don't have enough paths, try to find more by perturbing edge weights
-    while len(paths) < k:
-        # Temporarily increase weights on used edges
-        weight_multipliers = {}
-        for path in paths:
-            for i in range(len(path)-1):
-                u, v = path[i], path[i+1]
-                key = (u, v)
-                if key not in weight_multipliers:
-                    weight_multipliers[key] = 1.0
-                weight_multipliers[key] *= 1.1  # Increase weight by 10%
-        
-        # Apply weight multipliers
-        original_weights = {}
-        for (u, v), multiplier in weight_multipliers.items():
-            original_weights[(u,v)] = graph[u][v]['weight']
-            graph[u][v]['weight'] *= multiplier
-        
-        # Try to find a new path
-        try:
-            new_path = nx.shortest_path(graph, origin, dest, weight='weight')
-            if new_path not in paths:
-                paths.append(new_path)
-        except nx.NetworkXNoPath:
+    # Find the shortest path using Dijkstra
+    try:
+        shortest_path = nx.shortest_path(graph, origin, dest, weight='weight')
+        shortest_dist = nx.shortest_path_length(graph, origin, dest, weight='weight')
+        candidate_paths[next_path_id] = (shortest_dist, shortest_path)
+        A.append((shortest_dist, shortest_path))
+        next_path_id += 1
+    except nx.NetworkXNoPath:
+        return []
+
+    # ===== KEY PART: FINDING K DIFFERENT PATHS =====
+    for k_path in range(1, k):
+        if not A:
             break
+            
+        prev_path = A[-1][1]
         
-        # Restore original weights
-        for (u,v), weight in original_weights.items():
-            graph[u][v]['weight'] = weight
+        for i in range(len(prev_path) - 1):
+            spur_node = prev_path[i]
+            spur_node_next = prev_path[i+1] # set the distance between deviation node and the next node to inf
+
+            root_path = prev_path[:i+1]
+            edges_removed = []
+            nodes_removed = []
+            
+            # Remove nodes in root_path to avoid loops
+            for node in root_path[:-1]:  # Exclude spur_node
+                if node != spur_node and graph.has_node(node):
+                    # Save all edges connected to this node before removing it
+                    for neighbor in list(graph.neighbors(node)):
+                        if graph.has_edge(node, neighbor):
+                            edge_data = graph[node][neighbor].copy()  # Copy edge attributes
+                            edges_removed.append((node, neighbor, edge_data))
+                    
+                    # Also save incoming edges (for directed graphs)
+                    for neighbor in list(graph.predecessors(node)):
+                        if graph.has_edge(neighbor, node):
+                            edge_data_inv = graph[neighbor][node].copy()
+                            edges_removed.append((neighbor, node, edge_data_inv))
+                    
+                    nodes_removed.append(node)
+                    graph.remove_node(node)
+            
+            # Handle the direct edge between spur_node and next node
+            # u, v = prev_path[i], prev_path[i+1]
+            if graph.has_edge(spur_node, spur_node_next):
+                original_weight = graph[spur_node][spur_node_next].get('weight', 1)
+                graph[spur_node][spur_node_next]['weight'] = 1e5  # Set to high value to avoid this edge
+                
+            try:
+                spur_path = nx.shortest_path(graph, spur_node, dest, weight='weight')
+                total_path = root_path[:-1] + spur_path
+                # Restore removed nodes and their edges
+                for node in nodes_removed:
+                    graph.add_node(node)
+
+                # Restore all removed edges
+                for u, v, edge_data in edges_removed:
+                    graph.add_edge(u, v, **edge_data)
+                total_dist = sum(graph[total_path[i]][total_path[i+1]].get('weight', 1)
+                            for i in range(len(total_path)-1))
+                
+                # Store the candidate path with next available ID
+                candidate_paths[next_path_id] = (total_dist, total_path)
+                heappush(B, (total_dist, next_path_id))
+                next_path_id += 1
+            except nx.NetworkXNoPath:
+                pass
+            finally:
+                # Restore the edge weight
+                if graph.has_edge(spur_node, spur_node_next):
+                    graph[spur_node][spur_node_next]['weight'] = original_weight
+                
+
+
         
-        # Break if we can't find more paths
-        if len(paths) == len(candidates):
-            break
+        if B:
+            # Get the shortest candidate from priority queue
+            _, candidate_id = heappop(B)
+            candidate = candidate_paths[candidate_id]
+            A.append(candidate)
+            # Clean up the stored candidate
+            # del candidate_paths[candidate_id]
+        # else:
+        #     break
     
-    return paths[:k]
+    return [path for _, path in A]
 
 class PathFinder:
     """Handles path finding and path-related operations"""
@@ -98,9 +126,9 @@ class PathFinder:
         
         for origin, dest in od_pairs:
             try:
-                paths = list(nx.shortest_simple_paths(
-                    self.graph, origin, dest, weight='weight'))[:k_paths]
-                # paths = k_shortest_paths(self.graph, origin, dest)
+                # paths = list(nx.shortest_simple_paths(
+                #     self.graph, origin, dest, weight='weight'))[:k_paths]
+                paths = k_shortest_paths(self.graph, origin, dest, k=3)
                 self.od_paths[(origin, dest)] = paths
                 
                 # Record which nodes are used in this OD pair

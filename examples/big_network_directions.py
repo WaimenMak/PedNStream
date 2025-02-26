@@ -51,13 +51,13 @@ if __name__ == "__main__":
     # Initialize network with origin at node 0 and destination at node 8
     network_env = Network(adj, params, origin_nodes=[0], destination_nodes=[8], od_flows=od_flows, pos=pos)
     # Run simulation
-    for t in range(1, params['simulation_steps']):
-        network_env.network_loading(t)
+    # for t in range(1, params['simulation_steps']):
+    #     network_env.network_loading(t)
 
     # Save and visualize results
     output_dir = os.path.join("..", "outputs")
-    output_handler = OutputHandler(base_dir=output_dir, simulation_dir="delft_directions")
-    output_handler.save_network_state(network_env)
+    # output_handler = OutputHandler(base_dir=output_dir, simulation_dir="delft_directions")
+    # output_handler.save_network_state(network_env)
 
     # Create animation
     matplotlib.use('macosx')

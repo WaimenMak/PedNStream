@@ -60,7 +60,7 @@ class Link(BaseLink):
         self.travel_time = self.length / self.free_flow_speed
         self.unit_time = kwargs['unit_time']
         self.free_flow_tau = round(self.travel_time / self.unit_time)
-        self.congestion_tau = round(self.length / (0.8 * self.unit_time)) # assume the average congestion speed is 0.8 m/s
+        # self.congestion_tau = round(self.length / (0.8 * self.unit_time)) # assume the average congestion speed is 0.8 m/s
 
         # Additional dynamic attributes
         self.num_pedestrians = np.zeros(kwargs['simulation_steps'])

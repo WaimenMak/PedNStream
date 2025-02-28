@@ -126,9 +126,7 @@ class PathFinder:
         
         for origin, dest in od_pairs:
             try:
-                # paths = list(nx.shortest_simple_paths(
-                #     self.graph, origin, dest, weight='weight'))[:k_paths]
-                paths = k_shortest_paths(self.graph, origin, dest, k=3)
+                paths = k_shortest_paths(self.graph, origin, dest, k=k_paths)
                 self.od_paths[(origin, dest)] = paths
                 
                 # Record which nodes are used in this OD pair
@@ -270,6 +268,7 @@ class PathFinder:
         """Calculate turn probabilities including special cases for origin/destination nodes"""
         # node = self.graph.nodes[current_node]
         current_node_id = current_node.node_id
+        # get the relevant od pairs for this node
         relevant_od_pairs = self.node_to_od_pairs.get(current_node_id, set())
         turns_od_dict = {}
         for od_pair in relevant_od_pairs:
@@ -299,7 +298,7 @@ class PathFinder:
                     # Keep only the shortest remaining distance for this turn
                     if turn not in od_turn_distances or remaining_dist < od_turn_distances[turn]:
                         od_turn_distances[turn] = remaining_dist
-                        turns_od_dict[turn] = turns_od_dict.get(turn, []) + [od_pair]
+                        turns_od_dict[turn] = turns_od_dict.get(turn, []) + [od_pair] #no need recalculate
                         
                 except ValueError:
                     # Current node not in this path
@@ -321,9 +320,11 @@ class PathFinder:
                 # Update distances in existing structure or create new
                 for turn, distance in od_turn_distances.items():
                     up_node = turn[0]
+                    down_node = turn[1]
                     if up_node not in current_node.turns_by_upstream:
                         current_node.turns_by_upstream[up_node] = {}
-                    current_node.turns_by_upstream[up_node][turn] = distance
+                    # current_node.turns_by_upstream[up_node][turn] = distance
+                    current_node.turns_by_upstream[up_node][down_node] = distance
                     current_node.up_od_probs[up_node][od_pair] += 1
 
                 # Calculate probabilities for each upstream node separately
@@ -332,19 +333,29 @@ class PathFinder:
                 theta = 0.1
 
                 # process the turns with same upstream node
-                for up_node, turns_dict in current_node.turns_by_upstream.items():
-                    # Current turns in current upstream node group
-                    current_turns = {turn: dist for turn, dist in turns_dict.items() 
-                                  if turn in od_turn_distances}
+                # for up_node, turns_dict in current_node.turns_by_upstream.items():
+                #     # Current turns in current upstream node group
+                #     # current_turns = {turn: dist for turn, dist in turns_dict.items()
+                #     #               if turn in od_turn_distances}
                     
-                    if current_turns:
-                        turns = list(current_turns.keys())
-                        distances = [current_turns[turn] for turn in turns]
-                        exp_utilities = np.exp(-theta * np.array(distances))
-                        # Normalize within this upstream node group
-                        probs = exp_utilities / np.sum(exp_utilities)
+                #     # if current_turns:
+                #     if turns_dict:
+                #         # turns = list(current_turns.keys())
+                #         # distances = [current_turns[turn] for turn in turns]
+                #         turns = list(turns_dict.keys())
+                #         distances = [turns_dict[turn] for turn in turns]
+                #         exp_utilities = np.exp(-theta * np.array(distances))
+                #         # Normalize within this upstream node group
+                #         probs = exp_utilities / np.sum(exp_utilities)
                         
-                        # Update probabilities for turns from this upstream node P(down|up,od)
+                #         # Update probabilities for turns from this upstream node P(down|up,od)
+                #         current_node.node_turn_probs[od_pair].update(dict(zip(turns, probs)))
+                for up_node, down_nodes in current_node.turns_by_upstream.items():
+                    if down_nodes:
+                        turns = list((up_node, down_node) for down_node in down_nodes)
+                        distances = list(down_nodes.values())
+                        exp_utilities = np.exp(-theta * np.array(distances))
+                        probs = exp_utilities / np.sum(exp_utilities)
                         current_node.node_turn_probs[od_pair].update(dict(zip(turns, probs)))
 
         current_node.turns_in_ods = turns_od_dict

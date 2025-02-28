@@ -45,19 +45,22 @@ if __name__ == "__main__":
         # From node 1
         # (1, 4): create_pulse_pattern(30, 90, 3, 4),  # Pulse pattern to node 4
         (0, 8): 8,
+        (0, 100): 8,
+        (5, 8): 8,
+        (5, 100): 8,
         # (1, 5): create_pulse_pattern(40, 80, 5, 3)   # Different pulse to node 5
         # (1, 5): 5
     }
     # Initialize network with origin at node 0 and destination at node 8
-    network_env = Network(adj, params, origin_nodes=[0], destination_nodes=[8], od_flows=od_flows, pos=pos)
+    network_env = Network(adj, params, origin_nodes=[0, 5], destination_nodes=[8, 100], od_flows=od_flows, pos=pos)
     # Run simulation
-    # for t in range(1, params['simulation_steps']):
-    #     network_env.network_loading(t)
+    for t in range(1, params['simulation_steps']):
+        network_env.network_loading(t)
 
     # Save and visualize results
     output_dir = os.path.join("..", "outputs")
-    # output_handler = OutputHandler(base_dir=output_dir, simulation_dir="delft_directions")
-    # output_handler.save_network_state(network_env)
+    output_handler = OutputHandler(base_dir=output_dir, simulation_dir="delft_directions")
+    output_handler.save_network_state(network_env)
 
     # Create animation
     matplotlib.use('macosx')

@@ -5,6 +5,7 @@ import json
 import pandas as pd
 import os
 from tqdm import tqdm
+import numpy as np
 
 class NetworkVisualizer:
     def __init__(self, network=None, simulation_dir=None, pos=None):
@@ -25,6 +26,17 @@ class NetworkVisualizer:
         
         # Initialize fixed position for nodes
         self.pos = pos
+        self.G = nx.DiGraph()
+        # Initialize the graph structure
+        for node_id in self.node_data:
+            self.G.add_node(node_id, size=0)
+        for link_id, link_info in self.link_data.items():
+            start_node, end_node = link_id.split('-')
+            self.G.add_edge(start_node, end_node)
+            
+        # If no position provided, calculate it once and store it
+        if self.pos is None:
+            self.pos = nx.spring_layout(self.G, k=1, iterations=50, seed=42)
 
     def load_simulation_data(self, simulation_dir):
         """Load saved simulation data"""
@@ -192,46 +204,61 @@ class NetworkVisualizer:
         
         # Create initial figure
         fig, ax = plt.subplots(figsize=figsize)
-        G = nx.DiGraph()
-        
+        # G = nx.DiGraph()
+
         # Initialize the position if not already set
         if self.pos is None:
             # Create temporary graph for initial layout
-            G = nx.DiGraph()
-            if self.from_saved:
-                for node_id in self.node_data:
-                    G.add_node(node_id)
-                for link_id in self.link_data:
-                    u, v = link_id.split('-')
-                    G.add_edge(u, v)
-            else:
-                for node in self.network.nodes:
-                    G.add_node(node.node_id)
-                for (u, v) in self.network.links:
-                    G.add_edge(u, v)
+            # G = nx.DiGraph()
+            # if self.from_saved:
+            #     for node_id in self.node_data:
+            #         G.add_node(node_id)
+            #     for link_id in self.link_data:
+            #         u, v = link_id.split('-')
+            #         G.add_edge(u, v)
+            # else:
+            #     for node in self.network.nodes:
+            #         G.add_node(node.node_id)
+            #     for (u, v) in self.network.links:
+            #         G.add_edge(u, v)
             
             seed = 42  # You can change this seed value
-            self.pos = nx.spring_layout(G, k=1, iterations=50, seed=seed)
+            # self.pos = nx.spring_layout(G, k=1, iterations=50, seed=seed)
+            self.pos = nx.spring_layout(self.G, k=1, iterations=50, seed=seed)
             # print(self.pos)
         
+        # Calculate fixed axis limits once
+        x_coords = [coord[0] for coord in self.pos.values()]
+        y_coords = [coord[1] for coord in self.pos.values()]
+        x_min, x_max = min(x_coords), max(x_coords)
+        y_min, y_max = min(y_coords), max(y_coords)
+        
+        # Add some padding (e.g., 10% of the range)
+        x_padding = (x_max - x_min) * 0.1
+        y_padding = (y_max - y_min) * 0.1
+        x_min -= x_padding
+        x_max += x_padding
+        y_min -= y_padding
+        y_max += y_padding
+        
         def update(frame):
-            fig.clear()  # Clear the entire figure
-            ax = fig.add_subplot(111)  # Create new axis
+            fig.clear()
+            ax = fig.add_subplot(111)
             
-            # Create network for current frame
+            # Update edge values without changing positions
             if self.from_saved:
                 # print("aaa")
-                G = nx.DiGraph()
+                # G = nx.DiGraph()
                 # Add nodes from saved data
-                for node_id, node_info in self.node_data.items():
-                    if hasattr(self, 'time_series'):
-                        total_flow = self.time_series[
-                            (self.time_series['time_step'] == frame) &
-                            (self.time_series['link_id'].isin([f"{link}" for link in node_info['incoming_links']]))
-                        ]['inflow'].sum()
-                    else:
-                        total_flow = 0
-                    G.add_node(node_id, size=total_flow)
+                # for node_id, node_info in self.node_data.items():
+                #     if hasattr(self, 'time_series'):
+                #         total_flow = self.time_series[
+                #             (self.time_series['time_step'] == frame) &
+                #             (self.time_series['link_id'].isin([f"{link}" for link in node_info['incoming_links']]))
+                #         ]['inflow'].sum()
+                #     else:
+                #         total_flow = 0
+                #     G.add_node(node_id, size=total_flow)
                 
                 # Add edges from saved data
                 for link_id, link_info in self.link_data.items():
@@ -242,13 +269,15 @@ class NetworkVisualizer:
                         value = link_info['link_flow'][frame]
                     elif edge_property == 'speed':
                         value = link_info['speed'][frame]
-                    G.add_edge(u, v, value=value)
+                    # G.add_edge(u, v, value=value)
+                    #change value of edge
+                    self.G[u][v]['value'] = value
             else:
                 # Original logic for direct network object
-                for node in self.network.nodes:
-                    total_flow = sum(link.cumulative_inflow[frame] 
-                                   for link in node.incoming_links)
-                    G.add_node(node.node_id, size=total_flow)
+                # for node in self.network.nodes:
+                #     total_flow = sum(link.cumulative_inflow[frame] 
+                #                    for link in node.incoming_links)
+                #     G.add_node(node.node_id, size=total_flow)
                 
                 for (u, v), link in self.network.links.items():
                     if edge_property == 'density':
@@ -257,54 +286,46 @@ class NetworkVisualizer:
                         value = link.link_flow[frame]
                     elif edge_property == 'speed':
                         value = link.speed[frame]
-                    G.add_edge(u, v, value=value)
+                    # G.add_edge(u, v, value=value)
+                    #change value of edge
+                    self.G[u][v]['value'] = value
             
-            # Draw nodes
-            node_sizes = [G.nodes[node]['size'] * 100 + 100 for node in G.nodes()]
+            # Use stored positions for drawing
+            node_sizes = [self.G.nodes[node]['size'] * 100 + 100 for node in self.G.nodes()]
             # print(self.pos)
             # self.pos = nx.spring_layout(G, k=1, iterations=50, seed=42)
-            nx.draw_networkx_nodes(G, pos=self.pos, node_size=node_sizes,
+            nx.draw_networkx_nodes(self.G, pos=self.pos,  # Use stored positions
+                                 node_size=node_sizes,
                                  node_color='lightblue',
                                  ax=ax)
             
             # Draw edges
-            edges = list(G.edges())
-            for u, v in edges:
-                width = G[u][v]['value'] * 5
-                arrowsize = G[u][v]['value'] * 20 + 0
-                
-                # Set value range based on property type
-                if edge_property == 'density':
-                    vmin, vmax = 0, 8  # density typically ranges from 0 to 1
-                elif edge_property == 'flow':
-                    vmin, vmax = 0, 3  # adjust these values based on your flow range
-                elif edge_property == 'speed':
-                    vmin, vmax = 0, 3  # adjust these values based on your speed range
-                
-                if (v, u) in edges:
-                    nx.draw_networkx_edges(G, self.pos, 
-                                        edgelist=[(u, v)],
-                                        edge_color=[G[u][v]['value']],
-                                        edge_cmap=plt.cm.RdYlGn_r,
-                                        width=width,
-                                        edge_vmin=vmin,
-                                        edge_vmax=vmax,
-                                        arrowsize=arrowsize,
-                                        ax=ax,
-                                        connectionstyle=f"arc3,rad=0.2")
-                else:
-                    nx.draw_networkx_edges(G, self.pos, 
-                                         edgelist=[(u, v)],
-                                         edge_color=[G[u][v]['value']],
-                                         edge_cmap=plt.cm.RdYlGn_r,
-                                         width=width,
-                                         edge_vmin=vmin,
-                                         edge_vmax=vmax,
-                                         arrowsize=arrowsize,
-                                         ax=ax)
+            edges = list(self.G.edges())
+            edge_values = np.array(list(nx.get_edge_attributes(self.G, 'value').values()))
+            edges_widths = edge_values * 5
+            edges_arrowsizes = edge_values * 20
+            # edge_arrowsizes = []
+            # edge_colors = []
+            if edge_property == 'density':
+                vmin, vmax = 0, 8  # density typically ranges from 0 to 1
+            elif edge_property == 'flow':
+                vmin, vmax = 0, 3  # adjust these values based on your flow range
+            elif edge_property == 'speed':
+                vmin, vmax = 0, 3  # adjust these values based on your speed range
+            
+            nx.draw_networkx_edges(self.G, self.pos, 
+                                 edgelist=edges,
+                                 edge_color=edge_values.tolist(),
+                                 edge_cmap=plt.cm.RdYlGn_r,
+                                 width=edges_widths.tolist(),
+                                 edge_vmin=vmin,
+                                 edge_vmax=vmax,
+                                 arrowsize=edges_arrowsizes.tolist(),
+                                 ax=ax,
+                                 connectionstyle=f"arc3,rad=0.2")
             
             # Draw labels
-            nx.draw_networkx_labels(G, self.pos, ax=ax)
+            nx.draw_networkx_labels(self.G, self.pos, ax=ax)
             
             # Update colorbar with same value range
             sm = plt.cm.ScalarMappable(cmap=plt.cm.RdYlGn_r,
@@ -314,12 +335,16 @@ class NetworkVisualizer:
             cbar.ax.tick_params(labelsize=12)  # Enlarge tick labels
             cbar.set_label(edge_property.capitalize(), size=14)  # Enlarge colorbar label
             
+            # Set fixed axis limits
+            ax.set_xlim(x_min, x_max)
+            ax.set_ylim(y_min, y_max)
+            
             # Set title and turn off axis
             ax.set_title(f'Time Step: {frame}')
             ax.set_axis_off()
             
             # Clear the graph for next frame
-            G.clear()
+            # self.G.clear()
             
             # Adjust layout
             plt.tight_layout()

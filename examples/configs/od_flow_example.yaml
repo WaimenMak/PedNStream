@@ -23,8 +23,6 @@ default_link:
   free_flow_speed: 1.5
   k_critical: 2
   k_jam: 10
-  simulation_steps: 500
-  unit_time: 10
 
 # Link-specific Parameters (optional)
 links:
@@ -34,8 +32,6 @@ links:
     free_flow_speed: 1.5
     k_critical: 2
     k_jam: 10
-    simulation_steps: 500
-    unit_time: 10
 
   "2_4":
     length: 80
@@ -43,8 +39,6 @@ links:
     free_flow_speed: 1.5
     k_critical: 2
     k_jam: 10
-    simulation_steps: 500
-    unit_time: 10
 
 # Demand Configuration
 demand:
@@ -53,7 +47,7 @@ demand:
 #    value: 8
   origin_1:
     pattern: "gaussian_peaks"
-    peak_lambda: 15
+    peak_lambda: 35
     base_lambda: 5
     seed: 42
 

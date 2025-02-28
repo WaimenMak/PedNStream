@@ -39,7 +39,7 @@ class DemandGenerator:
         """Built-in gaussian peaks demand pattern"""
         peak_lambda = self.params.get(f'peak_lambda_{origin_id}', 10)
         base_lambda = self.params.get(f'base_lambda_{origin_id}', 5)
-        t = 300
+        t = self.simulation_steps
         
         morning_peak = peak_lambda * np.exp(-(self.time - t/4)**2 / (2 * (t/20)**2))
         evening_peak = peak_lambda * np.exp(-(self.time - 3*t/4)**2 / (2 * (t/20)**2))
@@ -178,8 +178,8 @@ class Network:
                                 self.link_params.get('default_link', {}))
                     
                     # Create forward and reverse links
-                    forward_link = Link(f"{i}_{j}", node, self.nodes[j], **link_params)
-                    reverse_link = Link(f"{j}_{i}", self.nodes[j], node, **link_params)
+                    forward_link = Link(f"{i}_{j}", node, self.nodes[j], self.simulation_steps, self.unit_time, **link_params)
+                    reverse_link = Link(f"{j}_{i}", self.nodes[j], node, self.simulation_steps, self.unit_time, **link_params)
                     
                     # Add links to nodes
                     node.outgoing_links.append(forward_link)

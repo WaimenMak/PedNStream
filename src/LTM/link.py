@@ -29,7 +29,7 @@ class BaseLink:
 
 class Link(BaseLink):
     """Physical link with full traffic dynamics"""
-    def __init__(self, link_id, start_node, end_node, **kwargs):
+    def __init__(self, link_id, start_node, end_node, simulation_steps, unit_time, **kwargs):
         """
         Initialize a Link with parameters from kwargs
         :param link_id: ID of the link
@@ -45,7 +45,7 @@ class Link(BaseLink):
             - simulation_steps: Number of simulation steps
             - gamma: Optional, default 2e-2
         """
-        super().__init__(link_id, start_node, end_node, kwargs['simulation_steps'])
+        super().__init__(link_id, start_node, end_node, simulation_steps)
         
         # Physical attributes
         self.length = kwargs['length']
@@ -58,15 +58,15 @@ class Link(BaseLink):
         self.shockwave_speed = self.capacity / (self.k_jam - self.k_critical)
         self.current_speed = self.free_flow_speed
         self.travel_time = self.length / self.free_flow_speed
-        self.unit_time = kwargs['unit_time']
+        self.unit_time = unit_time
         self.free_flow_tau = round(self.travel_time / self.unit_time)
         # self.congestion_tau = round(self.length / (0.8 * self.unit_time)) # assume the average congestion speed is 0.8 m/s
 
         # Additional dynamic attributes
-        self.num_pedestrians = np.zeros(kwargs['simulation_steps'])
-        self.density = np.zeros(kwargs['simulation_steps'])
-        self.speed = np.zeros(kwargs['simulation_steps'])
-        self.link_flow = np.zeros(kwargs['simulation_steps'])
+        self.num_pedestrians = np.zeros(simulation_steps)
+        self.density = np.zeros(simulation_steps)
+        self.speed = np.zeros(simulation_steps)
+        self.link_flow = np.zeros(simulation_steps)
         self.gamma = kwargs.get('gamma', 2e-3)  # Default value if not provided, diffusion coefficient
         # self.receiving_flow = []
         self.reverse_link = None

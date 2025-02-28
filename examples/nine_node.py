@@ -32,16 +32,37 @@ if __name__ == "__main__":
     ])
 
     # Simulation parameters
+    # params = {
+    #     'length': 100,
+    #     'width': 1,
+    #     'free_flow_speed': 1.5,
+    #     'k_critical': 2,
+    #     'k_jam': 10,
+    #     'unit_time': 10,
+    #     'peak_lambda': 15,
+    #     'base_lambda': 5,
+    #     'simulation_steps': 1000,
+    # }
     params = {
-        'length': 100,
-        'width': 1,
-        'free_flow_speed': 1.5,
-        'k_critical': 2,
-        'k_jam': 10,
         'unit_time': 10,
-        'peak_lambda': 15,
-        'base_lambda': 5,
-        'simulation_steps': 1000,
+        'simulation_steps': 600,
+        'default_link': {
+            'length': 100,
+            'width': 1,
+            'free_flow_speed': 1.5,
+            'k_critical': 2,
+            'k_jam': 10,
+        },
+        'demand':{
+            "origin_0":{
+                "peak_lambda": 15,
+                "base_lambda": 5,
+            },
+            "origin_4":{
+                "peak_lambda": 15,
+                "base_lambda": 5,
+            }
+        }
     }
 
     # Initialize network with origin at node 0 and destination at node 8

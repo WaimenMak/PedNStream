@@ -45,7 +45,7 @@ def load_config(config_path: str) -> dict:
         'adjacency_matrix': config['network']['adjacency_matrix'],
         'link_params': link_params,
         'origin_nodes': config['network']['origin_nodes'],
-        'destination_nodes': config['network']['destination_nodes'],
+        'destination_nodes': config['network'].get('destination_nodes', []),
         'od_flows': od_flows
     }
 
@@ -60,7 +60,7 @@ def validate_config(config: Dict[str, Any]) -> None:
         ValueError: If configuration is invalid
     """
     required_fields = {
-        'network': ['adjacency_matrix', 'origin_nodes', 'destination_nodes'],
+        'network': ['adjacency_matrix', 'origin_nodes'],
         'simulation': ['simulation_steps', 'unit_time'],
         'default_link': ['length', 'width', 'free_flow_speed', 'k_critical', 'k_jam'],
         'demand': [],
@@ -82,9 +82,9 @@ def validate_config(config: Dict[str, Any]) -> None:
     
     # Validate origin and destination nodes
     max_node = adj_matrix.shape[0] - 1
-    for node in config['network']['origin_nodes'] + config['network']['destination_nodes']:
-        if node > max_node:
-            raise ValueError(f"Node {node} exceeds network size")
+    # for node in config['network']['origin_nodes'] + config['network']['destination_nodes']:
+    #     if node > max_node:
+    #         raise ValueError(f"Node {node} exceeds network size")
             
     # Validate demand patterns
     for origin_id, demand_config in config.get('demand', {}).items():

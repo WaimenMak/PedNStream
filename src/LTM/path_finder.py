@@ -104,13 +104,12 @@ def k_shortest_paths(graph, origin, dest, k=1):
 class PathFinder:
     """Handles path finding and path-related operations"""
     def __init__(self, links):
-        self.od_paths = {}
-        self.path_probabilities = {}
-        self.turn_to_paths = {}
+        self.od_paths = {}  # {(origin, dest): [path1, path2, ...]}
         self.graph = self._create_graph(links)
         self.nodes_in_paths = set()
         self.node_turn_probs = {}  # {node_id: {(o,d): {(up_node, down_node): probability}}}
-        self.node_to_od_pairs = {}  # {node_id: set((o1,d1), (o2,d2), ...)}
+        self.node_to_od_pairs = {}  # {node_id: set((o1,d1), (o2,d2), ...)}, to get the relevant od pairs for the node
+        self._initialized = False  # Add initialization flag
 
     def _create_graph(self, links):
         """Convert network to NetworkX graph"""
@@ -152,6 +151,7 @@ class PathFinder:
             # nodes[node_id].turns = list(turns)
             # nodes[node_id].turns = dict.fromkeys(turns.keys(), 0)
             # nodes[node_id].turns_in_ods = turns
+        self._initialized = True
 
     def get_path_attributes(self, path):
         """Calculate path attributes"""
@@ -270,7 +270,7 @@ class PathFinder:
         current_node_id = current_node.node_id
         # get the relevant od pairs for this node
         relevant_od_pairs = self.node_to_od_pairs.get(current_node_id, set())
-        turns_od_dict = {}
+        # turns_od_dict = {}
         for od_pair in relevant_od_pairs:
             paths = self.od_paths[od_pair]
             od_turn_distances = {}  # {(up_node, down_node): shortest_remaining_distance}
@@ -293,12 +293,16 @@ class PathFinder:
                         down_node = path[node_idx + 1]
                         turn = (up_node, down_node)
                     
-                    remaining_dist = self.calculate_path_distance(path, start_idx=node_idx)
-                    
+                    if not self._initialized:
+                        remaining_dist = self.calculate_path_distance(path, start_idx=node_idx)
+                        
                     # Keep only the shortest remaining distance for this turn
                     if turn not in od_turn_distances or remaining_dist < od_turn_distances[turn]:
                         od_turn_distances[turn] = remaining_dist
-                        turns_od_dict[turn] = turns_od_dict.get(turn, []) + [od_pair] #no need recalculate
+                        # turns_od_dict[turn] = turns_od_dict.get(turn, []) + [od_pair] #no need recalculate
+                        # if ods_in_turns is e
+                        if not self._initialized:
+                            current_node.ods_in_turns[turn] = current_node.ods_in_turns.get(turn, []) + [od_pair]
                         
                 except ValueError:
                     # Current node not in this path
@@ -359,10 +363,10 @@ class PathFinder:
                         probs = exp_utilities / np.sum(exp_utilities)
                         current_node.node_turn_probs[od_pair].update(dict(zip(turns, probs)))
 
-        current_node.turns_in_ods = turns_od_dict
+        # current_node.turns_in_ods = turns_od_dict
         # store the turns for the node
         # return turns_od_dict
-
+        
     def update_turning_fractions(self, node, time_step: int, od_manager):
         """Calculate turning fractions using stored turn probabilities: node_turn_probs,
            Return turning_fractions: np.array
@@ -446,7 +450,7 @@ class PathFinder:
                 prob_sum = 0
                 
                 # Get all OD pairs for this turn
-                od_pairs = node.turns_in_ods.get(turn, [])
+                od_pairs = node.ods_in_turns.get(turn, [])
                 for od_pair in od_pairs:
                     # P(down|up,od) from node_turn_probs
                     turn_prob = node.node_turn_probs[od_pair].get(turn, 0)

@@ -23,7 +23,7 @@ class Node:
         self.demand = None # for origin node
         self.mask = None # for regular node, classic update method
         # self.turns = None # for recording the probs of the turns of each node (upstream, downstream)
-        self.turns_in_ods = None # for recording the turns in which od pairs
+        self.ods_in_turns = {} # for recording the turns in which od pairs
 
     def _create_virtual_link(self, node_id, direction, is_incoming, params: dict):
         """Helper method to create virtual links for origin and destination nodes"""

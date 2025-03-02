@@ -310,8 +310,8 @@ class PathFinder:
                     current_node.node_turn_probs = {}
                 
                 # Initialize turns_by_upstream in node if not exists
-                if not hasattr(current_node, 'turns_by_upstream'):
-                    current_node.turns_by_upstream = {}
+                if not hasattr(current_node, 'turns_distances'):
+                    current_node.turns_distances = {}
 
                 # Initialize up_od_probs if not exists
                 if not hasattr(current_node, 'up_od_probs'):
@@ -321,16 +321,17 @@ class PathFinder:
                 for turn, distance in od_turn_distances.items():
                     up_node = turn[0]
                     down_node = turn[1]
-                    if up_node not in current_node.turns_by_upstream:
-                        current_node.turns_by_upstream[up_node] = {}
+                    if up_node not in current_node.turns_distances:
+                        current_node.turns_distances[up_node] = {}
                     # current_node.turns_by_upstream[up_node][turn] = distance
-                    current_node.turns_by_upstream[up_node][down_node] = distance
-                    current_node.up_od_probs[up_node][od_pair] += 1
+                    current_node.turns_distances[up_node][down_node] = distance
+                    # current_node.up_od_probs[up_node][od_pair] += 1
+                    current_node.up_od_probs[up_node][od_pair] = 0 # just assign od_pair to the upstream node
 
                 # Calculate probabilities for each upstream node separately
                 if od_pair not in current_node.node_turn_probs:
                     current_node.node_turn_probs[od_pair] = {}
-                theta = 0.1
+                theta = 0.1  # like the temperature in the logit model
 
                 # process the turns with same upstream node
                 # for up_node, turns_dict in current_node.turns_by_upstream.items():
@@ -350,7 +351,7 @@ class PathFinder:
                         
                 #         # Update probabilities for turns from this upstream node P(down|up,od)
                 #         current_node.node_turn_probs[od_pair].update(dict(zip(turns, probs)))
-                for up_node, down_nodes in current_node.turns_by_upstream.items():
+                for up_node, down_nodes in current_node.turns_distances.items():
                     if down_nodes:
                         turns = list((up_node, down_node) for down_node in down_nodes)
                         distances = list(down_nodes.values())

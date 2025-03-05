@@ -5,6 +5,8 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 from streamlit_folium import st_folium
+import argparse
+import os
 
 class NetworkDashboard:
     def __init__(self, link_data_path, pos, zoom_start=14):
@@ -64,12 +66,23 @@ class NetworkDashboard:
         
         # Add nodes (these don't change)
         for node_id, pos in self.pos.items():
-            folium.CircleMarker(
-                location=[pos[1], pos[0]],
-                radius=5,
-                color='blue',
-                fill=True,
-                fillColor='lightblue',
+            if node_id in ['0', '8']: # 0, 8 are the orings.
+                folium.CircleMarker(
+                    location=[pos[1], pos[0]],
+                    radius=5,
+                    color='red',
+                    fill=True,
+                    fillColor='red',
+                    fillOpacity=0.7,
+                    popup=f"Node: {node_id}"
+                ).add_to(m)
+            else:
+                folium.CircleMarker(
+                    location=[pos[1], pos[0]],
+                    radius=5,
+                    color='blue',
+                    fill=True,
+                    fillColor='lightblue',
                 fillOpacity=0.7,
                 popup=f"Node: {node_id}"
             ).add_to(m)
@@ -182,8 +195,20 @@ def run_visualization(link_data_path, pos):
     dashboard.run_dashboard()
 
 if __name__ == "__main__":
-    # Example usage:
-    link_data_path = "../../outputs/delft/link_data.json"
-    with open("../../node_positions.json", 'r') as f:
+    parser = argparse.ArgumentParser(description='Network Dashboard Visualization')
+    parser.add_argument('--name', type=str, 
+                       default="delft_directions",
+                       help='Name of the simulation')
+    parser.add_argument('--pos', type=str,
+                       default="node_positions.json",
+                       help='Path to node_positions.json file')
+    
+    args = parser.parse_args()
+    path_to_pos = os.path.join(".", args.pos)
+    # Load node positions
+    with open(path_to_pos, 'r') as f:
         pos = {str(k): tuple(v) for k, v in json.load(f).items()}
-    run_visualization(link_data_path, pos)
+    
+    path_to_link_data = os.path.join(".", "outputs", args.name, "link_data.json")
+    # Run visualization with parsed arguments
+    run_visualization(path_to_link_data, pos)

@@ -65,6 +65,20 @@ class NetworkVisualizer:
         """
         # Create figure and axis
         fig, ax = plt.subplots(figsize=(10, 8))
+        # fix the size of the figure
+                # Calculate fixed axis limits once
+        x_coords = [coord[0] for coord in self.pos.values()]
+        y_coords = [coord[1] for coord in self.pos.values()]
+        x_min, x_max = min(x_coords), max(x_coords)
+        y_min, y_max = min(y_coords), max(y_coords)
+        
+        # Add some padding (e.g., 10% of the range)
+        x_padding = (x_max - x_min) * 0.1
+        y_padding = (y_max - y_min) * 0.1
+        x_min -= x_padding
+        x_max += x_padding
+        y_min -= y_padding
+        y_max += y_padding
         
         G = nx.DiGraph()
         
@@ -174,14 +188,15 @@ class NetworkVisualizer:
         
         # Turn off axis
         ax.set_axis_off()
-        
+        ax.set_xlim(x_min, x_max)
+        ax.set_ylim(y_min, y_max)
         # Adjust layout to prevent cutting off
         plt.tight_layout()
         plt.show()
         
         return fig, ax
 
-    def visualize_network_state(self, time_step, edge_property='density', use_folium=True):
+    def visualize_network_state(self, time_step, edge_property='density', use_folium=False):
         """
         Visualize network state at a specific time step using either networkx or folium
         """
@@ -193,8 +208,32 @@ class NetworkVisualizer:
         import folium
         from branca.colormap import LinearColormap
 
-        # Create base map centered on Delft
-        m = folium.Map(location=[52.00667, 4.35556], zoom_start=14)
+        # Calculate center from node positions
+        lats = [pos[1] for pos in self.pos.values()]
+        lons = [pos[0] for pos in self.pos.values()]
+        center = [
+            (max(lats) + min(lats)) / 2,
+            (max(lons) + min(lons)) / 2
+        ]
+        
+        # Calculate bounds for restricting the view
+        lat_range = max(lats) - min(lats)
+        lon_range = max(lons) - min(lons)
+        lat_padding = lat_range * 0.1
+        lon_padding = lon_range * 0.1
+        
+        min_bounds = [min(lats) - lat_padding, min(lons) - lon_padding]
+        max_bounds = [max(lats) + lat_padding, max(lons) + lon_padding]
+        
+        # Create map centered on the network with bounds
+        m = folium.Map(
+            location=center,
+            zoom_start=14,
+            max_bounds=True,
+            min_zoom=16,
+            max_zoom=18,
+            bounds=[min_bounds, max_bounds]
+        )
 
         # Set value range based on property type
         if edge_property == 'density':
@@ -217,8 +256,19 @@ class NetworkVisualizer:
         # Get edge values
         edge_values = {}
         if self.from_saved:
+            # Keep track of processed links to handle bidirectional links
+            processed_pairs = set()
+            
             for link_id, link_info in self.link_data.items():
                 u, v = map(int, link_id.split('-'))
+                reverse_id = f"{v}-{u}"
+                
+                # Skip if we've already processed this link pair
+                link_pair = tuple(sorted([u, v]))
+                if link_pair in processed_pairs:
+                    continue
+                
+                # Get value for current direction
                 if edge_property == 'density':
                     value = link_info['density'][time_step]
                 elif edge_property == 'flow':
@@ -227,7 +277,25 @@ class NetworkVisualizer:
                     value = link_info['speed'][time_step]
                 elif edge_property == 'num_pedestrians':
                     value = link_info['num_pedestrians'][time_step]
+                
+                # If bidirectional, consider reverse direction
+                if reverse_id in self.link_data:
+                    reverse_info = self.link_data[reverse_id]
+                    if edge_property == 'density':
+                        reverse_value = reverse_info['density'][time_step]
+                    elif edge_property == 'flow':
+                        reverse_value = reverse_info['link_flow'][time_step]
+                    elif edge_property == 'speed':
+                        reverse_value = reverse_info['speed'][time_step]
+                    elif edge_property == 'num_pedestrians':
+                        reverse_value = reverse_info['num_pedestrians'][time_step]
+                    
+                    # Use the maximum value of both directions
+                    # value = max(value, reverse_value)
+                    value = value + reverse_value
+                
                 edge_values[(u, v)] = value
+                processed_pairs.add(link_pair)
         else:
             for (u, v), link in self.network.links.items():
                 value = getattr(link, edge_property)[time_step]
@@ -253,7 +321,7 @@ class NetworkVisualizer:
 
             # Calculate width based on value (similar to original)
             # width = 2 + value * 3
-            width = value
+            width = min(10, value * 0.5)
 
             folium.PolyLine(
                 coords,
@@ -267,7 +335,7 @@ class NetworkVisualizer:
         for node_id in self.G.nodes():
             pos = self.pos[node_id]
             # Calculate node size (similar to original)
-            size = self.G.nodes[node_id].get('size', 0) * 50 + 300
+            size = self.G.nodes[node_id].get('size', 0) * 50 + 300 # there is not size in the node for now
             radius = np.sqrt(size) / 10  # Convert size to reasonable radius
 
             if node_id in ['0', '8']:
@@ -358,19 +426,7 @@ class NetworkVisualizer:
             
             # Update edge values without changing positions
             if self.from_saved:
-                # print("aaa")
-                # G = nx.DiGraph()
-                # Add nodes from saved data
-                # for node_id, node_info in self.node_data.items():
-                #     if hasattr(self, 'time_series'):
-                #         total_flow = self.time_series[
-                #             (self.time_series['time_step'] == frame) &
-                #             (self.time_series['link_id'].isin([f"{link}" for link in node_info['incoming_links']]))
-                #         ]['inflow'].sum()
-                #     else:
-                #         total_flow = 0
-                #     G.add_node(node_id, size=total_flow)
-                
+                # print("aaa")    
                 # Add edges from saved data
                 for link_id, link_info in self.link_data.items():
                     u, v = link_id.split('-')

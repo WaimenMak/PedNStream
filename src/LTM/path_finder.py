@@ -293,8 +293,8 @@ class PathFinder:
                         down_node = path[node_idx + 1]
                         turn = (up_node, down_node)
                     
-                    if not self._initialized:
-                        remaining_dist = self.calculate_path_distance(path, start_idx=node_idx)
+                    # if not self._initialized:
+                    remaining_dist = self.calculate_path_distance(path, start_idx=node_idx)
                         
                     # Keep only the shortest remaining distance for this turn
                     if turn not in od_turn_distances or remaining_dist < od_turn_distances[turn]:

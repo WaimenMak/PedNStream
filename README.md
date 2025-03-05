@@ -1,7 +1,9 @@
 # Implementation of the LTM pedestrian simulator
 
-## OriginNode
-[-] OriginNode is a class that represents the origin of a pedestrian. It is a subclass of the Node class. It is used to create the origin of a pedestrian. It has a method to create a pedestrian.
+## OneToOneNode
+[-] The node between two nodes.
+
+## RegularNode
 
 ```
 project_root/

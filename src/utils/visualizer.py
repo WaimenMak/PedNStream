@@ -57,10 +57,9 @@ class NetworkVisualizer:
         if os.path.exists(time_series_path):
             self.time_series = pd.read_csv(time_series_path)
 
-    def visualize_network_state(self, time_step, edge_property='density'):
+    def _visualize_network_nx(self, time_step, edge_property='density'):
         """
-        Visualize network state at a specific time step
-        Works with both direct network object and saved data
+        Visualize network state at a specific time step using networkx
         :param time_step: Time step to visualize
         :param edge_property: Property to visualize ('density', 'flow', or 'speed')
         """
@@ -90,6 +89,8 @@ class NetworkVisualizer:
                     value = link_info['link_flow'][time_step]
                 elif edge_property == 'speed':
                     value = link_info['speed'][time_step]
+                elif edge_property == 'num_pedestrians':
+                    value = link_info['num_pedestrians'][time_step]
                 G.add_edge(u, v, value=value)
         else:
             # Original logic for direct network object
@@ -105,32 +106,21 @@ class NetworkVisualizer:
                     value = link.link_flow[time_step]
                 elif edge_property == 'speed':
                     value = link.speed[time_step]
+                elif edge_property == 'num_pedestrians':
+                    value = link.num_pedestrians[time_step]
                 G.add_edge(u, v, value=value)
         
-        # # Initialize the position if not already set
+        # Initialize the position if not already set
         if self.pos is None:
             # Set random seed for reproducible layout
             seed = 42  # You can change this seed value
             self.pos = nx.spring_layout(G, k=1, iterations=50, seed=seed)
         
         # Draw nodes
-        # node_sizes = [G.nodes[node]['size'] * 100 + 500 for node in G.nodes()]
         node_sizes = [G.nodes[node]['size'] * 50 + 100 for node in G.nodes()]
         nx.draw_networkx_nodes(G, self.pos, node_size=node_sizes,
                              node_color='lightblue',
-                             ax=ax)  # Specify the axis
-        
-        # Get set of origin nodes from OD pairs
-        # origin_nodes = ['0', '8']
-        
-        # # Create node color list
-        # node_colors = ['red' if node in origin_nodes else 'lightblue' 
-        #                 for node in G.nodes()]
-        
-        # nx.draw_networkx_nodes(G, pos=self.pos, 
-        #                         node_size=node_sizes,
-        #                         node_color=node_colors,
-        #                         ax=ax)
+                             ax=ax)
         
         # Draw edges
         edges = list(G.edges())
@@ -145,6 +135,8 @@ class NetworkVisualizer:
                 vmin, vmax = 0, 3  # adjust these values based on your flow range
             elif edge_property == 'speed':
                 vmin, vmax = 0, 3  # adjust these values based on your speed range
+            elif edge_property == 'num_pedestrians':
+                vmin, vmax = 0, 100  # adjust these values based on your pedestrians range
             
             if (v, u) in edges:
                 nx.draw_networkx_edges(G, self.pos, 
@@ -167,8 +159,6 @@ class NetworkVisualizer:
                                      edge_vmax=vmax,
                                      arrowsize=arrowsize,
                                      ax=ax)
-        # Draw labels
-        # nx.draw_networkx_labels(G, self.pos, ax=ax)  # Specify the axis
         
         # Add title
         ax.set_title(f'Network State at Time Step {time_step}', 
@@ -178,10 +168,10 @@ class NetworkVisualizer:
         sm = plt.cm.ScalarMappable(cmap=plt.cm.RdYlGn_r,
                                   norm=plt.Normalize(vmin=vmin, vmax=vmax))
         sm.set_array([])
-        # plt.colorbar(sm, ax=ax, label=edge_property.capitalize())
         cbar = plt.colorbar(sm, ax=ax, label=edge_property.capitalize())
         cbar.ax.tick_params(labelsize=12)  # Enlarge tick labels
         cbar.set_label(edge_property.capitalize(), size=14)  # Enlarge colorbar label
+        
         # Turn off axis
         ax.set_axis_off()
         
@@ -189,7 +179,128 @@ class NetworkVisualizer:
         plt.tight_layout()
         plt.show()
         
-        # return fig, ax
+        return fig, ax
+
+    def visualize_network_state(self, time_step, edge_property='density', use_folium=True):
+        """
+        Visualize network state at a specific time step using either networkx or folium
+        """
+        if not use_folium:
+            # Original networkx visualization code
+            return self._visualize_network_nx(time_step, edge_property)
+
+        # Folium visualization
+        import folium
+        from branca.colormap import LinearColormap
+
+        # Create base map centered on Delft
+        m = folium.Map(location=[52.00667, 4.35556], zoom_start=14)
+
+        # Set value range based on property type
+        if edge_property == 'density':
+            vmin, vmax = 0, 8
+        elif edge_property == 'flow':
+            vmin, vmax = 0, 3
+        elif edge_property == 'speed':
+            vmin, vmax = 0, 3
+        elif edge_property == 'num_pedestrians':
+            vmin, vmax = 0, 100
+
+        # Create color map matching the original RdYlGn_r colormap
+        colormap = LinearColormap(
+            colors=['green', 'yellow', 'red'],
+            vmin=vmin,
+            vmax=vmax,
+            caption=edge_property.capitalize()
+        )
+
+        # Get edge values
+        edge_values = {}
+        if self.from_saved:
+            for link_id, link_info in self.link_data.items():
+                u, v = map(int, link_id.split('-'))
+                if edge_property == 'density':
+                    value = link_info['density'][time_step]
+                elif edge_property == 'flow':
+                    value = link_info['link_flow'][time_step]
+                elif edge_property == 'speed':
+                    value = link_info['speed'][time_step]
+                elif edge_property == 'num_pedestrians':
+                    value = link_info['num_pedestrians'][time_step]
+                edge_values[(u, v)] = value
+        else:
+            for (u, v), link in self.network.links.items():
+                value = getattr(link, edge_property)[time_step]
+                edge_values[(u, v)] = value
+
+        # Add edges to map
+        for (u, v), value in edge_values.items():
+            if hasattr(self, 'edges_gdf'):
+                # If we have GeoDataFrame with actual street geometries
+                try:
+                    geom = self.edges_gdf.loc[(u, v), 'geometry']
+                    coords = [(y, x) for x, y in geom.coords]
+                except KeyError:
+                    # If edge not found, use node positions
+                    start = self.pos[str(u)]
+                    end = self.pos[str(v)]
+                    coords = [(start[1], start[0]), (end[1], end[0])]
+            else:
+                # Use node positions from networkx layout
+                start = self.pos[str(u)]
+                end = self.pos[str(v)]
+                coords = [(start[1], start[0]), (end[1], end[0])]
+
+            # Calculate width based on value (similar to original)
+            # width = 2 + value * 3
+            width = value
+
+            folium.PolyLine(
+                coords,
+                color=colormap(value),
+                weight=width,
+                opacity=0.8,
+                popup=f"Link: {u}->{v}<br>{edge_property}: {value:.2f}"
+            ).add_to(m)
+
+        # Add nodes to map
+        for node_id in self.G.nodes():
+            pos = self.pos[node_id]
+            # Calculate node size (similar to original)
+            size = self.G.nodes[node_id].get('size', 0) * 50 + 300
+            radius = np.sqrt(size) / 10  # Convert size to reasonable radius
+
+            if node_id in ['0', '8']:
+                folium.CircleMarker(
+                    location=[pos[1], pos[0]],
+                    radius=np.sqrt(size) / 5,
+                    color='red',
+                    fill=True,
+                    fillColor='lightred',
+                    fillOpacity=0.7,
+                    popup=f"Node: {node_id}"
+                ).add_to(m)
+            else:
+                folium.CircleMarker(
+                    location=[pos[1], pos[0]],
+                    radius=radius,
+                    color='blue',
+                    fill=True,
+                    fillColor='lightblue',
+                    fillOpacity=0.7,
+                    popup=f"Node: {node_id}"
+                ).add_to(m)
+
+
+        # Add colormap to map
+        colormap.add_to(m)
+        
+        return m
+
+    def save_visualization(self, time_step, filename, edge_property='density'):
+        """Save the visualization to an HTML file"""
+        m = self.visualize_network_state(time_step, edge_property, use_folium=True)
+        m.save(filename)
 
     def animate_network(self, start_time=0, end_time=None, interval=50, figsize=(10, 8), edge_property='density'):
         """
@@ -416,6 +527,7 @@ class NetworkVisualizer:
         plt.tight_layout()
         plt.show()
 
+
 def progress_callback(current_frame, total_frames):
     if not hasattr(progress_callback, 'pbar'):
         progress_callback.pbar = tqdm(total=total_frames, desc='Saving animation')
@@ -427,7 +539,10 @@ if __name__ == "__main__":
     import matplotlib
     matplotlib.use('TkAgg')
     # Example usage
-    simulation_dir = "/Users/mmai/Devs/Crowd-Control/outputs/long_corridor" # Replace with actual timestamp
+    simulation_dir = "/Users/mmai/Devs/Crowd-Control/outputs/delft" # Replace with actual timestamp
     visualizer = NetworkVisualizer(simulation_dir=simulation_dir)
-    ani = visualizer.animate_network(start_time=0, interval=100, edge_property='speed')
-    plt.show()
+    # ani = visualizer.animate_network(start_time=0, interval=100, edge_property='speed')
+    m = visualizer.visualize_network_state(time_step=100, edge_property='num_pedestrians')
+    m.save('../../network_state_t100.html')
+    # m = visualizer.visualize_network_state(time_step=499, edge_property='density')
+    # plt.show()

@@ -57,7 +57,7 @@ class NetworkVisualizer:
         if os.path.exists(time_series_path):
             self.time_series = pd.read_csv(time_series_path)
 
-    def _visualize_network_nx(self, time_step, edge_property='density'):
+    def _visualize_network_nx(self, time_step, edge_property='density', with_colorbar=False):
         """
         Visualize network state at a specific time step using networkx
         :param time_step: Time step to visualize
@@ -182,9 +182,10 @@ class NetworkVisualizer:
         sm = plt.cm.ScalarMappable(cmap=plt.cm.RdYlGn_r,
                                   norm=plt.Normalize(vmin=vmin, vmax=vmax))
         sm.set_array([])
-        cbar = plt.colorbar(sm, ax=ax, label=edge_property.capitalize())
-        cbar.ax.tick_params(labelsize=12)  # Enlarge tick labels
-        cbar.set_label(edge_property.capitalize(), size=14)  # Enlarge colorbar label
+        if with_colorbar:
+            cbar = plt.colorbar(sm, ax=ax, label=edge_property.capitalize())
+            cbar.ax.tick_params(labelsize=12)  # Enlarge tick labels
+            cbar.set_label(edge_property.capitalize(), size=14)  # Enlarge colorbar label
         
         # Turn off axis
         ax.set_axis_off()
@@ -196,13 +197,13 @@ class NetworkVisualizer:
         
         return fig, ax
 
-    def visualize_network_state(self, time_step, edge_property='density', use_folium=False):
+    def visualize_network_state(self, time_step, edge_property='density', use_folium=False, with_colorbar=True):
         """
         Visualize network state at a specific time step using either networkx or folium
         """
         if not use_folium:
             # Original networkx visualization code
-            return self._visualize_network_nx(time_step, edge_property)
+            return self._visualize_network_nx(time_step, edge_property, with_colorbar)
 
         # Folium visualization
         import folium

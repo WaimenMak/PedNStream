@@ -43,22 +43,62 @@ if __name__ == "__main__":
     #                 [0, 0, 0, 0, 1, 0]])
 
 
+    # params = {
+    #     'length': 100,
+    #     'width': 1,
+    #     'free_flow_speed': 1.5,
+    #     'k_critical': 2,
+    #     'k_jam': 10,
+    #     'unit_time': 10,
+    #     'peak_lambda': 10,
+    #     'base_lambda': 5,
+    #     'simulation_steps': 1000,
+    # }
     params = {
-        'length': 100,
-        'width': 1,
-        'free_flow_speed': 1.5,
-        'k_critical': 2,
-        'k_jam': 10,
         'unit_time': 10,
-        'peak_lambda': 10,
-        'base_lambda': 5,
         'simulation_steps': 1000,
+        'custom_pattern': 'spike',
+        'default_link': {
+            'length': 100,
+            'width': 1,
+            'free_flow_speed': 1.5,
+            'k_critical': 2,
+            'k_jam': 10,
+        },
+        'demand': {
+            'origin_5': {
+                'pattern': "spike",
+                'peak_lambda': 10,
+                'base_lambda': 5,
+            }
+        }
     }
+
+    # set the demand pattern for origin 5, 4
+    def spike_pattern(origin_id, params):
+        # Access nested dictionary values correctly
+        peak_lambda = params['demand'][f'origin_{origin_id}']['peak_lambda']
+        base_lambda = params['demand'][f'origin_{origin_id}']['base_lambda']
+        t = params['simulation_steps']
+        time = np.arange(t)
+
+        morning_peak = peak_lambda * np.exp(-(time - t/4)**2 / (2 * (t/20)**2))
+        evening_peak = peak_lambda * np.exp(-(time - 3*t/4)**2 / (2 * (t/20)**2))
+        lambda_t = base_lambda + morning_peak + evening_peak
+
+        # np.random.seed(seed)
+
+        demand = np.random.poisson(lam=lambda_t)
+        demand[200:250] = 30
+        return demand
 
     # Initialize and run simulation
     # network_env = Network(adj, params, od_nodes=[5], origin_nodes=[5])
-    network_env = Network(adj, params, origin_nodes=[5])
+    network_env = Network(adj, params, origin_nodes=[5], demand_pattern=spike_pattern)
     network_env.visualize()
+
+    
+    # network_env.demand_generator.register_pattern('spike', spike_pattern)
 
     # Run simulation
     for t in range(1, params['simulation_steps']):

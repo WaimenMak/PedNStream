@@ -195,6 +195,7 @@ def run_visualization(link_data_path, pos):
     dashboard.run_dashboard()
 
 if __name__ == "__main__":
+    # Command line: streamlit run network_Dashboard.py -- --name delft --pos node_positions.json
     parser = argparse.ArgumentParser(description='Network Dashboard Visualization')
     parser.add_argument('--name', type=str, 
                        default="delft_directions",

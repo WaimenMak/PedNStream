@@ -35,26 +35,31 @@ class DemandGenerator:
             raise ValueError("pattern_func must be callable")
         self.demand_patterns[pattern_name] = pattern_func
 
-    def generate_gaussian_peaks(self, origin_id: int) -> np.ndarray:
+    def generate_gaussian_peaks(self, origin_id: int, params=None) -> np.ndarray:
         """Built-in gaussian peaks demand pattern"""
-        peak_lambda = self.params.get(f'peak_lambda_{origin_id}', 10)
-        base_lambda = self.params.get(f'base_lambda_{origin_id}', 5)
+        if params is None:
+            params = self.params
+        # peak_lambda = params.get(f'demand.origin_{origin_id}.peak_lambda', 10)
+        # base_lambda = params.get(f'demand.origin_{origin_id}.base_lambda', 5)
+        peak_lambda = params['demand'][f'origin_{origin_id}']['peak_lambda']
+        base_lambda = params['demand'][f'origin_{origin_id}']['base_lambda']
         t = self.simulation_steps
         
         morning_peak = peak_lambda * np.exp(-(self.time - t/4)**2 / (2 * (t/20)**2))
         evening_peak = peak_lambda * np.exp(-(self.time - 3*t/4)**2 / (2 * (t/20)**2))
         lambda_t = base_lambda + morning_peak + evening_peak
         
-        seed = self.params.get(f'seed_{origin_id}', 42)
+        seed = self.params.get(f'seed', 42)
         np.random.seed(seed)
         
         demand = np.random.poisson(lam=lambda_t)
         
         return demand
 
-    def generate_constant(self, origin_id: int) -> np.ndarray:
+    def generate_constant(self, origin_id: int, params=None) -> np.ndarray:
         """Built-in constant demand pattern"""
-        demand_value = self.params.get(f'constant_demand_{origin_id}', 10)
+        # demand_value = self.params.get(f'demand.origin_{origin_id}.base_lambda', 10)
+        demand_value = self.params['demand'][f'origin_{origin_id}']['base_lambda']
         return np.ones(self.simulation_steps) * demand_value
 
     def generate_custom(self, origin_id: int, pattern: str) -> np.ndarray:
@@ -75,27 +80,31 @@ class DemandGenerator:
             raise ValueError(f"Unknown demand pattern: {pattern}. "
                            f"Available patterns: {list(self.demand_patterns.keys())}")
         
-        return self.demand_patterns[pattern](origin_id)
+        return self.demand_patterns[pattern](origin_id, params=self.params)
 
 
 class Network:
-    def __init__(self, adjacency_matrix: np.array, link_params: dict,
-                 origin_nodes: list, destination_nodes: list = [], od_flows: dict = None, pos: dict = None):
+    def __init__(self, adjacency_matrix: np.array, params: dict,
+                 origin_nodes: list, destination_nodes: list = [], demand_pattern: Callable[[int, dict], np.ndarray] = None,
+                   od_flows: dict = None, pos: dict = None):
         """
         Initialize the network, with nodes and links according to the adjacency matrix
         """
         self.adjacency_matrix = adjacency_matrix
         self.nodes = {}
         self.links = {}  # key is tuple(start_node_id, end_node_id)
-        self.link_params = link_params
-        self.simulation_steps = link_params['simulation_steps']
-        self.unit_time = link_params['unit_time']
+        self.params = params
+        self.simulation_steps = params['simulation_steps']
+        self.unit_time = params['unit_time']
         self.destination_nodes = destination_nodes
         self.origin_nodes = origin_nodes
         self.pos = pos
 
         # Initialize demand generator
-        self.demand_generator = DemandGenerator(self.simulation_steps, link_params)
+        self.demand_generator = DemandGenerator(self.simulation_steps, params)
+        
+        if demand_pattern:
+            self.demand_generator.register_pattern(self.params.get('custom_pattern'), demand_pattern)
         
         # Initialize network structure
         self.init_nodes_and_links()
@@ -112,13 +121,13 @@ class Network:
     def _create_origin_destination(self, node: Node):
         """Create virtual links for origin/destination nodes and set demand"""
         node._create_virtual_link(node.node_id, "in", is_incoming=True, 
-                                params=self.link_params)
+                                params=self.params)
         node._create_virtual_link(node.node_id, "out", is_incoming=False, 
-                                params=self.link_params)
+                                params=self.params)
         
         if node.node_id in self.origin_nodes:
             # Get demand configuration for this origin
-            origin_config = self.link_params.get('demand', {}).get(f'origin_{node.node_id}', {})
+            origin_config = self.params.get('demand', {}).get(f'origin_{node.node_id}', {})
             pattern = origin_config.get('pattern', 'gaussian_peaks')
             node.demand = self.demand_generator.generate_custom(node.node_id, pattern)
         else:
@@ -174,8 +183,8 @@ class Network:
                         self.nodes[j] = node_j
                     
                     # Get link-specific parameters
-                    link_params = self.link_params.get('links', {}).get(f'{i}_{j}', 
-                                self.link_params.get('default_link', {}))
+                    link_params = self.params.get('links', {}).get(f'{i}_{j}', 
+                                self.params.get('default_link', {}))
                     
                     # Create forward and reverse links
                     forward_link = Link(f"{i}_{j}", node, self.nodes[j], self.simulation_steps, self.unit_time, **link_params)

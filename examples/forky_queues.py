@@ -36,16 +36,38 @@ if __name__ == "__main__":
                     ])
 
 
+    # params = {
+    #     'length': 100,
+    #     'width': 1,
+    #     'free_flow_speed': 1.5,
+    #     'k_critical': 2,
+    #     'k_jam': 10,
+    #     'unit_time': 10,
+    #     'peak_lambda': 25,
+    #     'base_lambda': 5,
+    #     'simulation_steps': 700,
+    # }
+
     params = {
-        'length': 100,
-        'width': 1,
-        'free_flow_speed': 1.5,
-        'k_critical': 2,
-        'k_jam': 10,
         'unit_time': 10,
-        'peak_lambda': 25,
-        'base_lambda': 5,
         'simulation_steps': 700,
+        'default_link': {
+            'length': 100,
+            'width': 1,
+            'free_flow_speed': 1.5,
+            'k_critical': 2,
+            'k_jam': 10,
+        },
+        'demand': {
+            "origin_0": {
+                "peak_lambda": 25,
+                "base_lambda": 5,
+            },
+            "origin_4": {
+                "peak_lambda": 25,
+                "base_lambda": 5,
+            }
+        }
     }
 
     # Initialize and run simulation

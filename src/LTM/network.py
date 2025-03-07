@@ -41,8 +41,14 @@ class DemandGenerator:
             params = self.params
         # peak_lambda = params.get(f'demand.origin_{origin_id}.peak_lambda', 10)
         # base_lambda = params.get(f'demand.origin_{origin_id}.base_lambda', 5)
-        peak_lambda = params['demand'][f'origin_{origin_id}']['peak_lambda']
-        base_lambda = params['demand'][f'origin_{origin_id}']['base_lambda']
+        try:
+            peak_lambda = params['demand'][f'origin_{origin_id}']['peak_lambda']
+            base_lambda = params['demand'][f'origin_{origin_id}']['base_lambda']
+        except KeyError:
+            print(f"No demand configuration found for origin {origin_id}, automatically set to default")
+            peak_lambda = 10
+            base_lambda = 5
+            
         t = self.simulation_steps
         
         morning_peak = peak_lambda * np.exp(-(self.time - t/4)**2 / (2 * (t/20)**2))
@@ -243,8 +249,8 @@ class Network:
             
         self.update_link_states(time_step)
 
-    def visualize(self, figsize=(15, 15), node_size=30, edge_width=1, 
-                 show_labels=False, label_font_size=6, alpha=0.8):
+    def visualize(self, figsize=(8, 10), node_size=200, edge_width=1,
+                 show_labels=True, label_font_size=20, alpha=0.8):
         """
         Visualize the network using networkx and matplotlib.
         
@@ -272,7 +278,7 @@ class Network:
         # Draw nodes
         nx.draw_networkx_nodes(graph, self.pos, 
                              node_size=node_size, 
-                             node_color='blue',
+                             node_color='lightblue',
                              alpha=alpha)
         
         # Separate and draw bidirectional and unidirectional edges

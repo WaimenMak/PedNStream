@@ -132,8 +132,12 @@ class NetworkVisualizer:
         
         # Draw nodes
         node_sizes = [G.nodes[node]['size'] * 50 + 100 for node in G.nodes()]
+        # Color nodes: red for origins, pink for destinations, lightblue for others
+        node_colors = ['red' if int(node) in self.network_params['origin_nodes'] 
+                      else 'pink' if int(node) in self.network_params['destination_nodes'] 
+                      else 'lightblue' for node in G.nodes()]
         nx.draw_networkx_nodes(G, self.pos, node_size=node_sizes,
-                             node_color='lightblue',
+                             node_color=node_colors,
                              ax=ax)
         
         # Draw edges
@@ -339,26 +343,22 @@ class NetworkVisualizer:
             size = self.G.nodes[node_id].get('size', 0) * 50 + 300 # there is not size in the node for now
             radius = np.sqrt(size) / 10  # Convert size to reasonable radius
 
-            if node_id in ['0', '8']:
-                folium.CircleMarker(
-                    location=[pos[1], pos[0]],
-                    radius=np.sqrt(size) / 5,
-                    color='red',
-                    fill=True,
-                    fillColor='lightred',
-                    fillOpacity=0.7,
-                    popup=f"Node: {node_id}"
-                ).add_to(m)
+            if node_id in self.network_params['origin_nodes']:
+                node_color = 'lightred'
+            elif node_id in self.network_params['destination_nodes']:
+                node_color = 'pink'
             else:
-                folium.CircleMarker(
-                    location=[pos[1], pos[0]],
-                    radius=radius,
-                    color='blue',
-                    fill=True,
-                    fillColor='lightblue',
-                    fillOpacity=0.7,
-                    popup=f"Node: {node_id}"
-                ).add_to(m)
+                node_color = 'lightblue'
+
+            folium.CircleMarker(
+                location=[pos[1], pos[0]],
+                radius=radius,
+                color='blue',
+                fill=True,
+                fillColor=node_color,
+                fillOpacity=0.7,
+                popup=f"Node: {node_id}"
+            ).add_to(m)
 
 
         # Add colormap to map
@@ -460,11 +460,14 @@ class NetworkVisualizer:
             
             # Use stored positions for drawing
             node_sizes = [self.G.nodes[node]['size'] * 100 + 100 for node in self.G.nodes()]
+            node_colors = ['red' if int(node) in self.network_params['origin_nodes'] 
+                          else 'pink' if int(node) in self.network_params['destination_nodes'] 
+                          else 'lightblue' for node in self.G.nodes()]
             # print(self.pos)
             # self.pos = nx.spring_layout(G, k=1, iterations=50, seed=42)
             nx.draw_networkx_nodes(self.G, pos=self.pos,  # Use stored positions
                                  node_size=node_sizes,
-                                 node_color='lightblue',
+                                 node_color=node_colors,
                                  ax=ax)
             
             # Draw edges

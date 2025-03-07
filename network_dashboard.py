@@ -9,7 +9,7 @@ import argparse
 import os
 
 class NetworkDashboard:
-    def __init__(self, link_data_path, pos, zoom_start=14):
+    def __init__(self, data_path, pos, zoom_start=14):
         """
         Initialize the dashboard
         
@@ -29,9 +29,14 @@ class NetworkDashboard:
             (max(lons) + min(lons)) / 2
         ]
         
+        link_data_path = os.path.join(data_path, "link_data.json")
+        network_params_path = os.path.join(data_path, "network_params.json")
         # Load link data
         with open(link_data_path, 'r') as f:
             self.link_data = json.load(f)
+        
+        with open(network_params_path, 'r') as f:
+            self.network_params = json.load(f)
             
         # Get time steps range
         self.max_time = len(next(iter(self.link_data.values()))['density'])
@@ -66,26 +71,24 @@ class NetworkDashboard:
         
         # Add nodes (these don't change)
         for node_id, pos in self.pos.items():
-            if node_id in ['0', '8']: # 0, 8 are the orings.
-                folium.CircleMarker(
-                    location=[pos[1], pos[0]],
-                    radius=5,
-                    color='red',
-                    fill=True,
-                    fillColor='red',
-                    fillOpacity=0.7,
-                    popup=f"Node: {node_id}"
-                ).add_to(m)
+            if int(node_id) in self.network_params['origin_nodes']:
+                node_color = 'red'
+                edge_color = 'red'
+            elif int(node_id) in self.network_params['destination_nodes']:
+                node_color = 'black'
+                edge_color = 'black'
             else:
-                folium.CircleMarker(
-                    location=[pos[1], pos[0]],
-                    radius=5,
-                    color='blue',
-                    fill=True,
-                    fillColor='lightblue',
+                node_color = 'lightblue'
+                edge_color = 'blue'
+            folium.CircleMarker(
+                location=[pos[1], pos[0]],
+                radius=5,
+                color=edge_color,
+                fill=True,
+                fillColor=node_color,
                 fillOpacity=0.7,
                 popup=f"Node: {node_id}"
-            ).add_to(m)
+        ).add_to(m)
             
         return m
     
@@ -210,6 +213,6 @@ if __name__ == "__main__":
     with open(path_to_pos, 'r') as f:
         pos = {str(k): tuple(v) for k, v in json.load(f).items()}
     
-    path_to_link_data = os.path.join(".", "outputs", args.name, "link_data.json")
+    path_to_data = os.path.join(".", "outputs", args.name)
     # Run visualization with parsed arguments
-    run_visualization(path_to_link_data, pos)
+    run_visualization(path_to_data, pos)

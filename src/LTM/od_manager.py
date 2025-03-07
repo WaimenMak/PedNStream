@@ -16,14 +16,15 @@ class ODManager:
             od_flows: Dictionary {(o,d): array or float} of flows
                      If float provided, will be expanded to constant array
         """
-        if od_flows is None:
-            # Initialize with zero flows
+        if od_flows:
+            self._set_predefined_flows(od_flows)
+        else:
+            # Initialize with ones, the ratio are all equal
+            print(f"No OD flows provided, initializing with ones")
             for o in origin_nodes:
                 for d in destination_nodes:
                     if o != d:
-                        self.od_flows[(o, d)] = np.zeros(self.simulation_steps)
-        else:
-            self._set_predefined_flows(od_flows)
+                        self.od_flows[(o, d)] = np.ones(self.simulation_steps)
 
     def _set_predefined_flows(self, od_flows: dict):
         """Set predefined OD flows"""

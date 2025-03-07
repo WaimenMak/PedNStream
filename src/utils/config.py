@@ -43,7 +43,7 @@ def load_config(config_path: str) -> dict:
     
     return {
         'adjacency_matrix': config['network']['adjacency_matrix'],
-        'link_params': link_params,
+        'params': link_params,
         'origin_nodes': config['network']['origin_nodes'],
         'destination_nodes': config['network'].get('destination_nodes', []),
         'od_flows': od_flows
@@ -64,7 +64,7 @@ def validate_config(config: Dict[str, Any]) -> None:
         'simulation': ['simulation_steps', 'unit_time'],
         'default_link': ['length', 'width', 'free_flow_speed', 'k_critical', 'k_jam'],
         'demand': [],
-        'od_flows': []
+        # 'od_flows': []
     }
     
     for section, fields in required_fields.items():

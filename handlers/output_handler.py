@@ -64,6 +64,8 @@ class OutputHandler:
         network_params = {
             'simulation_steps': network.simulation_steps,
             'unit_time': network.unit_time,
+            'destination_nodes': network.destination_nodes,
+            'origin_nodes': network.origin_nodes,
             # Add other relevant network parameters
         }
         

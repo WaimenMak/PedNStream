@@ -51,7 +51,7 @@ demand:
     base_lambda: 5
     seed: 42
 
-# OD Flow Configuration
+#OD Flow Configuration
 od_flows:
-  "1_4": 8
-  "1_5": 5 
+  "1_4": 20
+  "1_5": 5

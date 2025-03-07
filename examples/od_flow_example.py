@@ -19,7 +19,7 @@ def main():
     # Initialize network and run simulation
     network_env = Network(**config)
     
-    for t in range(1, config['link_params']['simulation_steps']):
+    for t in range(1, config['params']['simulation_steps']):
         network_env.network_loading(t)
     
     # Save and visualize results
@@ -34,7 +34,7 @@ def main():
     )
     anim = visualizer.animate_network(
         start_time=0,
-        end_time=config['link_params']['simulation_steps'],
+        end_time=config['params']['simulation_steps'],
         interval=100,
         edge_property='density'
     )

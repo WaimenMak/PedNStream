@@ -1,8 +1,10 @@
 import numpy as np
+import logging
 
 class ODManager:
     """Manages Origin-Destination flows and operations"""
-    def __init__(self, simulation_steps: int):
+    def __init__(self, simulation_steps: int, logger: logging.Logger = None):
+        self.logger = logger or logging.getLogger(__name__)
         self.od_flows = {}  # {(o,d): array of flows}
         self.simulation_steps = simulation_steps
 
@@ -20,7 +22,7 @@ class ODManager:
             self._set_predefined_flows(od_flows)
         else:
             # Initialize with ones, the ratio are all equal
-            print(f"No OD flows provided, initializing with ones")
+            self.logger.info("No OD flows provided, initializing with ones")
             for o in origin_nodes:
                 for d in destination_nodes:
                     if o != d:

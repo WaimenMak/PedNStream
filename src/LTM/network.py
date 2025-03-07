@@ -6,13 +6,16 @@ from .link import Link
 from .od_manager import ODManager
 from .path_finder import PathFinder
 from typing import Callable, Dict, Optional, List
+import logging
+import os
 
 """
 A Link Transmission Model for the Pedestrian Traffic
 """
 
 class DemandGenerator:
-    def __init__(self, simulation_steps: int, params: dict):
+    def __init__(self, simulation_steps: int, params: dict, logger: logging.Logger):
+        self.logger = logger
         self.simulation_steps = simulation_steps
         self.params = params
         self.time = np.arange(simulation_steps)
@@ -39,13 +42,12 @@ class DemandGenerator:
         """Built-in gaussian peaks demand pattern"""
         if params is None:
             params = self.params
-        # peak_lambda = params.get(f'demand.origin_{origin_id}.peak_lambda', 10)
-        # base_lambda = params.get(f'demand.origin_{origin_id}.base_lambda', 5)
+            
         try:
             peak_lambda = params['demand'][f'origin_{origin_id}']['peak_lambda']
             base_lambda = params['demand'][f'origin_{origin_id}']['base_lambda']
         except KeyError:
-            print(f"No demand configuration found for origin {origin_id}, automatically set to default")
+            self.logger.info(f"No demand configuration found for origin {origin_id}, automatically set to default")
             peak_lambda = 10
             base_lambda = 5
             
@@ -90,12 +92,47 @@ class DemandGenerator:
 
 
 class Network:
+    @staticmethod
+    def setup_logger(log_level=logging.INFO, log_dir=os.path.join("..", "outputs", "logs")):
+        """Set up and configure logger"""
+        # Create logs directory if it doesn't exist
+        os.makedirs(log_dir, exist_ok=True)
+        
+        logger = logging.getLogger(__name__)
+        
+        # Only add handlers if the logger doesn't have any
+        if not logger.handlers:
+            # Configure logging format
+            formatter = logging.Formatter(
+                '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+            )
+            
+            # Console handler
+            console_handler = logging.StreamHandler()
+            console_handler.setFormatter(formatter)
+            logger.addHandler(console_handler)
+            
+            # File handler
+            file_handler = logging.FileHandler(os.path.join(log_dir, 'network.log'))
+            file_handler.setFormatter(formatter)
+            logger.addHandler(file_handler)
+            
+            # Set level
+            logger.setLevel(log_level)
+        
+        return logger
+
     def __init__(self, adjacency_matrix: np.array, params: dict,
-                 origin_nodes: list, destination_nodes: list = [], demand_pattern: Callable[[int, dict], np.ndarray] = None,
-                   od_flows: dict = None, pos: dict = None):
+                 origin_nodes: list, destination_nodes: list = [], 
+                 demand_pattern: Callable[[int, dict], np.ndarray] = None,
+                 od_flows: dict = None, pos: dict = None,
+                 log_level: int = logging.INFO):
         """
         Initialize the network, with nodes and links according to the adjacency matrix
         """
+        # Set up logger
+        self.logger = self.setup_logger(log_level=log_level)
+        
         self.adjacency_matrix = adjacency_matrix
         self.nodes = {}
         self.links = {}  # key is tuple(start_node_id, end_node_id)
@@ -106,18 +143,22 @@ class Network:
         self.origin_nodes = origin_nodes
         self.pos = pos
 
-        # Initialize demand generator
-        self.demand_generator = DemandGenerator(self.simulation_steps, params)
+        self.logger.info("Network initialization started")
+        
+        # Initialize demand generator with passed logger
+        self.demand_generator = DemandGenerator(self.simulation_steps, params, self.logger)
         
         if demand_pattern:
             self.demand_generator.register_pattern(self.params.get('custom_pattern'), demand_pattern)
+            self.logger.debug(f"Custom demand pattern registered: {self.params.get('custom_pattern')}")
         
         # Initialize network structure
         self.init_nodes_and_links()
+        self.logger.info(f"Network initialized with {len(self.nodes)} nodes and {len(self.links)} links")
 
         # Initialize managers if destination nodes are specified
         if destination_nodes:
-            self.od_manager = ODManager(self.simulation_steps)
+            self.od_manager = ODManager(self.simulation_steps, logger=self.logger)
             self.od_manager.init_od_flows(origin_nodes, destination_nodes, od_flows)
         
             self.path_finder = PathFinder(self.links)

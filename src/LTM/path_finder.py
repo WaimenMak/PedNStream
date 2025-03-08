@@ -147,7 +147,9 @@ class PathFinder:
         """Calculate and store turn probabilities for all nodes in paths"""
         # self.node_turn_probs = {}
         for node_id in self.nodes_in_paths:
-            self.calculate_turn_probabilities(nodes[node_id])
+            if nodes[node_id].source_num > 2:
+                self.calculate_turn_probabilities(nodes[node_id])
+            # self.calculate_turn_probabilities(nodes[node_id])
             # nodes[node_id].turns = list(turns)
             # nodes[node_id].turns = dict.fromkeys(turns.keys(), 0)
             # nodes[node_id].turns_in_ods = turns
@@ -268,6 +270,8 @@ class PathFinder:
         """Calculate turn probabilities including special cases for origin/destination nodes"""
         # node = self.graph.nodes[current_node]
         current_node_id = current_node.node_id
+        # if current_node_id == 3 or current_node_id == 4:
+        #     pass
         # get the relevant od pairs for this node
         relevant_od_pairs = self.node_to_od_pairs.get(current_node_id, set())
         # turns_od_dict = {}
@@ -321,14 +325,17 @@ class PathFinder:
                 if not hasattr(current_node, 'up_od_probs'):
                     current_node.up_od_probs = defaultdict(lambda: defaultdict(int))
                 
+                current_node.turns_distances[od_pair] = {}
                 # Update distances in existing structure or create new
                 for turn, distance in od_turn_distances.items():
                     up_node = turn[0]
                     down_node = turn[1]
-                    if up_node not in current_node.turns_distances:
-                        current_node.turns_distances[up_node] = {}
+                    if up_node not in current_node.turns_distances[od_pair]:
+                        # current_node.turns_distances[up_node] = {}
+                        current_node.turns_distances[od_pair][up_node] = {}
                     # current_node.turns_by_upstream[up_node][turn] = distance
-                    current_node.turns_distances[up_node][down_node] = distance
+                    # current_node.turns_distances[up_node][down_node] = distance
+                    current_node.turns_distances[od_pair][up_node][down_node] = distance
                     # current_node.up_od_probs[up_node][od_pair] += 1
                     current_node.up_od_probs[up_node][od_pair] = 0 # just assign od_pair to the upstream node
 
@@ -355,7 +362,7 @@ class PathFinder:
                         
                 #         # Update probabilities for turns from this upstream node P(down|up,od)
                 #         current_node.node_turn_probs[od_pair].update(dict(zip(turns, probs)))
-                for up_node, down_nodes in current_node.turns_distances.items():
+                for up_node, down_nodes in current_node.turns_distances[od_pair].items():
                     if down_nodes:
                         turns = list((up_node, down_node) for down_node in down_nodes)
                         distances = list(down_nodes.values())
@@ -371,6 +378,8 @@ class PathFinder:
         """Calculate turning fractions using stored turn probabilities: node_turn_probs,
            Return turning_fractions: np.array
         """
+        # if node.node_id == 3 or node.node_id == 4:
+        #     pass
         turning_fractions = np.zeros(node.edge_num)
         # Update P(od|up) for each upstream node
         for up_node, od_pairs in node.up_od_probs.items():
@@ -492,6 +501,8 @@ class PathFinder:
         # turning_fractions = {}
         # Only process nodes that appear in paths
         if node.node_id in self.nodes_in_paths:
+            # if node.node_id == 4:
+            #     print(1)
             if node.source_num > 2:  # only process intersection nodes
                 fractions = self.update_turning_fractions(node, time_step, od_manager)
                 node.turning_fractions = fractions

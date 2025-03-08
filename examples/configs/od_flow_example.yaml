@@ -53,5 +53,5 @@ demand:
 
 #OD Flow Configuration
 od_flows:
-  "1_4": 20
+  "1_4": 30
   "1_5": 5

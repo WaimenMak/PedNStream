@@ -189,6 +189,7 @@ class Node:
                 #     r[j] = 1
         
         self.solve(s, r, type='classic')
+        # self.solve(s, r, type='optimal')
         self.update_links(time_step)
 
     def solve(self, s, r, type='classic'):

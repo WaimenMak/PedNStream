@@ -12,11 +12,14 @@ def k_shortest_paths(graph, origin, dest, k=1):
     B = []  # Priority queue of candidate paths
     candidate_paths = {}  # Store candidate paths by ID
     next_path_id = 0  # Simple counter for path IDs
+    found_paths = set()  # Keep track of paths we've already found
     
     # Find the shortest path using Dijkstra
     try:
         shortest_path = nx.shortest_path(graph, origin, dest, weight='weight')
         shortest_dist = nx.shortest_path_length(graph, origin, dest, weight='weight')
+        path_tuple = tuple(shortest_path)  # Convert to tuple for hashing
+        found_paths.add(path_tuple)
         candidate_paths[next_path_id] = (shortest_dist, shortest_path)
         A.append((shortest_dist, shortest_path))
         next_path_id += 1
@@ -24,7 +27,8 @@ def k_shortest_paths(graph, origin, dest, k=1):
         return []
 
     # ===== KEY PART: FINDING K DIFFERENT PATHS =====
-    for k_path in range(1, k):
+    # for k_path in range(1, k):
+    while len(A) < k:
         if not A:
             break
             
@@ -60,11 +64,12 @@ def k_shortest_paths(graph, origin, dest, k=1):
             # u, v = prev_path[i], prev_path[i+1]
             if graph.has_edge(spur_node, spur_node_next):
                 original_weight = graph[spur_node][spur_node_next].get('weight', 1)
-                graph[spur_node][spur_node_next]['weight'] = 1e5  # Set to high value to avoid this edge
+                graph[spur_node][spur_node_next]['weight'] = np.inf  # Set to infi to avoid this edge
                 
             try:
                 spur_path = nx.shortest_path(graph, spur_node, dest, weight='weight')
                 total_path = root_path[:-1] + spur_path
+
                 # Restore removed nodes and their edges
                 for node in nodes_removed:
                     graph.add_node(node)
@@ -72,6 +77,9 @@ def k_shortest_paths(graph, origin, dest, k=1):
                 # Restore all removed edges
                 for u, v, edge_data in edges_removed:
                     graph.add_edge(u, v, **edge_data)
+
+                if tuple(total_path) in found_paths:
+                    continue
                 total_dist = sum(graph[total_path[i]][total_path[i+1]].get('weight', 1)
                             for i in range(len(total_path)-1))
                 
@@ -85,15 +93,15 @@ def k_shortest_paths(graph, origin, dest, k=1):
                 # Restore the edge weight
                 if graph.has_edge(spur_node, spur_node_next):
                     graph[spur_node][spur_node_next]['weight'] = original_weight
-                
 
-
-        
         if B:
             # Get the shortest candidate from priority queue
             _, candidate_id = heappop(B)
             candidate = candidate_paths[candidate_id]
-            A.append(candidate)
+            path_tuple = tuple(candidate[1])
+            if path_tuple not in found_paths:
+                found_paths.add(path_tuple)
+                A.append(candidate)
             # Clean up the stored candidate
             # del candidate_paths[candidate_id]
         # else:
@@ -147,7 +155,7 @@ class PathFinder:
         """Calculate and store turn probabilities for all nodes in paths"""
         # self.node_turn_probs = {}
         for node_id in self.nodes_in_paths:
-            if nodes[node_id].source_num > 2:
+            if nodes[node_id].source_num > 2: # only process intersection nodes
                 self.calculate_turn_probabilities(nodes[node_id])
             # self.calculate_turn_probabilities(nodes[node_id])
             # nodes[node_id].turns = list(turns)

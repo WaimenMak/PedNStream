@@ -71,4 +71,12 @@ if __name__ == "__main__":
                                     figsize=(14, 12),
                                     edge_property='density')
 
+    # MP4
+    writer = matplotlib.animation.FFMpegWriter(fps=15, metadata=dict(artist='Me'),
+                                             bitrate=2000)
+
+    # Save the animation as MP4
+    anim.save(os.path.join(output_dir, "delft_directions", "delft.mp4"),
+              writer=writer,
+              progress_callback=progress_callback)
     plt.show()

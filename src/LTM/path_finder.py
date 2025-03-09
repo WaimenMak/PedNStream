@@ -289,93 +289,108 @@ class PathFinder:
         relevant_od_pairs = self.node_to_od_pairs.get(current_node_id, set())
         # turns_od_dict = {}
         for od_pair in relevant_od_pairs:
-            if not self._initialized:
-                paths = self.od_paths[od_pair]
-                od_turn_distances = {}  # {(up_node, down_node): shortest_remaining_distance}
-                origin, dest = od_pair
-                
-                for path in paths:
-                    try:
-                        node_idx = path.index(current_node_id)
-                        
-                        if current_node_id == origin:
-                            down_node = path[node_idx + 1]
-                            turn = (-1, down_node)
-                        elif current_node_id == dest:
-                            # Destination node: no need for turn probabilities
-                            up_node = path[node_idx - 1]
-                            turn = (up_node, -1)
-
-                        elif node_idx < len(path) - 1:
-                            up_node = path[node_idx - 1]
-                            down_node = path[node_idx + 1]
-                            turn = (up_node, down_node)
-                        
-                        # if not self._initialized:
-                        remaining_dist = self.calculate_path_distance(path, start_idx=node_idx)
-                            
-                        # Keep only the shortest remaining distance for this turn
-                        if turn not in od_turn_distances or remaining_dist < od_turn_distances[turn]:
-                            od_turn_distances[turn] = remaining_dist
-                            # turns_od_dict[turn] = turns_od_dict.get(turn, []) + [od_pair] #no need recalculate
-                            # if ods_in_turns is e
-                            if not self._initialized:
-                                current_node.ods_in_turns[turn] = current_node.ods_in_turns.get(turn, []) + [od_pair]
-                            
-                    except ValueError:
-                        # Current node not in this path
-                        continue
-                
-                if od_turn_distances:
-                    # Initialize or get existing turn_probs from node
-                    if not hasattr(current_node, 'node_turn_probs'):
-                        current_node.node_turn_probs = {}
+            # if not self._initialized:
+            paths = self.od_paths[od_pair]
+            od_turn_distances = {}  # {(up_node, down_node): shortest_remaining_distance}
+            origin, dest = od_pair
+            
+            for path in paths:
+                try:
+                    node_idx = path.index(current_node_id)
                     
-                    # Initialize turns_by_upstream in node if not exists
-                    if not hasattr(current_node, 'turns_distances'):
-                        current_node.turns_distances = {}
+                    if current_node_id == origin:
+                        down_node = path[node_idx + 1]
+                        turn = (-1, down_node)
+                    elif current_node_id == dest:
+                        # Destination node: no need for turn probabilities
+                        up_node = path[node_idx - 1]
+                        turn = (up_node, -1)
 
-                    # Initialize up_od_probs if not exists
-                    if not hasattr(current_node, 'up_od_probs'):
-                        current_node.up_od_probs = defaultdict(lambda: defaultdict(int))
+                    elif node_idx < len(path) - 1:
+                        up_node = path[node_idx - 1]
+                        down_node = path[node_idx + 1]
+                        turn = (up_node, down_node)
                     
-                    current_node.turns_distances[od_pair] = {}
-                    # Update distances in existing structure or create new
-                    for turn, distance in od_turn_distances.items():
-                        up_node = turn[0]
-                        down_node = turn[1]
-                        if up_node not in current_node.turns_distances[od_pair]:
-                            # current_node.turns_distances[up_node] = {}
-                            current_node.turns_distances[od_pair][up_node] = {}
-                        # current_node.turns_by_upstream[up_node][turn] = distance
-                        # current_node.turns_distances[up_node][down_node] = distance
-                        current_node.turns_distances[od_pair][up_node][down_node] = distance
-                        # current_node.up_od_probs[up_node][od_pair] += 1
-                        current_node.up_od_probs[up_node][od_pair] = 0 # just assign od_pair to the upstream node
+                    # if not self._initialized:
+                    remaining_dist = self.calculate_path_distance(path, start_idx=node_idx)
+                        
+                    # Keep only the shortest remaining distance for this turn
+                    if turn not in od_turn_distances or remaining_dist < od_turn_distances[turn]:
+                        od_turn_distances[turn] = remaining_dist
+                        # turns_od_dict[turn] = turns_od_dict.get(turn, []) + [od_pair] #no need recalculate
+                        # if ods_in_turns is e
+                        if not self._initialized:
+                            current_node.ods_in_turns[turn] = current_node.ods_in_turns.get(turn, []) + [od_pair]
+                        
+                except ValueError:
+                    # Current node not in this path
+                    continue
+            
+            if od_turn_distances:
+                # Initialize or get existing turn_probs from node
+                if not hasattr(current_node, 'node_turn_probs'):
+                    current_node.node_turn_probs = {}
+                
+                # Initialize turns_by_upstream in node if not exists
+                if not hasattr(current_node, 'turns_distances'):
+                    current_node.turns_distances = {} # {(o,d): {up_node: {down_node: distance}}}
 
-                    # Calculate probabilities for each upstream node separately
-                    if od_pair not in current_node.node_turn_probs:
-                        current_node.node_turn_probs[od_pair] = {}
+                # Initialize up_od_probs if not exists
+                if not hasattr(current_node, 'up_od_probs'):
+                    current_node.up_od_probs = defaultdict(lambda: defaultdict(int))
+                
+                current_node.turns_distances[od_pair] = {}
+                # Update distances in existing structure or create new
+                for turn, distance in od_turn_distances.items():
+                    up_node = turn[0]
+                    down_node = turn[1]
+                    if up_node not in current_node.turns_distances[od_pair]:
+                        # current_node.turns_distances[up_node] = {}
+                        current_node.turns_distances[od_pair][up_node] = {}
+                    # current_node.turns_by_upstream[up_node][turn] = distance
+                    # current_node.turns_distances[up_node][down_node] = distance
+                    current_node.turns_distances[od_pair][up_node][down_node] = distance
+                    # current_node.up_od_probs[up_node][od_pair] += 1
+                    current_node.up_od_probs[up_node][od_pair] = 0 # just assign od_pair to the upstream node
 
-                # calculate the turn probabilities based on the distances and num_pedestrians of the downstream nodes
-                #TODO: calibrate the parameters
-                # theta = 0.1  # like the temperature in the logit model
-                # alpha = 1.0  # distance weight
-                # beta = 0.01   # congestion weight
-                for up_node, down_nodes in current_node.turns_distances[od_pair].items():
-                    if down_nodes:
-                        turns = list((up_node, down_node) for down_node in down_nodes)
-                        distances = list(down_nodes.values())
-                        num_pedestrians = [0 if down_node == -1 else self.graph.edges[current_node_id, down_node].get('num_pedestrians', 0) for down_node in down_nodes]
-                        utilities = self.alpha * np.array(distances) + self.beta * np.array(num_pedestrians)
-                        exp_utilities = np.exp(-self.theta * utilities)
-                        probs = exp_utilities / np.sum(exp_utilities)
-                        current_node.node_turn_probs[od_pair].update(dict(zip(turns, probs)))
+                # Calculate probabilities for each upstream node separately
+                if od_pair not in current_node.node_turn_probs:
+                    current_node.node_turn_probs[od_pair] = {}
+
+            # calculate the turn probabilities based on the distances and num_pedestrians of the downstream nodes
+            #TODO: calibrate the parameters
+            # theta = 0.1  # like the temperature in the logit model
+            # alpha = 1.0  # distance weight
+            # beta = 0.01   # congestion weight
+            self.update_node_turn_probs(current_node, od_pair)
+            # for up_node, down_nodes in current_node.turns_distances[od_pair].items():
+            #     if down_nodes:
+            #         turns = list((up_node, down_node) for down_node in down_nodes)
+            #         distances = list(down_nodes.values())
+            #         num_pedestrians = [0 if down_node == -1 else self.graph.edges[current_node_id, down_node].get('num_pedestrians', 0) for down_node in down_nodes]
+            #         utilities = self.alpha * np.array(distances) + self.beta * np.array(num_pedestrians)
+            #         exp_utilities = np.exp(-self.theta * utilities)
+            #         probs = exp_utilities / np.sum(exp_utilities)
+            #         current_node.node_turn_probs[od_pair].update(dict(zip(turns, probs)))
 
         # current_node.turns_in_ods = turns_od_dict
         # store the turns for the node
         # return turns_od_dict
+
+    def update_node_turn_probs(self, node, od_pair):
+        """Update the turn probabilities for the node"""
+        for up_node, down_nodes in node.turns_distances[od_pair].items():
+            if down_nodes:
+                turns = list((up_node, down_node) for down_node in down_nodes)
+                distances = list(down_nodes.values())
+                num_pedestrians = [0 if down_node == -1 else self.graph.edges[node.node_id, down_node].get('num_pedestrians', 0) for down_node in down_nodes]
+                utilities = self.alpha * np.array(distances) + self.beta * np.array(num_pedestrians)
+                exp_utilities = np.exp(-self.theta * utilities)
+                probs = exp_utilities / np.sum(exp_utilities)
+                node.node_turn_probs[od_pair].update(dict(zip(turns, probs)))
         
+        return node.node_turn_probs
+    
     def update_turning_fractions(self, node, time_step: int, od_manager):
         """Calculate turning fractions using stored turn probabilities: node_turn_probs,
            Return turning_fractions: np.array
@@ -464,6 +479,7 @@ class PathFinder:
                 od_pairs = node.ods_in_turns.get(turn, [])
                 for od_pair in od_pairs:
                     # P(down|up,od) from node_turn_probs
+                    self.update_node_turn_probs(node, od_pair) # with updating
                     turn_prob = node.node_turn_probs[od_pair].get(turn, 0)
                     # P(od|up) from up_od_probs
                     od_prob = node.up_od_probs[up].get(od_pair, 0)

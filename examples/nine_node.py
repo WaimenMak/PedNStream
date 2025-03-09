@@ -46,6 +46,7 @@ if __name__ == "__main__":
     params = {
         'unit_time': 10,
         'simulation_steps': 600,
+        'assign_flows_type': 'optimal',
         'default_link': {
             'length': 100,
             'width': 1,

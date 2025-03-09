@@ -101,7 +101,7 @@ class Node:
 
         # turning fractions constraints
         # if self.A_eq is not None:
-        self.update_matrix_A_eq(self.turning_fractions) # first init is equal probability
+        # self.update_matrix_A_eq(self.turning_fractions) # first init is equal probability
         # remove the columns with all zeros
         # self.A_ub = self.A_ub[:, np.any(self.A_ub != 0, axis=0)]
         # self.A_eq = self.A_eq[:, np.any(self.A_eq != 0, axis=0)]
@@ -160,7 +160,7 @@ class Node:
             link.update_cum_inflow(outflow, time_step)
             # link.update_speeds(time_step)
 
-    def assign_flows(self, time_step: int):
+    def assign_flows(self, time_step: int, type='classic'):
         """
         Get the sending and receiving flows constraints.
         """
@@ -188,7 +188,7 @@ class Node:
                 # if l.link_id == "2_3" and time_step < 400: # simulate bottleneck
                 #     r[j] = 1
         
-        self.solve(s, r, type='classic')
+        self.solve(s, r, type=type)
         # self.solve(s, r, type='optimal')
         self.update_links(time_step)
 
@@ -217,6 +217,7 @@ class RegularNode(Node):
 
     def solve(self, s, r, type='classic'):
         if type == 'optimal':
+            self.update_matrix_A_eq(self.turning_fractions) # update the matrix A_eq for the turning fractions
             # solve the linear programming problem
             w = self.w * np.ones(2 * self.edge_num)  # variables for the penalty term
             c = -1 * np.ones(self.edge_num) # variables for the flow

@@ -142,8 +142,8 @@ class Network:
         self.destination_nodes = destination_nodes
         self.origin_nodes = origin_nodes
         self.pos = pos
-
-        self.logger.info("Network initialization started")
+        self.assign_flows_type = params.get('assign_flows_type', 'classic')
+        self.logger.info(f"Network initialization started, assign flows type: {self.assign_flows_type}")
         
         # Initialize demand generator with passed logger
         self.demand_generator = DemandGenerator(self.simulation_steps, params, self.logger)
@@ -251,12 +251,12 @@ class Network:
 
             node.init_node()
 
-    def update_turning_fractions_per_node(self, node_ids: List[int], 
-                                        new_turning_fractions: np.array):
-        """Update turning fractions for specified nodes"""
-        for i, n in enumerate(node_ids):
-            node = self.nodes[n]
-            node.update_matrix_A_eq(new_turning_fractions[i])
+    # def update_turning_fractions_per_node(self, node_ids: List[int], 
+    #                                     new_turning_fractions: np.array):
+    #     """Update turning fractions for specified nodes"""
+    #     for i, n in enumerate(node_ids):
+    #         node = self.nodes[n]
+    #         node.update_matrix_A_eq(new_turning_fractions[i])
 
     def update_link_states(self, time_step: int):
         """Update link states for the current time step"""
@@ -286,7 +286,7 @@ class Network:
             else:
                 if node.A_ub is None:
                     node.get_matrix_A()
-                node.assign_flows(time_step)
+                node.assign_flows(time_step, type=self.assign_flows_type)
             
         self.update_link_states(time_step)
 

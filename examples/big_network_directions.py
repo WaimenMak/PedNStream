@@ -26,6 +26,7 @@ if __name__ == "__main__":
     params = {
         'unit_time': 10,
         'simulation_steps': 500,
+        'assign_flows_type': 'classic',
         'default_link': {
             'length': 50,
             'width': 1,
@@ -52,7 +53,7 @@ if __name__ == "__main__":
     #     # (1, 5): 5
     # }
     # Initialize network with origin at node 0 and destination at node 8
-    network_env = Network(adj, params, origin_nodes=[0, 5, 20], destination_nodes=[8, 100, 50], pos=pos)
+    network_env = Network(adj, params, origin_nodes=[136, 0, 5, 177, 29], destination_nodes=[8, 100, 213, 69], pos=pos)
     # Run simulation
     for t in range(1, params['simulation_steps']):
         network_env.network_loading(t)
@@ -72,11 +73,11 @@ if __name__ == "__main__":
                                     edge_property='density')
 
     # MP4
-    writer = matplotlib.animation.FFMpegWriter(fps=15, metadata=dict(artist='Me'),
-                                             bitrate=2000)
-
-    # Save the animation as MP4
-    anim.save(os.path.join(output_dir, "delft_directions", "delft.mp4"),
-              writer=writer,
-              progress_callback=progress_callback)
+    # writer = matplotlib.animation.FFMpegWriter(fps=15, metadata=dict(artist='Me'),
+    #                                          bitrate=2000)
+    #
+    # # Save the animation as MP4
+    # anim.save(os.path.join(output_dir, "delft_directions", "delft_optimal.mp4"),
+    #           writer=writer,
+    #           progress_callback=progress_callback)
     plt.show()

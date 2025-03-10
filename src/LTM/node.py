@@ -75,7 +75,8 @@ class Node:
         Get the matrix A_ub for the linear programming problem
         """
         row_num = self.source_num + self.dest_num
-        self.A_ub = np.zeros((row_num, self.edge_num + self.source_num + 2 * self.edge_num)) # - source_num for the link from the same source-destination pair
+        # - source_num for the link from the same source-destination pair, now it is included in the source_num
+        self.A_ub = np.zeros((row_num, self.edge_num + self.source_num + 2 * self.edge_num)) # 2 * edge_num for the penalty term
 
         # set the constraints for the source node
         # e = np.ones(self.dest_num - 1)

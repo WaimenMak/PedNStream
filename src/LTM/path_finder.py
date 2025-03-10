@@ -114,6 +114,7 @@ class PathFinder:
     def __init__(self, links):
         self.od_paths = {}  # {(origin, dest): [path1, path2, ...]}
         self.graph = self._create_graph(links)
+        self.links = links
         self.nodes_in_paths = set()
         self.node_turn_probs = {}  # {node_id: {(o,d): {(up_node, down_node): probability}}}
         self.node_to_od_pairs = {}  # {node_id: set((o1,d1), (o2,d2), ...)}, to get the relevant od pairs for the node
@@ -124,11 +125,11 @@ class PathFinder:
         self.alpha = 1.0  # distance weight
         self.beta = 0.01   # congestion weight
 
-    def _create_graph(self, links):
+    def _create_graph(self, links, time_step=0):
         """Convert network to NetworkX graph"""
         G = nx.DiGraph()
         for (start, end), link in links.items():
-            G.add_edge(start, end, weight=link.length)
+            G.add_edge(start, end, weight=link.length, num_pedestrians=link.num_pedestrians[time_step])
         return G
 
     def find_od_paths(self, od_pairs, nodes, k_paths=3):
@@ -362,7 +363,7 @@ class PathFinder:
             # theta = 0.1  # like the temperature in the logit model
             # alpha = 1.0  # distance weight
             # beta = 0.01   # congestion weight
-            self.update_node_turn_probs(current_node, od_pair)
+            self.update_node_turn_probs(current_node, od_pair, time_step=0)
             # for up_node, down_nodes in current_node.turns_distances[od_pair].items():
             #     if down_nodes:
             #         turns = list((up_node, down_node) for down_node in down_nodes)
@@ -377,13 +378,20 @@ class PathFinder:
         # store the turns for the node
         # return turns_od_dict
 
-    def update_node_turn_probs(self, node, od_pair):
-        """Update the turn probabilities for the node"""
+    def update_node_turn_probs(self, node, od_pair, time_step):
+        """Update the turn probabilities for the node, P(down|up,od)"""
+        if time_step == 100:
+            pass
         for up_node, down_nodes in node.turns_distances[od_pair].items():
             if down_nodes:
                 turns = list((up_node, down_node) for down_node in down_nodes)
                 distances = list(down_nodes.values())
-                num_pedestrians = [0 if down_node == -1 else self.graph.edges[node.node_id, down_node].get('num_pedestrians', 0) for down_node in down_nodes]
+                num_pedestrians = []
+                for down_node in down_nodes:
+                    try:
+                        num_pedestrians.append(self.links[(node.node_id, down_node)].num_pedestrians[time_step-1])
+                    except KeyError:
+                        num_pedestrians.append(0)
                 utilities = self.alpha * np.array(distances) + self.beta * np.array(num_pedestrians)
                 exp_utilities = np.exp(-self.theta * utilities)
                 probs = exp_utilities / np.sum(exp_utilities)
@@ -479,7 +487,7 @@ class PathFinder:
                 od_pairs = node.ods_in_turns.get(turn, [])
                 for od_pair in od_pairs:
                     # P(down|up,od) from node_turn_probs
-                    self.update_node_turn_probs(node, od_pair) # with updating
+                    self.update_node_turn_probs(node, od_pair, time_step=time_step) # with updating
                     turn_prob = node.node_turn_probs[od_pair].get(turn, 0)
                     # P(od|up) from up_od_probs
                     od_prob = node.up_od_probs[up].get(od_pair, 0)

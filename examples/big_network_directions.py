@@ -26,13 +26,19 @@ if __name__ == "__main__":
     params = {
         'unit_time': 10,
         'simulation_steps': 500,
-        'assign_flows_type': 'classic',
+        'assign_flows_type': 'optimal',
         'default_link': {
             'length': 50,
             'width': 1,
             'free_flow_speed': 1.5,
             'k_critical': 2,
             'k_jam': 10,
+        },
+        'demand':{
+            'origin_136':{
+                'peak_lambda': 25,
+                'base_lambda': 5,
+            },
         }
     }
 
@@ -73,11 +79,11 @@ if __name__ == "__main__":
                                     edge_property='density')
 
     # MP4
-    # writer = matplotlib.animation.FFMpegWriter(fps=15, metadata=dict(artist='Me'),
-    #                                          bitrate=2000)
-    #
-    # # Save the animation as MP4
-    # anim.save(os.path.join(output_dir, "delft_directions", "delft_optimal.mp4"),
-    #           writer=writer,
-    #           progress_callback=progress_callback)
+    writer = matplotlib.animation.FFMpegWriter(fps=10, metadata=dict(artist='Me'),
+                                             bitrate=2000)
+
+    # Save the animation as MP4
+    anim.save(os.path.join(output_dir, "delft_directions", f"delft_{params['assign_flows_type']}.mp4"),
+              writer=writer,
+              progress_callback=progress_callback)
     plt.show()

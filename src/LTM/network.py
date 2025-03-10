@@ -251,12 +251,12 @@ class Network:
 
             node.init_node()
 
-    # def update_turning_fractions_per_node(self, node_ids: List[int], 
-    #                                     new_turning_fractions: np.array):
-    #     """Update turning fractions for specified nodes"""
-    #     for i, n in enumerate(node_ids):
-    #         node = self.nodes[n]
-    #         node.update_matrix_A_eq(new_turning_fractions[i])
+    def update_turning_fractions_per_node(self, node_ids: List[int], # function external call
+                                        new_turning_fractions: np.array):
+        """Update turning fractions for specified nodes"""
+        for i, n in enumerate(node_ids):
+            node = self.nodes[n]
+            node.update_matrix_A_eq(new_turning_fractions[i])
 
     def update_link_states(self, time_step: int):
         """Update link states for the current time step"""

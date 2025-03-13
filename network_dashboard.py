@@ -99,7 +99,7 @@ class NetworkDashboard:
             vmin, vmax = 0, 8
             colors = ['green', 'yellow', 'red']  # Low to high
         elif variable == 'speed':
-            vmin, vmax = 0, 3
+            vmin, vmax = 0, 1.5
             colors = ['red', 'yellow', 'green']  # Low to high (inverted)
         else:  # num_pedestrians
             vmin, vmax = 0, 100
@@ -154,7 +154,7 @@ class NetworkDashboard:
             if variable == 'num_pedestrians':
                 width = min(10, value * 0.5)
             elif variable == 'speed':
-                width = min(10, value * 0.5)
+                width = max(1, min(10, value * 10))
             else: # density
                 width = min(10, value * 8)
             

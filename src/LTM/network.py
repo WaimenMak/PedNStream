@@ -14,6 +14,9 @@ A Link Transmission Model for the Pedestrian Traffic
 """
 
 class DemandGenerator:
+    """
+    Generate demand patterns for origin nodes.
+    """
     def __init__(self, simulation_steps: int, params: dict, logger: logging.Logger):
         self.logger = logger
         self.simulation_steps = simulation_steps

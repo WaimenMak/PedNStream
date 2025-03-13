@@ -123,7 +123,7 @@ class PathFinder:
         # parameters for the logit model
         self.theta = 0.1  # like the temperature in the logit model
         self.alpha = 1.0  # distance weight
-        self.beta = 0.01   # congestion weight
+        self.beta = 0.05   # congestion weight
 
     def _create_graph(self, links, time_step=0):
         """Convert network to NetworkX graph"""
@@ -380,8 +380,8 @@ class PathFinder:
 
     def update_node_turn_probs(self, node, od_pair, time_step):
         """Update the turn probabilities for the node, P(down|up,od)"""
-        if time_step == 100:
-            pass
+        # if time_step == 100:
+        #     pass
         for up_node, down_nodes in node.turns_distances[od_pair].items():
             if down_nodes:
                 turns = list((up_node, down_node) for down_node in down_nodes)
@@ -389,7 +389,7 @@ class PathFinder:
                 num_pedestrians = []
                 for down_node in down_nodes:
                     try:
-                        num_pedestrians.append(self.links[(node.node_id, down_node)].num_pedestrians[time_step-1])
+                        num_pedestrians.append(self.links[(node.node_id, down_node)].num_pedestrians[time_step-1]) # use the previous time step, current time step is not available is not updated yet
                     except KeyError:
                         num_pedestrians.append(0)
                 utilities = self.alpha * np.array(distances) + self.beta * np.array(num_pedestrians)

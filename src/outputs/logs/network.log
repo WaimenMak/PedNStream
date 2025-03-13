@@ -1,0 +1,14 @@
+2025-03-13 00:29:51,244 - src.LTM.network - INFO - Network initialization started, assign flows type: classic
+2025-03-13 00:29:51,245 - src.LTM.network - INFO - No demand configuration found for origin 0, automatically set to default
+2025-03-13 00:29:51,248 - src.LTM.network - INFO - No demand configuration found for origin 5, automatically set to default
+2025-03-13 00:29:51,252 - src.LTM.network - INFO - No demand configuration found for origin 29, automatically set to default
+2025-03-13 00:29:51,266 - src.LTM.network - INFO - No demand configuration found for origin 177, automatically set to default
+2025-03-13 00:29:51,275 - src.LTM.network - INFO - Network initialized with 298 nodes and 818 links
+2025-03-13 00:29:51,275 - src.LTM.network - INFO - No OD flows provided, initializing with ones
+2025-03-13 11:43:07,952 - src.LTM.network - INFO - Network initialization started, assign flows type: classic
+2025-03-13 11:43:07,952 - src.LTM.network - INFO - No demand configuration found for origin 0, automatically set to default
+2025-03-13 11:43:07,954 - src.LTM.network - INFO - No demand configuration found for origin 5, automatically set to default
+2025-03-13 11:43:07,955 - src.LTM.network - INFO - No demand configuration found for origin 29, automatically set to default
+2025-03-13 11:43:07,961 - src.LTM.network - INFO - No demand configuration found for origin 177, automatically set to default
+2025-03-13 11:43:07,965 - src.LTM.network - INFO - Network initialized with 298 nodes and 818 links
+2025-03-13 11:43:07,965 - src.LTM.network - INFO - No OD flows provided, initializing with ones

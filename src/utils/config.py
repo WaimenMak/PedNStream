@@ -19,35 +19,54 @@ def load_config(config_path: str) -> dict:
         config = yaml.safe_load(f)
     
     # Validate configuration
-    validate_config(config)
+    # validate_config(config)
     
     # Convert adjacency matrix to numpy array
-    config['network']['adjacency_matrix'] = np.array(
-        config['network']['adjacency_matrix']
-    )
-    
+    if 'adjacency_matrix' in config['network']:
+        config['network']['adjacency_matrix'] = np.array(
+            config['network']['adjacency_matrix']
+        )
+
     # Combine all parameters into link_params
     link_params = {
         'simulation_steps': config['simulation']['simulation_steps'],
         'unit_time': config['simulation']['unit_time'],
         'default_link': config['default_link'],
         'links': config.get('links', {}),
-        'demand': config.get('demand', {})
+        # 'demand': config.get('demand', {})
     }
-    
-    # Convert OD flows from string keys to tuple keys
-    od_flows = {}
-    for od_pair, flow in config.get('od_flows', {}).items():
-        origin, dest = map(int, od_pair.split('_'))
-        od_flows[(origin, dest)] = flow
-    
-    return {
-        'adjacency_matrix': config['network']['adjacency_matrix'],
-        'params': link_params,
+
+    # Initialize the return dictionary with required fields
+    result = {
+        # 'adjacency_matrix': config['network']['adjacency_matrix'],
+        'params': link_params,  # Include default link parameters, simulation steps, and unit time, demand, links specific params
         'origin_nodes': config['network']['origin_nodes'],
-        'destination_nodes': config['network'].get('destination_nodes', []),
-        'od_flows': od_flows
     }
+
+    if 'adjacency_matrix' in config['network']:
+        result['adjacency_matrix'] = config['network']['adjacency_matrix']
+
+    if 'links' in config:
+        result['params']['links'] = config['links']
+
+    if 'demand' in config:
+        result['params']['demand'] = config['demand']
+
+    # Only add optional fields if they exist
+    if 'destination_nodes' in config['network']:
+        result['destination_nodes'] = config['network']['destination_nodes']
+    # else:
+    #     result['destination_nodes'] = []  # Provide default empty list
+
+    # Add OD flows if they exist
+    if 'od_flows' in config:
+        od_flows = {}
+        for od_pair, flow in config['od_flows'].items():
+            origin, dest = map(int, od_pair.split('_'))
+            od_flows[(origin, dest)] = flow
+        result['od_flows'] = od_flows
+
+    return result
 
 def validate_config(config: Dict[str, Any]) -> None:
     """

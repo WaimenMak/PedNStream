@@ -19,14 +19,14 @@ from src.LTM.network import Network
 
 if __name__ == "__main__":
     # Loading
-    with open("../node_positions.json", 'r') as f:
+    with open("../data/delft/node_positions.json", 'r') as f:
         pos = {str(k): np.array(v) for k, v in json.load(f).items()}
 
-    adj = np.load("../delft_adj_matrix.npy", allow_pickle=False)
+    adj = np.load("../data/delft/adj_matrix.npy", allow_pickle=False)
     params = {
         'unit_time': 10,
         'simulation_steps': 500,
-        'assign_flows_type': 'optimal',
+        'assign_flows_type': 'classic',
         'default_link': {
             'length': 50,
             'width': 1,
@@ -43,21 +43,21 @@ if __name__ == "__main__":
     }
 
     # Define OD flows
-    # od_flows = {
-    #     # From node 0
-    #     # (0, 4): create_peak_pattern(100),  # Peak pattern to node 4
-    #     # (0, 4): 10,
-    #     # (0, 5): 5,                        # Constant flow to node 5
-    #
-    #     # From node 1
-    #     # (1, 4): create_pulse_pattern(30, 90, 3, 4),  # Pulse pattern to node 4
-    #     (0, 8): 8,
-    #     (0, 100): 8,
-    #     (5, 8): 8,
-    #     (5, 100): 8,
-    #     # (1, 5): create_pulse_pattern(40, 80, 5, 3)   # Different pulse to node 5
-    #     # (1, 5): 5
-    # }
+    od_flows = {
+        # From node 0
+        # (0, 4): create_peak_pattern(100),  # Peak pattern to node 4
+        # (0, 4): 10,
+        # (0, 5): 5,                        # Constant flow to node 5
+
+        # From node 1
+        # (1, 4): create_pulse_pattern(30, 90, 3, 4),  # Pulse pattern to node 4
+        (0, 8): 8,
+        (0, 100): 8,
+        (5, 8): 8,
+        (5, 100): 8,
+        # (1, 5): create_pulse_pattern(40, 80, 5, 3)   # Different pulse to node 5
+        # (1, 5): 5
+    }
     # Initialize network with origin at node 0 and destination at node 8
     network_env = Network(adj, params, origin_nodes=[136, 0, 5, 177, 29], destination_nodes=[8, 100, 213, 69], pos=pos)
     # Run simulation
@@ -79,11 +79,11 @@ if __name__ == "__main__":
                                     edge_property='density')
 
     # MP4
-    writer = matplotlib.animation.FFMpegWriter(fps=10, metadata=dict(artist='Me'),
-                                             bitrate=2000)
-
-    # Save the animation as MP4
-    anim.save(os.path.join(output_dir, "delft_directions", f"delft_{params['assign_flows_type']}.mp4"),
-              writer=writer,
-              progress_callback=progress_callback)
+    # writer = matplotlib.animation.FFMpegWriter(fps=10, metadata=dict(artist='Me'),
+    #                                          bitrate=2000)
+    #
+    # # Save the animation as MP4
+    # anim.save(os.path.join(output_dir, "delft_directions", f"delft_{params['assign_flows_type']}.mp4"),
+    #           writer=writer,
+    #           progress_callback=progress_callback)
     plt.show()

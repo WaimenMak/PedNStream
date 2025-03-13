@@ -236,7 +236,7 @@ class Network:
                     link_params = self.params.get('links', {}).get(f'{i}_{j}', 
                                 self.params.get('default_link', {}))
                     
-                    # Create forward and reverse links
+                    # Create forward and reverse links, with same length
                     forward_link = Link(f"{i}_{j}", node, self.nodes[j], self.simulation_steps, self.unit_time, **link_params)
                     reverse_link = Link(f"{j}_{i}", self.nodes[j], node, self.simulation_steps, self.unit_time, **link_params)
                     

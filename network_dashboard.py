@@ -97,14 +97,17 @@ class NetworkDashboard:
         # Set value range based on variable
         if variable == 'density':
             vmin, vmax = 0, 8
+            colors = ['green', 'yellow', 'red']  # Low to high
         elif variable == 'speed':
             vmin, vmax = 0, 3
+            colors = ['red', 'yellow', 'green']  # Low to high (inverted)
         else:  # num_pedestrians
             vmin, vmax = 0, 100
+            colors = ['green', 'yellow', 'red']  # Low to high
         
         # Create colormap
         colormap = LinearColormap(
-            colors=['green', 'yellow', 'red'],
+            colors=colors,
             vmin=vmin,
             vmax=vmax,
             caption=variable.capitalize()
@@ -134,9 +137,12 @@ class NetworkDashboard:
             # If bidirectional, get the value for the reverse direction
             if is_bidirectional:
                 reverse_value = self.link_data[reverse_id][variable][time_step]
-                # Use the maximum value of both directions
-                # value = max(value, reverse_value)
-                value = value + reverse_value
+                if variable == 'speed':
+                    # For speed, use the maximum of both directions
+                    value = max(value, reverse_value)
+                else:
+                    # For density and num_pedestrians, sum the values
+                    value = value + reverse_value
                 processed_pairs.add(link_pair)
             
             start = self.pos[u]
@@ -145,7 +151,12 @@ class NetworkDashboard:
             
             # Normalize width to be between 1 and 3 for better visualization
             # width = max(1, min(3, value / vmax * 3))
-            width = min(10, value * 0.5)
+            if variable == 'num_pedestrians':
+                width = min(10, value * 0.5)
+            elif variable == 'speed':
+                width = min(10, value * 0.5)
+            else: # density
+                width = min(10, value * 8)
             
             # Draw the link
             folium.PolyLine(

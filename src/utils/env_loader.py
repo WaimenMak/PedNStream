@@ -14,7 +14,6 @@ from src.LTM.network import Network
 import os
 from pathlib import Path
 import numpy as np
-import networkx as nx
 import pickle
 from src.utils.config import load_config
 
@@ -24,7 +23,7 @@ class NetworkEnvGenerator:
     def __init__(self, data_dir="data"):
         # self.simulation_params = simulation_params
 
-        self.data_dir = Path(os.path.join("..", "..", data_dir))
+        self.data_dir = Path(os.path.join("..", data_dir))
         self.data_dir.mkdir(parents=True, exist_ok=True)
 
     # def save_network_data(self, simulation_params: dict, data: dict):

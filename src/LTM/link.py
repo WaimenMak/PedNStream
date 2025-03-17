@@ -149,7 +149,7 @@ class Link(BaseLink):
             sending_flow_max = self.k_critical * self.free_flow_speed * self.unit_time
             self.sending_flow = min(sending_flow_boundary, sending_flow_max)
             # TODO: add diffusion flow to the sending flow
-
+            # TODO: fix the flow release logic
             # if (self.sending_flow < 0) and (self.speed[time_step - 1] < 0.2):
             if (self.sending_flow < 0) and (self.density[time_step - 1] > 4.5):
                 # it means the link is a bit congested, 0.2 m/s is a threshold

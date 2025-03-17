@@ -26,31 +26,6 @@ class NetworkEnvGenerator:
         self.data_dir = Path(os.path.join("..", data_dir))
         self.data_dir.mkdir(parents=True, exist_ok=True)
 
-    # def save_network_data(self, simulation_params: dict, data: dict):
-    #     """
-    #     Save network data to file
-
-    #     Args:
-    #         simulation_params: Dictionary containing simulation parameters
-    #         data: Dictionary containing network data including:
-    #             - adjacency_matrix
-    #             - edge_distances
-    #             - node_positions
-    #             - other network attributes
-    #     """
-    #     file_path = self.data_dir / f"{simulation_params['network_name']}.json"
-
-    #     # Convert numpy arrays to lists if present
-    #     save_data = {}
-    #     for key, value in data.items():
-    #         if isinstance(value, np.ndarray):
-    #             save_data[key] = value.tolist()
-    #         else:
-    #             save_data[key] = value
-
-    #     with open(file_path, 'w') as f:
-    #         json.dump(save_data, f, indent=2)
-
     def load_network_data(self, data_path: str) -> dict:
         """
         Load network data from file
@@ -92,36 +67,9 @@ class NetworkEnvGenerator:
 
         return data
 
-# Usage example:
-# def save_network_configuration(G, simulation_params: dict):
-#     """Save network configuration from NetworkX graph"""
-#     data_manager = NetworkEnvGenerator()
-
-#     network_data = {
-#         'adjacency_matrix': nx.to_numpy_array(G),
-#         'edge_distances': dict(nx.get_edge_attributes(G, 'length')),
-#         'node_positions': dict(nx.get_node_attributes(G, 'pos')),
-#         'network_params': {
-#             'default_link': {
-#                 'width': 1,
-#                 'free_flow_speed': 1.5,
-#                 'k_critical': 2,
-#                 'k_jam': 10
-#             }
-#         }
-#     }
-
-#     data_manager.save_network_data(simulation_params, network_data)
-
     def create_network(self, yaml_file_path: str):
         """Create network from saved data, simulation_params is the config dict of the yaml file"""
         network_data = self.load_network_data(yaml_file_path)
-
-        # Merge simulation params with network params
-        # params = {
-        #     **network_data['network_params'], # include adjacency matrix, edge distances, node positions
-        #     **self.config, # include simulation time, unit time, and default link parameters
-        # }
 
         # Add link-specific parameters using edge distances
         for (u, v), distance in network_data['edge_distances'].items():
@@ -146,6 +94,16 @@ class NetworkEnvGenerator:
         )
 
         return network
+
+    def randomize_network(self, network, randomize_params):
+        """
+        Randomize network parameters
+        Args:
+            network: Network object
+            randomize_params: Dictionary containing randomization parameters
+        """
+        # Implement randomization logic here
+        pass
 
 if __name__ == "__main__":
     data_manager = NetworkEnvGenerator()

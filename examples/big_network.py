@@ -23,17 +23,17 @@ if __name__ == "__main__":
         pos = {str(k): np.array(v) for k, v in json.load(f).items()}
 
     adj = np.load("../data/delft/adj_matrix.npy", allow_pickle=False)
-    params = {
-        'length': 50,
-        'width': 1,
-        'free_flow_speed': 1.5,
-        'k_critical': 2,
-        'k_jam': 10,
-        'unit_time': 10,
-        'peak_lambda': 15,
-        'base_lambda': 5,
-        'simulation_steps': 500,
-    }
+    # params = {
+    #     'length': 50,
+    #     'width': 1,
+    #     'free_flow_speed': 1.5,
+    #     'k_critical': 2,
+    #     'k_jam': 10,
+    #     'unit_time': 10,
+    #     'peak_lambda': 15,
+    #     'base_lambda': 5,
+    #     'simulation_steps': 500,
+    # }
 
     params = {
         'unit_time': 10,

@@ -1,3 +1,8 @@
+"""
+Network dashboard visualization. Visualize the results of the simulation.
+"""
+
+
 import folium
 from branca.colormap import LinearColormap
 import json
@@ -209,7 +214,7 @@ def run_visualization(link_data_path, pos):
     dashboard.run_dashboard()
 
 if __name__ == "__main__":
-    # Command line: streamlit run network_Dashboard.py -- --name delft --pos node_positions.json
+    # Command line: streamlit run network_Dashboard.py -- --name delft --pos data/delft/node_positions.json
     parser = argparse.ArgumentParser(description='Network Dashboard Visualization')
     parser.add_argument('--name', type=str, 
                        default="delft_directions",

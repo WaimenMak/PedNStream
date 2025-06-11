@@ -157,9 +157,9 @@ class Link(BaseLink):
                 # if self.link_id == '6_7':
                 #     print(self.link_flow[time_step - 1], self.density[time_step - 1], self.speed[time_step - 1])
             # elif self.sending_flow > 0 and self.speed[time_step - 1] > 1.2:
-            # elif self.sending_flow > 0 and self.inflow[time_step - 1] > 0 and self.speed[time_step - 1] > 1.2:
-            #     # if the sending flow is positive, then use diffusion flow. outcome: the flow is propagated more slowly
-            #     self.sending_flow = min(self.get_outflow(time_step, tau), self.sending_flow)
+            elif self.sending_flow > 0 and self.inflow[time_step - 1] > 0 and self.speed[time_step - 1] >= self.free_flow_speed:
+                # if the sending flow is positive, then use diffusion flow. outcome: the flow is propagated more slowly
+                self.sending_flow = min(self.get_outflow(time_step, tau), self.sending_flow)
         return max(0, self.sending_flow)
 
     def cal_receiving_flow(self, time_step: int) -> float:

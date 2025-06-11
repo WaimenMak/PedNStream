@@ -16,7 +16,7 @@ from pathlib import Path
 import numpy as np
 import pickle
 from src.utils.config import load_config
-
+from typing import List, Callable
 class NetworkEnvGenerator:
     """The input of this class is the simulation parameters, and the output is the network environment."""
 
@@ -67,11 +67,11 @@ class NetworkEnvGenerator:
 
         return data
 
-    def create_network(self, yaml_file_path: str):
+    def create_network(self, yaml_file_path: str, custom_demand_functions: List[Callable] = None):
         """Create network from saved data, simulation_params is the config dict of the yaml file"""
         network_data = self.load_network_data(yaml_file_path)
 
-        # Add link-specific parameters using edge distances
+        # Set up the simulation params, Add link-specific parameters using edge distances
         for (u, v), distance in network_data['edge_distances'].items():
             link_id = f"{u}_{v}"
             self.config['params']['links'][link_id] = {
@@ -88,7 +88,8 @@ class NetworkEnvGenerator:
             params=self.config['params'],
             origin_nodes=self.config.get('origin_nodes', []),
             destination_nodes=self.config.get('destination_nodes', []),
-            demand_pattern=self.config.get('demand_pattern', None),
+            # demand_pattern=self.config.get('demand_pattern', None),
+            demand_pattern=custom_demand_functions,
             od_flows=self.config.get('od_flows', None),
             pos=network_data.get('node_positions')
         )

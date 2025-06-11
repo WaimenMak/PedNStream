@@ -42,8 +42,7 @@ class ODManager:
 
     def get_od_flow(self, origin: int, destination: int, time_step: int) -> float:
         """Get flow for specific OD pair at time step"""
-        return self.od_flows.get((origin, destination),
-                               np.zeros(self.simulation_steps))[time_step]
+        return self.od_flows.get((origin, destination), np.zeros(self.simulation_steps))[time_step]
 
     # def get_total_origin_flow(self, origin: int, time_step: int) -> float:
     #     """Get total outflow from an origin at time step"""
@@ -144,7 +143,7 @@ class DemandGenerator:
 
     def generate_custom(self, origin_id: int, pattern: str) -> np.ndarray:
         """
-        Generate demand based on specified pattern name.
+        Generate demand based on specified pattern name. To use custom patterns, register them first.
 
         Args:
             origin_id: ID of the origin node
@@ -159,5 +158,5 @@ class DemandGenerator:
         if pattern not in self.demand_patterns:
             raise ValueError(f"Unknown demand pattern: {pattern}. "
                            f"Available patterns: {list(self.demand_patterns.keys())}")
-
+        # the argument params is optional for some patterns, it is the params setting in the yaml file
         return self.demand_patterns[pattern](origin_id, params=self.params)

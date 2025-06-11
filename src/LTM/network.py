@@ -46,7 +46,7 @@ class Network:
 
     def __init__(self, adjacency_matrix: np.array, params: dict,
                  origin_nodes: list, destination_nodes: list = [], 
-                 demand_pattern: Callable[[int, dict], np.ndarray] = None,
+                 demand_pattern: List[Callable[[int, dict], np.ndarray]] = None,
                  od_flows: dict = None, pos: dict = None,
                  log_level: int = logging.INFO):
         """
@@ -71,8 +71,10 @@ class Network:
         self.demand_generator = DemandGenerator(self.simulation_steps, params, self.logger)
         
         if demand_pattern:
-            self.demand_generator.register_pattern(self.params.get('custom_pattern'), demand_pattern)
-            self.logger.debug(f"Custom demand pattern registered: {self.params.get('custom_pattern')}")
+            # self.demand_generator.register_pattern(self.params.get('custom_pattern'), demand_pattern)
+            for func in demand_pattern:
+                self.demand_generator.register_pattern(func.__name__, func)
+                self.logger.info(f"Custom demand pattern registered: {func.__name__}")
         
         # Initialize network structure
         self.init_nodes_and_links()
@@ -97,10 +99,10 @@ class Network:
         if node.node_id in self.origin_nodes:
             # Get demand configuration for this origin
             origin_config = self.params.get('demand', {}).get(f'origin_{node.node_id}', {})
-            pattern = origin_config.get('pattern', 'gaussian_peaks')
+            pattern = origin_config.get('pattern', 'gaussian_peaks')   # get the pattern name of the node in the yaml file
             node.demand = self.demand_generator.generate_custom(node.node_id, pattern)
         else:
-            node.demand = np.zeros(self.simulation_steps)
+            node.demand = np.zeros(self.simulation_steps) # destination nodes have no demand
 
     def _create_nodes(self, node_id: int) -> Node:
         """

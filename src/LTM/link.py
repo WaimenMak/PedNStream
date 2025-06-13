@@ -70,6 +70,7 @@ class Link(BaseLink):
         self.gamma = kwargs.get('gamma', 2e-3)  # Default value if not provided, diffusion coefficient
         # self.receiving_flow = []
         self.reverse_link = None
+        self.activity_probability = kwargs.get('activity_probability', 0.0)
 
     def update_link_density_flow(self, time_step: int):
         num_peds = self.inflow[time_step] - self.outflow[time_step]
@@ -160,6 +161,17 @@ class Link(BaseLink):
             elif self.sending_flow > 0 and self.inflow[time_step - 1] > 0 and self.speed[time_step - 1] >= self.free_flow_speed:
                 # if the sending flow is positive, then use diffusion flow. outcome: the flow is propagated more slowly
                 self.sending_flow = min(self.get_outflow(time_step, tau), self.sending_flow)
+
+        # Stochastic model for pedestrians performing activities
+        if self.activity_probability > 0 and self.sending_flow > 1:
+            # Number of pedestrians who could potentially leave
+            potential_leavers = int(np.floor(self.sending_flow))
+            # Each pedestrian has an independent probability of staying for an "activity".
+            # We use a binomial distribution to find out how many stay.
+            num_staying = np.random.binomial(n=potential_leavers, p=self.activity_probability)
+            # Reduce the sending flow by the number of people who decided to stay
+            self.sending_flow -= num_staying
+
         return max(0, self.sending_flow)
 
     def cal_receiving_flow(self, time_step: int) -> float:

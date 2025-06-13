@@ -9,11 +9,11 @@ from src.utils.config import load_config
 
 def main():
     # Setup paths
-    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    project_root = os.path.dirname(os.path.abspath(__file__))
     sys.path.append(project_root)
     
     # Load configuration
-    config_path = os.path.join(project_root, 'examples', 'configs', 'od_flow_example.yaml')
+    config_path = os.path.join(project_root, 'od_flow_example.yaml')
     config = load_config(config_path)
     
     # Initialize network and run simulation

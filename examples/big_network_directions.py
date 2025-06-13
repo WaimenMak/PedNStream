@@ -33,6 +33,7 @@ if __name__ == "__main__":
             'free_flow_speed': 1.5,
             'k_critical': 2,
             'k_jam': 10,
+            'activity_probability': 0.0
         },
         'demand':{
             'origin_136':{

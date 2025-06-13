@@ -72,15 +72,27 @@ class NetworkEnvGenerator:
         network_data = self.load_network_data(yaml_file_path)
 
         # Set up the simulation params, Add link-specific parameters using edge distances
+        default_link_params = self.config['params']['default_link']
+        
+        # Ensure 'links' dictionary exists in params
+        if 'links' not in self.config['params']:
+            self.config['params']['links'] = {}
+
         for (u, v), distance in network_data['edge_distances'].items():
             link_id = f"{u}_{v}"
-            self.config['params']['links'][link_id] = {
-                'length': distance,
-                'width': self.config['params']['default_link']['width'],
-                'free_flow_speed': self.config['params']['default_link']['free_flow_speed'],
-                'k_critical': self.config['params']['default_link']['k_critical'],
-                'k_jam': self.config['params']['default_link']['k_jam'],
-            }
+            
+            # Get existing link-specific params, or an empty dict if none
+            link_specific_params = self.config['params']['links'].get(link_id, {})
+            
+            # Build the parameters for the link, starting with defaults and overriding
+            final_params = default_link_params.copy()
+            final_params.update(link_specific_params)
+            
+            # Explicitly set length from distance data and ensure width uses the default
+            final_params['length'] = distance
+            # final_params['width'] = default_link_params['width']
+
+            self.config['params']['links'][link_id] = final_params
 
         # Create network
         network = Network(

@@ -58,7 +58,7 @@ class Network:
         self.adjacency_matrix = adjacency_matrix
         self.nodes = {}
         self.links = {}  # key is tuple(start_node_id, end_node_id)
-        self.params = params
+        self.params = params # already contains default link parameters, simulation steps, unit time, link specific params and demand params
         self.simulation_steps = params['simulation_steps']
         self.unit_time = params['unit_time']
         self.destination_nodes = destination_nodes

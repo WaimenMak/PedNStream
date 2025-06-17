@@ -56,8 +56,8 @@ if __name__ == "__main__":
     # }
     params = {
         'unit_time': 10,
-        'simulation_steps': 1000,
-        'custom_pattern': 'spike',
+        'simulation_steps': 1200,
+        'custom_pattern': 'spike_pattern', # the name should be the same as the function name
         'default_link': {
             'length': 100,
             'width': 1,
@@ -67,7 +67,7 @@ if __name__ == "__main__":
         },
         'demand': {
             'origin_5': {
-                'pattern': "spike",
+                'pattern': "spike_pattern",
                 'peak_lambda': 10,
                 'base_lambda': 5,
             }
@@ -90,11 +90,12 @@ if __name__ == "__main__":
 
         demand = np.random.poisson(lam=lambda_t)
         demand[200:250] = 30
+        demand[800:] = 0
         return demand
 
     # Initialize and run simulation
     # network_env = Network(adj, params, od_nodes=[5], origin_nodes=[5])
-    network_env = Network(adj, params, origin_nodes=[5], demand_pattern=spike_pattern)
+    network_env = Network(adj, params, origin_nodes=[5], demand_pattern=[spike_pattern])
     network_env.visualize()
 
     

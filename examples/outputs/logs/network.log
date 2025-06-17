@@ -3,3 +3,5 @@
 2025-06-13 23:15:05,127 - src.LTM.network - INFO - Network initialized with 6 nodes and 14 links
 2025-06-13 23:17:03,257 - src.LTM.network - INFO - Network initialization started, assign flows type: classic
 2025-06-13 23:17:03,258 - src.LTM.network - INFO - Network initialized with 6 nodes and 14 links
+2025-06-13 23:22:23,547 - src.LTM.network - INFO - Network initialization started, assign flows type: classic
+2025-06-13 23:22:23,548 - src.LTM.network - INFO - Network initialized with 6 nodes and 14 links

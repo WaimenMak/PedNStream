@@ -88,12 +88,14 @@ class Link(BaseLink):
         """
 
         # Get reverse link density
-        reverse_density = 0
+        reverse_num_peds = 0
         if self.reverse_link is not None:
-            reverse_density = self.reverse_link.density[time_step]
+            reverse_num_peds = self.reverse_link.num_pedestrians[time_step]
+            # reverse_area = self.reverse_link.area
 
         # Calculate new speed using density ratio formula
-        density = self.density[time_step] + reverse_density
+        # density = self.density[time_step] + reverse_density
+        density = (self.num_pedestrians[time_step] + reverse_num_peds) / self.area
         speed = cal_travel_speed(density, self.free_flow_speed, k_critical=self.k_critical, k_jam=self.k_jam)
         # speed = cal_free_flow_speed(
         #     density_i=self.density[time_step],
@@ -117,16 +119,30 @@ class Link(BaseLink):
         sending_flow = (F * self.inflow[time_step - tau] + F * (1 - F) * self.inflow[time_step - tau - 1] +
                         F * (1 - F) ** 2 * self.inflow[time_step - tau - 2] +
                         F * (1 - F) ** 3 * self.inflow[time_step - tau - 3])
+        # if sending_flow >= 20:
+        #     pass
         return np.ceil(sending_flow)
 
     def cal_sending_flow(self, time_step: int) -> float:
         # if self.link_id == '2_3':
         #     print(self.density[time_step-1])
+        # get the total density
+        reverse_num_peds = 0
+        if self.reverse_link is not None:
+            reverse_num_peds = self.reverse_link.num_pedestrians[time_step-1]
+        density = (self.num_pedestrians[time_step-1] + reverse_num_peds) / self.area
+
         if self.travel_time == float('inf'):
-            if self.density[time_step - 1] > self.k_critical: # for fully jam stage
-                self.sending_flow = np.random.randint(0, 10)
-            else:
-                self.sending_flow = 0
+            # if self.density[time_step - 1] > self.k_critical: # for fully jam stage and link flow is 0
+            # if density > self.k_critical:
+            # self.sending_flow = np.random.randint(0, 10)
+            # extrusion people using binomial distribution
+            sending_flow_boundary = self.num_pedestrians[time_step - 1]
+            num_peds = int(np.floor(sending_flow_boundary))
+            num_leaving = np.random.binomial(n=num_peds, p=0.05) # 5% of the people will leave
+            self.sending_flow = max(0, num_leaving)
+            # else:
+            #     self.sending_flow = 0
             return self.sending_flow
 
         tau = round(self.travel_time / self.unit_time)
@@ -134,33 +150,40 @@ class Link(BaseLink):
         if time_step < self.free_flow_tau:  # for the initial stage
             self.sending_flow = 0
             return self.sending_flow
+
         elif time_step - tau < 0:
             # for the highly congested stage
             # if self.density[time_step - 1] > self.k_critical:
-            if self.density[time_step - 1] > self.k_jam - 2:
-                self.sending_flow = max(0, np.floor(self.link_flow[time_step - 1] * self.unit_time)) # ensure when congested, the number of peds going through is at least 1
-                # if self.link_id == '1_0':
-                #     print(self.num_pedestrians[time_step-1])
-            else:
-                self.sending_flow = 0
+            # if self.density[time_step - 1] > self.k_jam - 2:
+            #     self.sending_flow = max(0, np.floor(self.link_flow[time_step - 1] * self.unit_time)) # ensure when congested, the number of peds going through is at least 1
+            #     # if self.link_id == '1_0':
+            #     #     print(self.num_pedestrians[time_step-1])
+            # else:
+            #     self.sending_flow = 0
+            self.sending_flow = max(0, np.floor(self.link_flow[time_step - 1] * self.unit_time))
 
-            return self.sending_flow
-        else:                  # for the normal stage and the congestion stage
+            # return self.sending_flow
+        # for the normal stage and the congestion stage
+        else:                  
             sending_flow_boundary = self.cumulative_inflow[time_step - tau] - self.cumulative_outflow[time_step - 1]
             sending_flow_max = self.k_critical * self.free_flow_speed * self.unit_time
             self.sending_flow = min(sending_flow_boundary, sending_flow_max)
             # TODO: add diffusion flow to the sending flow
             # TODO: fix the flow release logic
             # if (self.sending_flow < 0) and (self.speed[time_step - 1] < 0.2):
-            if (self.sending_flow < 0) and (self.density[time_step - 1] > 4.5):
+            # if (self.sending_flow < 0) and (self.density[time_step - 1] > 4.5):
+            if self.sending_flow < 0:
                 # it means the link is a bit congested, 0.2 m/s is a threshold
                 self.sending_flow = max(0, np.floor(self.link_flow[time_step - 1] * self.unit_time))
                 # if self.link_id == '6_7':
                 #     print(self.link_flow[time_step - 1], self.density[time_step - 1], self.speed[time_step - 1])
             # elif self.sending_flow > 0 and self.speed[time_step - 1] > 1.2:
-            elif self.sending_flow > 0 and self.inflow[time_step - 1] > 0 and self.speed[time_step - 1] >= self.free_flow_speed:
-                # if the sending flow is positive, then use diffusion flow. outcome: the flow is propagated more slowly
-                self.sending_flow = min(self.get_outflow(time_step, tau), self.sending_flow)
+            # elif self.sending_flow > 0 and self.inflow[time_step - 1] > 0 and self.speed[time_step - 1] >= self.free_flow_speed:
+        
+        if self.sending_flow > 0 and self.inflow[time_step - tau] > 0:
+        # if self.sending_flow > 0:
+            # if the sending flow is positive, then use diffusion flow. outcome: the flow is propagated more slowly
+            self.sending_flow = min(self.get_outflow(time_step, tau), self.sending_flow)
 
         # Stochastic model for pedestrians performing activities
         if self.activity_probability > 0 and self.sending_flow > 1:
@@ -172,6 +195,8 @@ class Link(BaseLink):
             # Reduce the sending flow by the number of people who decided to stay
             self.sending_flow -= num_staying
 
+        if self.sending_flow == 0 and density > 0:
+            pass
         return max(0, self.sending_flow)
 
     def cal_receiving_flow(self, time_step: int) -> float:

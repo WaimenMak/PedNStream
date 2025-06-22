@@ -49,7 +49,7 @@ if __name__ == "__main__":
             'gamma': 0,
         },
         'links': {
-            '1_2': {'length': 100, 'width': 2, 'free_flow_speed': 1.5, 'k_critical': 2, 'k_jam': 6},
+            '1_2': {'length': 100, 'width': 1, 'free_flow_speed': 1.5, 'k_critical': 2, 'k_jam': 6},
             '2_3': {'length': 50, 'width': 1, 'free_flow_speed': 1.5, 'k_critical': 1, 'k_jam': 2},
         },
         'demand': {

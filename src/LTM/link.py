@@ -13,8 +13,8 @@ class BaseLink:
         self.outflow = np.zeros(simulation_steps)
         self.cumulative_inflow = np.zeros(simulation_steps)
         self.cumulative_outflow = np.zeros(simulation_steps)
-        self.sending_flow = 0
-        self.receiving_flow = 0
+        self.sending_flow = -1 * np.ones(simulation_steps)
+        self.receiving_flow = -1 * np.ones(simulation_steps)
 
     def update_cum_outflow(self, q_j: float, time_step: int):
         self.outflow[time_step] = q_j
@@ -119,21 +119,21 @@ class Link(BaseLink):
         sending_flow = (F * self.inflow[time_step - tau] + F * (1 - F) * self.inflow[time_step - tau - 1] +
                         F * (1 - F) ** 2 * self.inflow[time_step - tau - 2] +
                         F * (1 - F) ** 3 * self.inflow[time_step - tau - 3])
-        # if sending_flow >= 20:
-        #     pass
+
         return max(np.ceil(sending_flow), 0)
 
     def cal_sending_flow(self, time_step: int) -> float:
-        if self.link_id == '1_2' and time_step ==149:
+        if self.link_id == '5_4' and time_step >= 806:
             pass
 
-        if self.density[time_step] == 0.08 and time_step > 500:
-            pass
         # get the total density
         reverse_num_peds = 0
         if self.reverse_link is not None:
             reverse_num_peds = self.reverse_link.num_pedestrians[time_step]
         density = (self.num_pedestrians[time_step] + reverse_num_peds) / self.area
+
+        if self.link_id == '3_4' and self.density[time_step] == 0 and time_step >= 950:
+            pass
 
         if self.travel_time == float('inf'): # speed is 0
             # if self.density[time_step - 1] > self.k_critical: # for fully jam stage and link flow is 0
@@ -145,29 +145,17 @@ class Link(BaseLink):
             sending_flow = min(sending_flow_boundary, sending_flow_max)
             num_peds = int(np.floor(sending_flow))
             num_stay = np.random.binomial(n=num_peds, p=0.1) # 10% of the people will leave
-            self.sending_flow = num_peds - num_stay
+            self.sending_flow[time_step] = num_peds - num_stay
             # else:
             #     self.sending_flow = 0
-            return self.sending_flow
+            return self.sending_flow[time_step]
 
         tau = round(self.travel_time / self.unit_time)
         # if time_step - tau < 0:
         if time_step < self.free_flow_tau:  # for the initial stage
-            self.sending_flow = 0
-            return self.sending_flow
+            self.sending_flow[time_step] = 0
+            return self.sending_flow[time_step]
 
-        # elif time_step - tau < 0:
-            # for the highly congested stage
-            # if self.density[time_step - 1] > self.k_critical:
-            # if self.density[time_step - 1] > self.k_jam - 2:
-            #     self.sending_flow = max(0, np.floor(self.link_flow[time_step - 1] * self.unit_time)) # ensure when congested, the number of peds going through is at least 1
-            #     # if self.link_id == '1_0':
-            #     #     print(self.num_pedestrians[time_step-1])
-            # else:
-            #     self.sending_flow = 0
-            # self.sending_flow = max(0, np.floor(self.link_flow[time_step] * self.unit_time))
-
-            # return self.sending_flow
         # for the normal stage or the congestion stage
         else:   
             # if time_step - tau + 1 < 0: # congestion stage
@@ -178,7 +166,7 @@ class Link(BaseLink):
 
             # sending_flow_boundary = self.num_pedestrians[time_step]
             sending_flow_max = self.k_critical * self.free_flow_speed * self.unit_time
-            self.sending_flow = min(sending_flow_boundary, sending_flow_max)
+            self.sending_flow[time_step] = min(sending_flow_boundary, sending_flow_max)
             # TODO: add diffusion flow to the sending flow
             # TODO: fix the flow release logic: if sending flow >0, then use diffusion flow
             # if (self.sending_flow < 0) and (self.speed[time_step - 1] < 0.2):
@@ -191,27 +179,27 @@ class Link(BaseLink):
             # elif self.sending_flow > 0 and self.speed[time_step - 1] > 1.2:
             # elif self.sending_flow > 0 and self.inflow[time_step - 1] > 0 and self.speed[time_step - 1] >= self.free_flow_speed:
         
-        # if self.sending_flow > 0 and self.inflow[time_step - tau] > 0:
-        # if self.sending_flow > 0 and np.sum(self.inflow[time_step - tau - 3:time_step - tau]) > 0:
-        if self.sending_flow > 0:
-            # if the sending flow is positive, then use diffusion flow. outcome: the flow is propagated more slowly
-            # free flow stage
-            # if density <= self.k_critical + (self.k_jam - self.k_critical) / 2:
-            if density <= self.k_critical:
-                diffusion_flow = self.get_outflow(time_step, tau)
-                # If diffusion flow is active, it represents the arrival of a platoon.
-                if diffusion_flow > 0:
-                    self.sending_flow = min(diffusion_flow, self.sending_flow)
-                # Otherwise, fall back to FD-based flow to prevent stuck agents.
-                # else:
-                #     # fd_flow = np.floor(self.link_flow[time_step] * self.unit_time)
-                #     # self.sending_flow = min(fd_flow, self.sending_flow)
-                #     pass
 
-            else:
-                num_passing_peds = int(np.floor(self.sending_flow))
-                num_leave = np.random.binomial(n=num_passing_peds, p=0.7) # 70% of the people will leave
-                self.sending_flow = num_leave
+        # if self.sending_flow > 0 and np.sum(self.inflow[time_step - tau - 3:time_step - tau]) > 0:
+        # if self.sending_flow[time_step] > 0:
+        #     ''' The purpose is to mitigate the maximum sending flow to avoid unrealistic high flow'''
+        #     # if the sending flow is positive, then use diffusion flow. outcome: the flow is propagated more slowly
+        #     # free flow stage
+        #     # if density <= self.k_critical + (self.k_jam - self.k_critical) / 2:
+        #     if density <= self.k_critical:
+        #         diffusion_flow = self.get_outflow(time_step, tau)
+        #         # If diffusion flow is active, it represents the arrival of a platoon.
+        #         if diffusion_flow > 0:
+        #             self.sending_flow[time_step] = min(diffusion_flow, self.sending_flow[time_step]) # this min is necessary because there might be inflow but actual num peds is less than it.
+        #
+        #         else: # Prevent maximum flow when the inflow is 0, therefore duffusion flow is 0
+        #             num_passing_peds = int(np.floor(self.sending_flow[time_step]))
+        #             num_leave = np.random.binomial(n=num_passing_peds, p=0.9)  # 90% of the people will leave
+        #             self.sending_flow[time_step] = num_leave
+        #     else:
+        #         num_passing_peds = int(np.floor(self.sending_flow[time_step]))
+        #         num_leave = np.random.binomial(n=num_passing_peds, p=0.7) # 70% of the people will leave
+        #         self.sending_flow[time_step] = num_leave
             # pass
             # congested stage
             # self.sending_flow = min(self.get_outflow(time_step, tau), self.sending_flow)
@@ -219,14 +207,14 @@ class Link(BaseLink):
         # Stochastic model for pedestrians performing activities
         if self.activity_probability > 0 and self.sending_flow > 1:
             # Number of pedestrians who could potentially leave
-            potential_leavers = int(np.floor(self.sending_flow))
+            potential_leavers = int(np.floor(self.sending_flow[time_step]))
             # Each pedestrian has an independent probability of staying for an "activity".
             # We use a binomial distribution to find out how many stay.
             num_staying = np.random.binomial(n=potential_leavers, p=self.activity_probability)
             # Reduce the sending flow by the number of people who decided to stay
-            self.sending_flow -= num_staying
+            self.sending_flow[time_step] -= num_staying
 
-        return max(0, self.sending_flow)
+        return max(0, self.sending_flow[time_step])
 
     def cal_receiving_flow(self, time_step: int) -> float:
         #TODO: is using length the correct way to calculate receiving flow?
@@ -240,8 +228,8 @@ class Link(BaseLink):
                               + self.k_jam * self.area - self.cumulative_inflow[time_step])
 
         receiving_flow_max = self.k_critical * self.free_flow_speed * self.unit_time
-        self.receiving_flow = min(receiving_flow_boundary, receiving_flow_max)
+        self.receiving_flow[time_step] = min(receiving_flow_boundary, receiving_flow_max)
         # if receiving_flow < 30:
         #     print(receiving_flow, receiving_flow_boundary, receiving_flow_max, time_step)
 
-        return self.receiving_flow
+        return self.receiving_flow[time_step]

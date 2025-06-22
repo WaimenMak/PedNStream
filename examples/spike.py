@@ -57,6 +57,7 @@ if __name__ == "__main__":
     params = {
         'unit_time': 10,
         'simulation_steps': 1200,
+        'assign_flows_type': 'classic',
         'custom_pattern': 'spike_pattern', # the name should be the same as the function name
         'default_link': {
             'length': 100,
@@ -127,13 +128,13 @@ if __name__ == "__main__":
     import matplotlib
     matplotlib.use('macosx')
     visualizer = NetworkVisualizer(simulation_dir=os.path.join(output_dir, simulation_dir))
-    anim = visualizer.animate_network(start_time=0, interval=100, edge_property='density')
+    anim = visualizer.animate_network(start_time=0, interval=100, edge_property='density', tag=True)
     # #  # MP4
     # writer = matplotlib.animation.FFMpegWriter(fps=15, metadata=dict(artist='Me'),
     #                                          bitrate=2000)
     #
     # # Save the animation as MP4
-    # anim.save(os.path.join(output_dir, simulation_dir, f"{simulation_dir}.mp4"),
+    # anim.save(os.path.join(output_dir, simulation_dir, f"{simulation_dir}_debug.mp4"),
     #           writer=writer,
     #           progress_callback=progress_callback)
     plt.show()

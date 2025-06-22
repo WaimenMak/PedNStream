@@ -42,6 +42,8 @@ class OutputHandler:
                 'num_pedestrians': link.num_pedestrians.tolist(),
                 'cumulative_inflow': link.cumulative_inflow.tolist(),
                 'cumulative_outflow': link.cumulative_outflow.tolist(),
+                'sending_flow': link.sending_flow.tolist(),
+                'receiving_flow': link.receiving_flow.tolist(),
                 'parameters': {
                     'length': link.length,
                     'width': link.width,

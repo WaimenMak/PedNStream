@@ -192,7 +192,7 @@ class Network:
             link.update_speeds(time_step)
 
     def network_loading(self, time_step: int):
-        """Perform network loading for the current time step"""
+        """Perform network loading for the current time step, time_step starts from 1"""
         for node_id, node in self.nodes.items():
             if node.turning_fractions is None:
                 phi = 1/(node.dest_num - 1)

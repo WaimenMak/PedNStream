@@ -152,18 +152,20 @@ class Node:
         assert len(self.q) == self.source_num + self.dest_num
 
         for l, link in enumerate(self.incoming_links):
-            inflow = self.q[l]
+            inflow = self.q[l]  # here inflow is from the perspective of the node, which is the outflow of the link
             link.update_cum_outflow(inflow, time_step)
             # link.update_speeds(time_step)
 
         for m, link in enumerate(self.outgoing_links):
             outflow = self.q[self.source_num + m]
+            if outflow < 0:
+                pass
             link.update_cum_inflow(outflow, time_step)
             # link.update_speeds(time_step)
 
     def assign_flows(self, time_step: int, type='classic'):
         """
-        Get the sending and receiving flows constraints.
+        Get the sending and receiving flows constraints. time_step starts from 1.
         """
         s = np.zeros(self.source_num)
         r = np.zeros(self.dest_num)
@@ -171,9 +173,9 @@ class Node:
         # Calculate sending flows
         for i, l in enumerate(self.incoming_links):
             if hasattr(self, 'virtual_incoming_link') and l == self.virtual_incoming_link:
-                s[i] = self.demand[time_step]
+                s[i] = self.demand[time_step-1]
             else:
-                s[i] = l.cal_sending_flow(time_step)
+                s[i] = l.cal_sending_flow(time_step-1)
                 # if l.link_id == "2_3":
                 #     print(f'{time_step}:link {l.link_id} num peds: {l.link_flow[time_step-1]}')
                 #     print(f'{time_step}:link {l.link_id} num peds: {l.sending_flow}')
@@ -184,11 +186,18 @@ class Node:
                 r[j] = self.M
             else:
                 #reverse link sending flow
-                r[j] = max(0, l.cal_receiving_flow(time_step) - l.reverse_link.num_pedestrians[time_step]) # consider the flow from the reverse link
+                # r[j] = max(0, l.cal_receiving_flow(time_step) - l.reverse_link.num_pedestrians[time_step]) # consider the num peds from the reverse link
+                r[j] = max(l.cal_receiving_flow(time_step-1) - l.reverse_link.cal_sending_flow(time_step-1), 0) # consider the flow from the reverse link
+                # r[j] = max(0, l.cal_receiving_flow(time_step-1))
                 # debug forky_queues example
-                # if l.link_id == "2_3" and time_step < 400: # simulate bottleneck
+                # if l.link_id == "2_3" and time_step < 200: # simulate bottleneck
                 #     r[j] = 1
-        
+                # if l.link_id == "2_3" and l.reverse_link.cal_sending_flow(time_step-1) > 0:
+                #     pass
+
+        # raise Warining if s and r has negative values
+        if np.any(s < 0) or np.any(r < 0):
+            raise Warning(f"Negative flows detected at time step {time_step}: s={s}, r={r}")
         self.solve(s, r, type=type)
         # self.solve(s, r, type='optimal')
         self.update_links(time_step)
@@ -207,6 +216,8 @@ class OneToOneNode(Node):
         # Ensure non-negative flows by using maximum of 0 and the minimum flow
         self.q = np.array([np.min([s[0],r[1]]), np.min([s[1],r[0]]),
                             np.min([s[1],r[0]]), np.min([s[0],r[1]])])
+        if np.any(self.q < 0):
+            raise Warning(f"Negative flows detected: {self.q}")
         # self.q = np.where(self.q < 0, 0, self.q)
         # min_val = 1 # ensure when congested, the number of peds going through is at least 1
         # self.q = np.where(self.q > 0, np.maximum(min_val, np.floor(self.q)), 0)
@@ -249,7 +260,9 @@ class RegularNode(Node):
             flows_list = []
             for i in range(self.edge_num):
                 source_idx = i // (self.dest_num - 1)
-                g_ij = self.turning_fractions[i] * np.min([s[source_idx], np.min(weighted_sr[self.mask[source_idx, :]] * s[source_idx])])
+                destination_idx = i % (self.dest_num - 1)
+                # g_ij = self.turning_fractions[i] * np.min([s[source_idx], np.min(weighted_sr[self.mask[source_idx, :]] * s[source_idx])]) # use min according to the equation in the paper.
+                g_ij = self.turning_fractions[i] * min(s[source_idx], weighted_sr[self.mask[source_idx, :]][destination_idx] * s[source_idx]) # do not use min
                 flows_list.append(g_ij)
             flows = self.A_ub[:,:self.edge_num] @ np.floor(np.array(flows_list))
             self.q = np.maximum(0, flows)

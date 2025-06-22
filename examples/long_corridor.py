@@ -42,9 +42,9 @@ if __name__ == "__main__":
     # }
     params = {
         'unit_time': 10,
-        'simulation_steps': 500,
+        'simulation_steps': 600,
         'default_link': {
-            'length': 120,  # make it to 50 to see spillback
+            'length': 100,  # make it to 50 to see spillback
             'width': 1,
             'free_flow_speed': 1.1,
             'k_critical': 2,
@@ -52,12 +52,12 @@ if __name__ == "__main__":
         },
         'demand': {
             "origin_0": {
-                "peak_lambda": 50,
-                "base_lambda": 5,
+                "peak_lambda": 20,
+                "base_lambda": 10,
             },
             "origin_5": {
-                "peak_lambda": 5,
-                "base_lambda": 5,
+                "peak_lambda": 20,
+                "base_lambda": 10,
             }
         }
 
@@ -68,8 +68,8 @@ if __name__ == "__main__":
     network_env.visualize()
 
     # Set demand for nodes to zero after a certain time step
-    network_env.nodes[0].demand[400:] = np.zeros(500 - 400)
-    network_env.nodes[5].demand[400:] = np.zeros(500 - 400)
+    network_env.nodes[0].demand[300:] = np.zeros(600 - 300)
+    network_env.nodes[5].demand[300:] = np.zeros(600 - 300)
     # Run simulation
     for t in range(1, params['simulation_steps']):
         network_env.network_loading(t)
@@ -108,7 +108,7 @@ if __name__ == "__main__":
     # Create the visualization
     visualizer = NetworkVisualizer(simulation_dir=os.path.join(output_dir, "long_corridor"))
     anim = visualizer.animate_network(start_time=0, end_time=params["simulation_steps"],
-                                    interval=100, edge_property='density')
+                                    interval=100, edge_property='density', tag=True)
 
     # GIf
     # writer = PillowWriter(fps=15, metadata=dict(artist='Me'))

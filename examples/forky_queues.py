@@ -45,15 +45,20 @@ if __name__ == "__main__":
             'width': 1,
             'free_flow_speed': 1.5,
             'k_critical': 2,
-            'k_jam': 10,
+            'k_jam': 6,
+            'gamma': 0,
+        },
+        'links': {
+            '1_2': {'length': 100, 'width': 2, 'free_flow_speed': 1.5, 'k_critical': 2, 'k_jam': 6},
+            '2_3': {'length': 50, 'width': 1, 'free_flow_speed': 1.5, 'k_critical': 1, 'k_jam': 2},
         },
         'demand': {
             "origin_0": {
-                "peak_lambda": 25,
+                "peak_lambda": 15,
                 "base_lambda": 5,
             },
             "origin_4": {
-                "peak_lambda": 25,
+                "peak_lambda": 15,
                 "base_lambda": 5,
             }
         }
@@ -70,6 +75,10 @@ if __name__ == "__main__":
         if t == 10:
             network_env.update_turning_fractions_per_node(node_ids=[1],
                                                           new_turning_fractions=np.array([[1, 0, 0.5, 0.5, 0, 1]])) #[1_2, 1_4, 1_0, 1_4, 1_0, 1_2]
+        if t == 300: # adjust the width of link 2_3, simulate remove the bottleneck
+            network_env.links[(2,3)].width = 2
+            network_env.links[(2,3)].k_critical = 2
+            network_env.links[(2,3)].k_jam = 6
 
     # Construct paths relative to the project root
     output_dir = os.path.join("..", "outputs")
@@ -81,7 +90,7 @@ if __name__ == "__main__":
     import matplotlib
     matplotlib.use('macosx')
     visualizer = NetworkVisualizer(simulation_dir=os.path.join(output_dir, "forky_queues"))
-    anim = visualizer.animate_network(start_time=0, end_time=params["simulation_steps"], interval=100, edge_property='density')
+    anim = visualizer.animate_network(start_time=0, end_time=params["simulation_steps"], interval=100, edge_property='density', tag=True)
 
     # # MP4
     # writer = matplotlib.animation.FFMpegWriter(fps=15, metadata=dict(artist='Me'),

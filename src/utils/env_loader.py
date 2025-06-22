@@ -93,6 +93,9 @@ class NetworkEnvGenerator:
             # final_params['width'] = default_link_params['width']
 
             self.config['params']['links'][link_id] = final_params
+            # if reverse link not in the config, add it
+            if f"{v}_{u}" not in self.config['params']['links']:
+                self.config['params']['links'][f"{v}_{u}"] = final_params
 
         # Create network
         network = Network(

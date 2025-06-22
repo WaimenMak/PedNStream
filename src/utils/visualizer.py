@@ -371,10 +371,12 @@ class NetworkVisualizer:
         m = self.visualize_network_state(time_step, edge_property, use_folium=True)
         m.save(filename)
 
-    def animate_network(self, start_time=0, end_time=None, interval=50, figsize=(10, 8), edge_property='density'):
+    def animate_network(self, start_time=0, end_time=None, interval=50, figsize=(10, 8), 
+                       edge_property='density', tag=False):
         """
         Create an animation of the network evolution
         :param edge_property: Property to visualize ('density', 'flow', or 'speed')
+        :param tag: Boolean to control whether to show value labels on links
         """
         if end_time is None:
             if self.from_saved:
@@ -425,10 +427,9 @@ class NetworkVisualizer:
             fig.clear()
             ax = fig.add_subplot(111)
             
-            # Update edge values without changing positions
+            # Update edge values
+            edge_labels = {}  # Dictionary to store edge labels
             if self.from_saved:
-                # print("aaa")    
-                # Add edges from saved data
                 for link_id, link_info in self.link_data.items():
                     u, v = link_id.split('-')
                     if edge_property == 'density':
@@ -437,16 +438,10 @@ class NetworkVisualizer:
                         value = link_info['link_flow'][frame]
                     elif edge_property == 'speed':
                         value = link_info['speed'][frame]
-                    # G.add_edge(u, v, value=value)
-                    #change value of edge
                     self.G[u][v]['value'] = value
+                    if tag:  # Only create labels if tag is True
+                        edge_labels[(u, v)] = f'{value:.2f}'
             else:
-                # Original logic for direct network object
-                # for node in self.network.nodes:
-                #     total_flow = sum(link.cumulative_inflow[frame] 
-                #                    for link in node.incoming_links)
-                #     G.add_node(node.node_id, size=total_flow)
-                
                 for (u, v), link in self.network.links.items():
                     if edge_property == 'density':
                         value = link.density[frame]
@@ -454,18 +449,18 @@ class NetworkVisualizer:
                         value = link.link_flow[frame]
                     elif edge_property == 'speed':
                         value = link.speed[frame]
-                    # G.add_edge(u, v, value=value)
-                    #change value of edge
                     self.G[u][v]['value'] = value
+                    if tag:  # Only create labels if tag is True
+                        edge_labels[(u, v)] = f'{value:.2f}'
             
-            # Use stored positions for drawing
+            # Draw nodes
             node_sizes = [self.G.nodes[node]['size'] * 100 + 100 for node in self.G.nodes()]
             node_colors = ['red' if int(node) in self.network_params['origin_nodes'] 
                           else 'pink' if int(node) in self.network_params['destination_nodes'] 
                           else 'lightblue' for node in self.G.nodes()]
             # print(self.pos)
             # self.pos = nx.spring_layout(G, k=1, iterations=50, seed=42)
-            nx.draw_networkx_nodes(self.G, pos=self.pos,  # Use stored positions
+            nx.draw_networkx_nodes(self.G, pos=self.pos,
                                  node_size=node_sizes,
                                  node_color=node_colors,
                                  ax=ax)
@@ -493,18 +488,55 @@ class NetworkVisualizer:
                                  edge_vmax=vmax,
                                  arrowsize=edges_arrowsizes.tolist(),
                                  ax=ax,
-                                 connectionstyle=f"arc3,rad=0.2")
+                                 connectionstyle="arc3,rad=0.2")
             
-            # Draw labels
+            # Only draw edge labels if tag is True
+            if tag:
+                # Separate edge labels for forward and reverse directions
+                forward_labels = {}
+                reverse_labels = {}
+                
+                # Sort edges into forward and reverse based on node indices
+                for (u, v), label in edge_labels.items():
+                    if int(u) < int(v):  # Forward direction
+                        forward_labels[(u, v)] = label
+                    else:  # Reverse direction
+                        reverse_labels[(u, v)] = label
+                
+                # Draw forward edge labels above the edge
+                if forward_labels:
+                    nx.draw_networkx_edge_labels(
+                        self.G, self.pos,
+                        edge_labels=forward_labels,
+                        bbox=dict(facecolor='none', edgecolor='none', alpha=1),
+                        font_size=10,
+                        label_pos=0.4,
+                        rotate=False,
+                        verticalalignment='bottom'  # Place above the edge
+                    )
+                
+                # Draw reverse edge labels below the edge
+                if reverse_labels:
+                    nx.draw_networkx_edge_labels(
+                        self.G, self.pos,
+                        edge_labels=reverse_labels,
+                        bbox=dict(facecolor='none', edgecolor='none', alpha=1),
+                        font_size=10,
+                        label_pos=0.5,
+                        rotate=False,
+                        verticalalignment='top'  # Place below the edge
+                    )
+            
+            # Draw node labels
             nx.draw_networkx_labels(self.G, self.pos, ax=ax)
             
-            # Update colorbar with same value range
+            # Update colorbar
             sm = plt.cm.ScalarMappable(cmap=plt.cm.RdYlGn_r,
                                       norm=plt.Normalize(vmin=vmin, vmax=vmax))
             sm.set_array([])
             cbar = plt.colorbar(sm, ax=ax, label=edge_property.capitalize())
-            cbar.ax.tick_params(labelsize=12)  # Enlarge tick labels
-            cbar.set_label(edge_property.capitalize(), size=14)  # Enlarge colorbar label
+            cbar.ax.tick_params(labelsize=12)
+            cbar.set_label(edge_property.capitalize(), size=14)
             
             # Set fixed axis limits
             ax.set_xlim(x_min, x_max)

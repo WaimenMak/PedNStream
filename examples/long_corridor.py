@@ -52,12 +52,12 @@ if __name__ == "__main__":
         },
         'demand': {
             "origin_0": {
-                "peak_lambda": 20,
-                "base_lambda": 10,
+                "peak_lambda": 15,
+                "base_lambda": 5,
             },
             "origin_5": {
-                "peak_lambda": 20,
-                "base_lambda": 10,
+                "peak_lambda": 15,
+                "base_lambda": 5,
             }
         }
 

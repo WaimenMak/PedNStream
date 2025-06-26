@@ -158,8 +158,6 @@ class Node:
 
         for m, link in enumerate(self.outgoing_links):
             outflow = self.q[self.source_num + m]
-            if outflow < 0:
-                pass
             link.update_cum_inflow(outflow, time_step)
             # link.update_speeds(time_step)
 
@@ -187,18 +185,20 @@ class Node:
             else:
                 #reverse link sending flow
                 # r[j] = max(0, l.cal_receiving_flow(time_step) - l.reverse_link.num_pedestrians[time_step]) # consider the num peds from the reverse link
-                reverse_sending_flow = l.reverse_link.sending_flow[time_step-1]
+                reverse_sending_flow = l.reverse_link.sending_flow[time_step-1].copy()
                 # raise Warning if reverse_sending_flow is negative
                 if reverse_sending_flow < 0:
+                    print(reverse_sending_flow)
                     raise Warning(f"Negative reverse sending flow detected at time step {time_step}: {reverse_sending_flow}")
                 
                 forward_receiving_flow = l.cal_receiving_flow(time_step-1)
-                # simulate people any squeeze in and out of the link
-                if forward_receiving_flow == reverse_sending_flow:
-                    reverse_sending_flow -= np.random.binomial(n=reverse_sending_flow, p=0.1)
+                ''' simulate people any squeeze in and out of the link (Added)'''
+                if forward_receiving_flow <= reverse_sending_flow:
+                    reverse_sending_flow -= np.random.binomial(n=reverse_sending_flow, p=0.2)
 
                 receiving_flow = forward_receiving_flow - reverse_sending_flow
                 r[j] = max(receiving_flow, 0) # consider the flow from the reverse link
+                l.receiving_flow[time_step-1] = r[j]
                 # r[j] = max(l.cal_receiving_flow(time_step-1) - l.reverse_link.cal_sending_flow(time_step-1), 0) # consider the flow from the reverse link
                 # r[j] = max(0, l.cal_receiving_flow(time_step-1))
                 # debug forky_queues example

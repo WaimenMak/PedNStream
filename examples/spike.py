@@ -91,7 +91,7 @@ if __name__ == "__main__":
 
         demand = np.random.poisson(lam=lambda_t)
         demand[200:250] = 30
-        demand[800:] = 0
+        demand[300:] = 0
         return demand
 
     # Initialize and run simulation

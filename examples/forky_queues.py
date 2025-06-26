@@ -79,6 +79,7 @@ if __name__ == "__main__":
             network_env.links[(2,3)].width = 2
             network_env.links[(2,3)].k_critical = 2
             network_env.links[(2,3)].k_jam = 6
+            network_env.links[(2,3)].shock_wave_speed = network_env.links[(2,3)].capacity / (6 - 2)
 
     # Construct paths relative to the project root
     output_dir = os.path.join("..", "outputs")

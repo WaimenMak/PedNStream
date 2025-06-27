@@ -114,7 +114,7 @@ class Link(BaseLink):
         """
         # tau = self.congestion_tau if self.speed[time_step] < self.free_flow_speed else self.free_flow_tau
         # tau = self.congestion_tau
-        travel_time = self.length / self.speed[time_step-1]
+        travel_time = self.length / self.speed[time_step]
         F = 1/ (1 + self.gamma * travel_time)
         sending_flow = (F * self.inflow[time_step - tau] + F * (1 - F) * self.inflow[time_step - tau - 1] +
                         F * (1 - F) ** 2 * self.inflow[time_step - tau - 2] +
@@ -197,8 +197,8 @@ class Link(BaseLink):
             #     # If diffusion flow is active, it represents the arrival of a platoon.
                 if diffusion_flow > 0:
                     # sending_flow = min(diffusion_flow, sending_flow) # this min is necessary because there might be inflow but actual num peds is less than it.
-                    # weight = diffusion_flow / (diffusion_flow + sending_flow)
-                    weight = 0.5
+                    # weight = np.clip( density / self.k_critical, 0.5, 0.8)
+                    weight = 0.8
                     sending_flow = int(np.floor(min(weight * diffusion_flow + (1 - weight) * sending_flow, sending_flow)))
             #         # self.sending_flow[time_step] = np.floor(0.2 * diffusion_flow + 0.8 * self.sending_flow[time_step])
                 else: # Prevent maximum flow when the inflow is 0, therefore duffusion flow is 0
@@ -216,10 +216,7 @@ class Link(BaseLink):
                 sending_flow = num_leave
             #     # self.sending_flow[time_step] = smooth_factor * num_leave + (1 - smooth_factor) * last_flow
             ''' Smooth the sending flow to avoid unrealistic high flow (Added) '''
-            # if sending_flow - self.sending_flow[time_step - 1] > 20:
-            #     sending_flow = 0.5 * sending_flow + 0.5 * self.sending_flow[time_step - 1]
-            # else:
-            sending_flow = min(np.floor(0.5 * sending_flow + 0.5 * self.sending_flow[time_step - 1]), original_sending_flow)
+            sending_flow = min(np.floor(0.8 * sending_flow + 0.2 * self.sending_flow[time_step - 1]), original_sending_flow)
             if sending_flow < 0:
                 print(1)
 

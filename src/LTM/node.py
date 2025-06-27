@@ -167,7 +167,7 @@ class Node:
         """
         s = np.zeros(self.source_num)
         r = np.zeros(self.dest_num)
-        
+
         # Calculate sending flows
         for i, l in enumerate(self.incoming_links):
             if hasattr(self, 'virtual_incoming_link') and l == self.virtual_incoming_link:
@@ -177,7 +177,7 @@ class Node:
                 # if l.link_id == "2_3":
                 #     print(f'{time_step}:link {l.link_id} num peds: {l.link_flow[time_step-1]}')
                 #     print(f'{time_step}:link {l.link_id} num peds: {l.sending_flow}')
-        
+
         # Calculate receiving flows
         for j, l in enumerate(self.outgoing_links):
             if hasattr(self, 'virtual_outgoing_link') and l == self.virtual_outgoing_link:
@@ -190,7 +190,7 @@ class Node:
                 if reverse_sending_flow < 0:
                     print(reverse_sending_flow)
                     raise Warning(f"Negative reverse sending flow detected at time step {time_step}: {reverse_sending_flow}")
-                
+
                 forward_receiving_flow = l.cal_receiving_flow(time_step-1)
                 ''' simulate people any squeeze in and out of the link (Added)'''
                 if forward_receiving_flow <= reverse_sending_flow:
@@ -211,7 +211,6 @@ class Node:
         if np.any(s < 0) or np.any(r < 0):
             raise Warning(f"Negative flows detected at time step {time_step}: s={s}, r={r}")
         self.solve(s, r, type=type)
-        # self.solve(s, r, type='optimal')
         self.update_links(time_step)
 
     def solve(self, s, r, type='classic'):

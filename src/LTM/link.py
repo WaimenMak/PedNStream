@@ -143,7 +143,8 @@ class Link(BaseLink):
             # self.sending_flow = np.random.randint(0, 10)
             # extrusion people using binomial distribution
             sending_flow_boundary = self.num_pedestrians[time_step]
-            sending_flow_max = self.k_critical * self.free_flow_speed * self.unit_time
+            # sending_flow_max = self.k_critical * self.free_flow_speed * self.unit_time
+            sending_flow_max = self.width * self.k_critical * self.free_flow_speed * self.unit_time
             sending_flow = min(sending_flow_boundary, sending_flow_max)
             num_peds = int(np.floor(sending_flow))
             num_stay = np.random.binomial(n=num_peds, p=0.1) # 10% of the people will leave
@@ -172,7 +173,8 @@ class Link(BaseLink):
             # sending_flow_boundary = max(0, self.cumulative_inflow[time_step + 1 - self.free_flow_tau] - self.cumulative_outflow[time_step]) # +1 is the delta t
 
             # sending_flow_boundary = self.num_pedestrians[time_step]
-            sending_flow_max = self.k_critical * self.free_flow_speed * self.unit_time
+            # sending_flow_max = self.k_critical * self.free_flow_speed * self.unit_time
+            sending_flow_max = self.width * self.k_critical * self.free_flow_speed * self.unit_time
             sending_flow = min(sending_flow_boundary, sending_flow_max)
             # TODO: add diffusion flow to the sending flow
             # TODO: fix the flow release logic: if sending flow >0, then use diffusion flow
@@ -247,7 +249,8 @@ class Link(BaseLink):
             receiving_flow_boundary = (self.cumulative_outflow[time_step + 1 - tau_shockwave]
                               + self.k_jam * self.area - self.cumulative_inflow[time_step])
 
-        receiving_flow_max = self.k_critical * self.free_flow_speed * self.unit_time
+        # receiving_flow_max = self.k_critical * self.free_flow_speed * self.unit_time
+        receiving_flow_max = self.width * self.k_critical * self.free_flow_speed * self.unit_time
         receiving_flow = min(receiving_flow_boundary, receiving_flow_max)
         if receiving_flow < 0:
             print(f"Negative receiving flow detected, {receiving_flow} at {time_step}")

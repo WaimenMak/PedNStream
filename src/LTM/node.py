@@ -171,7 +171,8 @@ class Node:
         # Calculate sending flows
         for i, l in enumerate(self.incoming_links):
             if hasattr(self, 'virtual_incoming_link') and l == self.virtual_incoming_link:
-                s[i] = self.demand[time_step-1]
+                sending_flow_max = 33 # for origin node, the sending flow is limited by the capacity of the entrance, we now set it by default to 33
+                s[i] = min(self.demand[time_step-1], sending_flow_max)
             else:
                 s[i] = l.cal_sending_flow(time_step-1)
                 # if l.link_id == "2_3":

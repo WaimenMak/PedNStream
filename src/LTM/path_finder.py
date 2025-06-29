@@ -363,7 +363,7 @@ class PathFinder:
             # theta = 0.1  # like the temperature in the logit model
             # alpha = 1.0  # distance weight
             # beta = 0.01   # congestion weight
-            self.update_node_turn_probs(current_node, od_pair, time_step=0)
+            self.update_node_turn_probs(current_node, od_pair, time_step=0)   # this is the first time we calculate the turn probabilities, so we can use time_step=0
             # for up_node, down_nodes in current_node.turns_distances[od_pair].items():
             #     if down_nodes:
             #         turns = list((up_node, down_node) for down_node in down_nodes)

@@ -40,31 +40,62 @@ if __name__ == "__main__":
     #     'base_lambda': 5,
     #     'simulation_steps': 800,
     # }
+
+
+    # Initialize and run simulation
+    ''' Scenario 1 '''
+    # params = {
+    #     'unit_time': 10,
+    #     'simulation_steps': 600,
+    #     'default_link': {
+    #         'length': 100,  # make it to 50 to see spillback
+    #         'width': 1,
+    #         'free_flow_speed': 1.1,
+    #         'k_critical': 2,
+    #         'k_jam': 6,
+    #     },
+    #     'demand': {
+    #         "origin_0": {
+    #             "peak_lambda": 15,
+    #             "base_lambda": 5,
+    #         },
+    #         "origin_5": {
+    #             "peak_lambda": 15,
+    #             "base_lambda": 5,
+    #         }
+    #     }
+    #
+    # }
+    # network_env = Network(adj, params, origin_nodes=[5, 0])
+    ''' Scenario 2 '''
     params = {
-        'unit_time': 10,
+        'unit_time': 20,
         'simulation_steps': 600,
         'default_link': {
-            'length': 100,  # make it to 50 to see spillback
+            'length': 50,  # make it to 50 to see spillback
             'width': 1,
             'free_flow_speed': 1.1,
             'k_critical': 2,
             'k_jam': 6,
         },
         'demand': {
-            "origin_0": {
-                "peak_lambda": 15,
-                "base_lambda": 5,
+            "origin_3": {
+                "peak_lambda": 50,
+                "base_lambda": 6,
             },
-            "origin_5": {
-                "peak_lambda": 15,
-                "base_lambda": 5,
+            "origin_2": {
+                "peak_lambda": 50,
+                "base_lambda": 6,
             }
         }
 
     }
+    network_env = Network(adj, params, origin_nodes=[2, 3])
+    network_env.update_turning_fractions_per_node(node_ids=[2, 3],
+                                                          new_turning_fractions=np.array([[0, 1, 0.5, 0.5, 0, 1],
+                                                                                          [1, 0, 0, 1, 0.5, 0.5]]))
 
-    # Initialize and run simulation
-    network_env = Network(adj, params, origin_nodes=[5, 0])
+
     network_env.visualize()
 
     # Set demand for nodes to zero after a certain time step

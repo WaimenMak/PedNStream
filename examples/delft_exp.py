@@ -45,9 +45,9 @@ if __name__ == "__main__":
     # MP4
     # writer = matplotlib.animation.FFMpegWriter(fps=10, metadata=dict(artist='Me'),
     #                                          bitrate=2000)
-
-    # Save the animation as MP4
-    # anim.save(os.path.join(output_dir, "delft_exp", f"delft_exp.mp4"),
+    #
+    # # Save the animation as MP4
+    # anim.save(os.path.join(output_dir, "delft_exp", f"delft_exp2.mp4"),
     #           writer=writer,
     #           progress_callback=progress_callback)
     

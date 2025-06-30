@@ -77,6 +77,7 @@ if __name__ == "__main__":
             'free_flow_speed': 1.1,
             'k_critical': 2,
             'k_jam': 6,
+            'activity_probability': 0,  # probability of activity on the link
         },
         'demand': {
             "origin_3": {

@@ -189,8 +189,8 @@ class Link(BaseLink):
             # elif self.sending_flow > 0 and self.inflow[time_step - 1] > 0 and self.speed[time_step - 1] >= self.free_flow_speed:
         
         ''' The purpose is to mitigate the maximum sending flow to avoid unrealistic high flow (Added)'''
+        original_sending_flow = sending_flow
         if sending_flow > 0:
-            original_sending_flow = sending_flow
             # if the sending flow is positive, then use diffusion flow. outcome: the flow is propagated more slowly
             # last_flow = self.sending_flow[time_step - 1] if time_step - 1 >= 0 else 0
             # free flow stage
@@ -216,9 +216,6 @@ class Link(BaseLink):
                 num_passing_peds = int(np.floor(sending_flow))
                 num_leave = np.random.binomial(n=num_passing_peds, p=0.7) # 70% of the people will leave
                 sending_flow = num_leave
-            #     # self.sending_flow[time_step] = smooth_factor * num_leave + (1 - smooth_factor) * last_flow
-            ''' Smooth the sending flow to avoid unrealistic high flow (Added) '''
-            sending_flow = min(np.floor(0.8 * sending_flow + 0.2 * self.sending_flow[time_step - 1]), original_sending_flow)
             if sending_flow < 0:
                 print(1)
 
@@ -236,7 +233,13 @@ class Link(BaseLink):
 
         # if self.link_id == '1_3' and self.density[time_step] > self.k_critical and sending_flow == 0:
         #     pass
-        self.sending_flow[time_step] = max(0, sending_flow)
+        ''' Smooth the sending flow to avoid unrealistic high flow (Added) '''
+        sending_flow = max(0, sending_flow)
+        sending_flow = min(np.floor(0.8 * sending_flow + 0.2 * self.sending_flow[time_step - 1]), original_sending_flow)
+        if sending_flow < 0:
+            print(f"Negative sending flow detected, {sending_flow} at {time_step}")
+        self.sending_flow[time_step] = sending_flow
+        # self.sending_flow[time_step] = max(0, sending_flow)
         # self.sending_flow[time_step] = min(max(0, sending_flow), self.num_pedestrians[time_step])
         return self.sending_flow[time_step]
 

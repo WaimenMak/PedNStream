@@ -57,16 +57,24 @@ class Link(BaseLink):
         self.k_critical = kwargs['k_critical']
         self.shockwave_speed = self.capacity / (self.k_jam - self.k_critical)
         self.current_speed = self.free_flow_speed
-        self.travel_time = self.length / self.free_flow_speed
+        self.max_travel_time = self.length / 0.01  # Jam threshold, equivalent to speed of 0.01 m/s
+
+        self.travel_time = np.zeros(simulation_steps, dtype=np.float32)
+        self.travel_time[0] = min(self.length / self.free_flow_speed, self.max_travel_time)
+        self._travel_time_running_sum = self.travel_time[0]
         self.unit_time = unit_time
-        self.free_flow_tau = round(self.travel_time / self.unit_time)
-        # self.congestion_tau = round(self.length / (0.8 * self.unit_time)) # assume the average congestion speed is 0.8 m/s
+        self.free_flow_tau = round(self.travel_time[0] / self.unit_time)
+
+        # For efficient moving average calculation
+        self.avg_travel_time_window = round(60 / self.unit_time)
+        self.avg_travel_time = np.zeros(simulation_steps, dtype=np.float32)
+        self.avg_travel_time[:self.avg_travel_time_window] = self.travel_time[0] # initialize the first window
 
         # Additional dynamic attributes
-        self.num_pedestrians = np.zeros(simulation_steps)
-        self.density = np.zeros(simulation_steps)
-        self.speed = np.zeros(simulation_steps)
-        self.link_flow = np.zeros(simulation_steps)
+        self.num_pedestrians = np.zeros(simulation_steps, dtype=np.float32)
+        self.density = np.zeros(simulation_steps, dtype=np.float32) 
+        self.speed = np.zeros(simulation_steps, dtype=np.float32)
+        self.link_flow = np.zeros(simulation_steps, dtype=np.float32)
         self.gamma = kwargs.get('gamma', 2e-3)  # Default value if not provided, diffusion coefficient
         # self.receiving_flow = []
         self.reverse_link = None
@@ -105,8 +113,15 @@ class Link(BaseLink):
 
         # Update travel time and speed
         self.speed[time_step] = speed
-        self.travel_time = self.length / speed if speed > 0 else float('inf')
+        self.travel_time[time_step] = self.length / speed if speed > 0 else self.max_travel_time
+        # self.travel_time[time_step] = self.length / speed if speed > 0 else float('inf')
+
         self.link_flow[time_step] = cal_link_flow_kv(self.density[time_step], self.speed[time_step])
+
+        self._travel_time_running_sum += self.travel_time[time_step]
+        if time_step >= self.avg_travel_time_window:
+            self._travel_time_running_sum -= self.travel_time[time_step - self.avg_travel_time_window]
+            self.avg_travel_time[time_step] = self._travel_time_running_sum / self.avg_travel_time_window
 
     def get_outflow(self, time_step: int, tau: int) -> int:
         """
@@ -114,19 +129,20 @@ class Link(BaseLink):
         """
         # tau = self.congestion_tau if self.speed[time_step] < self.free_flow_speed else self.free_flow_tau
         # tau = self.congestion_tau
-        travel_time = self.length / self.speed[time_step]
-        F = 1/ (1 + self.gamma * travel_time)
+        travel_time = self.avg_travel_time[time_step] # use average travel time to calculate
+        # travel_time = self.travel_time[time_step] # use real-time travel time to calculate
+        F = 1 / (1 + self.gamma * travel_time)
         sending_flow = (F * self.inflow[time_step - tau] + F * (1 - F) * self.inflow[time_step - tau - 1] +
                         F * (1 - F) ** 2 * self.inflow[time_step - tau - 2] +
                         F * (1 - F) ** 3 * self.inflow[time_step - tau - 3])
 
-        # sending_flow = (F * self.sending_flow[time_step - 1] + F * (1 - F) * self.inflow[time_step - 2] +
-        #         F * (1 - F) ** 2 * self.sending_flow[time_step - 3] +
-        #         F * (1 - F) ** 3 * self.sending_flow[time_step - 4])
-
         return max(np.ceil(sending_flow), 0)
 
     def cal_sending_flow(self, time_step: int) -> float:
+        """
+        Calculate the sending flow of the link at a given time step
+        :param time_step: Current time step - 1
+        """
         # if time_step == 8:
         #     pass
 
@@ -137,7 +153,8 @@ class Link(BaseLink):
         density = (self.num_pedestrians[time_step] + reverse_num_peds) / self.area
 
         ''' for the jam stage '''
-        if self.travel_time == float('inf'): # speed is 0
+        # if self.travel_time[time_step] == float('inf'): # speed is 0
+        if self.travel_time[time_step] >= self.max_travel_time:
             # if self.density[time_step - 1] > self.k_critical: # for fully jam stage and link flow is 0
             # if density > self.k_critical:
             # self.sending_flow = np.random.randint(0, 10)
@@ -154,7 +171,9 @@ class Link(BaseLink):
             #     self.sending_flow = 0
             return self.sending_flow[time_step]
 
-        tau = round(self.travel_time / self.unit_time)
+        tau = round(self.avg_travel_time[time_step] / self.unit_time) # use average travel time to calculate tau
+        # tau = round(self.travel_time[time_step] / self.unit_time)  # use real-time travel time to calculate tau
+
         ''' for the initial stage '''
         # if time_step - tau < 0:
         if time_step < self.free_flow_tau:
@@ -217,7 +236,7 @@ class Link(BaseLink):
                 num_leave = np.random.binomial(n=num_passing_peds, p=0.7) # 70% of the people will leave
                 sending_flow = num_leave
             if sending_flow < 0:
-                print(1)
+                raise ValueError(f"Negative sending flow detected, {sending_flow} at {time_step}")
 
 
 
@@ -237,13 +256,17 @@ class Link(BaseLink):
         sending_flow = max(0, sending_flow)
         sending_flow = min(np.floor(0.8 * sending_flow + 0.2 * self.sending_flow[time_step - 1]), original_sending_flow)
         if sending_flow < 0:
-            print(f"Negative sending flow detected, {sending_flow} at {time_step}")
+            raise ValueError('Negative sending flow detected, sending flow more than original flow')
         self.sending_flow[time_step] = sending_flow
         # self.sending_flow[time_step] = max(0, sending_flow)
         # self.sending_flow[time_step] = min(max(0, sending_flow), self.num_pedestrians[time_step])
         return self.sending_flow[time_step]
 
     def cal_receiving_flow(self, time_step: int) -> float:
+        """
+        Calculate the receiving flow of the link at a given time step
+        :param time_step: Current time step - 1
+        """
         #TODO: is using length the correct way to calculate receiving flow?
         tau_shockwave = round(self.length/(self.shockwave_speed * self.unit_time))
         if time_step + 1 - tau_shockwave < 0:

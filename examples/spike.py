@@ -62,9 +62,9 @@ if __name__ == "__main__":
         'default_link': {
             'length': 100,
             'width': 1,
-            'free_flow_speed': 1.5,
+            'free_flow_speed': 1.1,
             'k_critical': 2,
-            'k_jam': 10,
+            'k_jam': 6,
         },
         'demand': {
             'origin_5': {

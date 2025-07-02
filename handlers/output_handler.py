@@ -37,6 +37,7 @@ class OutputHandler:
                 'density': link.density.tolist(),
                 'link_flow': link.link_flow.tolist(),
                 'speed': link.speed.tolist(),
+                'travel_time': link.travel_time.tolist(),
                 'inflow': link.inflow.tolist(),
                 'outflow': link.outflow.tolist(),
                 'num_pedestrians': link.num_pedestrians.tolist(),

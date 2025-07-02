@@ -69,7 +69,7 @@ if __name__ == "__main__":
     # network_env = Network(adj, params, origin_nodes=[5, 0])
     ''' Scenario 2 '''
     params = {
-        'unit_time': 20,
+        'unit_time': 10,
         'simulation_steps': 600,
         'default_link': {
             'length': 50,  # make it to 50 to see spillback
@@ -81,12 +81,12 @@ if __name__ == "__main__":
         },
         'demand': {
             "origin_3": {
-                "peak_lambda": 50,
-                "base_lambda": 6,
+                "peak_lambda": 30,
+                "base_lambda": 8,
             },
             "origin_2": {
-                "peak_lambda": 50,
-                "base_lambda": 6,
+                "peak_lambda": 30,
+                "base_lambda": 8,
             }
         }
 

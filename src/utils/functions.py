@@ -5,7 +5,7 @@ class SpeedDensityFd:
     A callable class to model travel speed based on traffic density.
     This encapsulates the fundamental diagram parameters.
     """
-    def __init__(self, v_f, k_critical, k_jam, model_type=1):
+    def __init__(self, v_f, k_critical, k_jam, model_type=1, add_noise=False):
         """
         Initializes the travel speed model with hyperparameters.
         :param v_f: Free-flow speed.
@@ -21,31 +21,37 @@ class SpeedDensityFd:
         self.u0 = 1.5
         self.gamma = self.u0 * self.k_critical 
         self.model_type = model_type
-
+        self.add_noise = add_noise
     def __call__(self, density: float) -> float:
         """Calculate the travel speed for a given density."""
-        # type1: linear density speed fundamental diagram
-        if self.model_type == 1:
+        # type1: linear density speed fundamental diagram (Greenshields)
+        if self.model_type == 'greenshields':
             if density <= self.k_critical:
-                return self.v_f
+                v = self.v_f
             elif self.k_critical < density:
-                return max(0, -self.v_f * (density - self.k_jam) / (self.k_jam - self.k_critical))
+                v = max(0, -self.v_f * (density - self.k_jam) / (self.k_jam - self.k_critical))
 
-        # type2: triangular density flow fundamental diagram
-        elif self.model_type == 2:
+        # type2: triangular density flow fundamental diagram (Yperman's LTM)
+        elif self.model_type == 'yperman':
             if density <= self.k_critical:
-                return self.v_f
+                v = self.v_f
             elif self.k_critical < density:
-                return max(0, (self.k_critical * self.v_f) / (self.k_jam - self.k_critical) * (self.k_jam / density - 1))
+                v = max(0, (self.k_critical * self.v_f) / (self.k_jam - self.k_critical) * (self.k_jam / density - 1))
 
         # type3: Smulders’ fundamental diagram vehiclar
-        elif self.model_type == 3:
+        elif self.model_type == 'smulders':
             if density <= self.k_critical:
-                return self.u0 * (1 - density / self.k_jam)
+                v = self.u0 * (1 - density / self.k_jam)
             elif self.k_critical < density:
-                return max(0, self.gamma * (1 / density - 1 / self.k_jam))
+                v = max(0, self.gamma * (1 / density - 1 / self.k_jam))
+
+        else:
+            raise ValueError(f"Unknown model type: {self.model_type}")
         
-        raise ValueError(f"Unknown model type: {self.model_type}")
+        if self.add_noise:
+            v += np.random.normal(0, 0.01)
+
+        return max(0, v)
 
 
 def travel_cost(link, inflow, outflow):

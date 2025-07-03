@@ -47,10 +47,12 @@ if __name__ == "__main__":
             'k_critical': 2,
             'k_jam': 6,
             'gamma': 0,
+            'speed_noise': False,
+            'fd_type': 'yperman',
         },
         'links': {
-            '1_2': {'length': 100, 'width': 1, 'free_flow_speed': 1.5, 'k_critical': 2, 'k_jam': 6},
-            '2_3': {'length': 50, 'width': 1, 'free_flow_speed': 1.5, 'k_critical': 1, 'k_jam': 2},
+            '1_2': {'length': 100, 'width': 1, 'free_flow_speed': 1.5, 'k_critical': 2, 'k_jam': 6, 'speed_noise': False, 'fd_type': 'yperman'},
+            '2_3': {'length': 50, 'width': 1, 'free_flow_speed': 1.5, 'k_critical': 1, 'k_jam': 2, 'speed_noise': False, 'fd_type': 'yperman'},
         },
         'demand': {
             "origin_0": {
@@ -76,7 +78,7 @@ if __name__ == "__main__":
             network_env.update_turning_fractions_per_node(node_ids=[1],
                                                           new_turning_fractions=np.array([[1, 0, 0.5, 0.5, 0, 1]])) #[1_2, 1_4, 1_0, 1_4, 1_0, 1_2]
         if t == 300: # adjust the width of link 2_3, simulate remove the bottleneck
-            network_env.links[(2,3)].width = 2
+            network_env.links[(2,3)].width = 1
             network_env.links[(2,3)].k_critical = 2
             network_env.links[(2,3)].k_jam = 6
             network_env.links[(2,3)].shock_wave_speed = network_env.links[(2,3)].capacity / (6 - 2)

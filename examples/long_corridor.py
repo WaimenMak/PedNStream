@@ -78,6 +78,8 @@ if __name__ == "__main__":
             'k_critical': 2,
             'k_jam': 6,
             'activity_probability': 0,  # probability of activity on the link
+            'fd_type': 'greenshields',  # type of fundamental diagram
+            'speed_noise': True,  # whether to add noise to the speed
         },
         'demand': {
             "origin_3": {

@@ -61,7 +61,9 @@ class Link(BaseLink):
         self.speed_density_fd = SpeedDensityFd(
             v_f=self.free_flow_speed,
             k_critical=self.k_critical,
-            k_jam=self.k_jam
+            k_jam=self.k_jam,
+            model_type=kwargs.get('fd_type', 'greenshields'),
+            add_noise=kwargs.get('speed_noise', False)
         )
 
         self.travel_time = np.zeros(simulation_steps, dtype=np.float32)
@@ -81,7 +83,6 @@ class Link(BaseLink):
         self.speed = np.zeros(simulation_steps, dtype=np.float32)
         self.link_flow = np.zeros(simulation_steps, dtype=np.float32)
         self.gamma = kwargs.get('gamma', 2e-3)  # Default value if not provided, diffusion coefficient
-        # self.receiving_flow = []
         self.reverse_link = None
         self.activity_probability = kwargs.get('activity_probability', 0.0)
 
@@ -201,7 +202,6 @@ class Link(BaseLink):
             # sending_flow_max = self.k_critical * self.free_flow_speed * self.unit_time
             sending_flow_max = self.width * self.k_critical * self.free_flow_speed * self.unit_time
             sending_flow = min(sending_flow_boundary, sending_flow_max)
-            # TODO: add diffusion flow to the sending flow
             # TODO: fix the flow release logic: if sending flow >0, then use diffusion flow
             # if (self.sending_flow < 0) and (self.speed[time_step - 1] < 0.2):
             # if (self.sending_flow < 0) and (self.density[time_step - 1] > 4.5):

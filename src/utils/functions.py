@@ -1,5 +1,53 @@
 import numpy as np
 
+class SpeedDensityFd:
+    """
+    A callable class to model travel speed based on traffic density.
+    This encapsulates the fundamental diagram parameters.
+    """
+    def __init__(self, v_f, k_critical, k_jam, model_type=1):
+        """
+        Initializes the travel speed model with hyperparameters.
+        :param v_f: Free-flow speed.
+        :param k_critical: Critical density.
+        :param k_jam: Jam density.
+        :param model_type: The type of fundamental diagram model to use.
+        """
+        if k_jam <= k_critical:
+            raise ValueError("k_jam must be greater than k_critical")
+        self.v_f = v_f
+        self.k_critical = k_critical
+        self.k_jam = k_jam
+        self.u0 = 1.5
+        self.gamma = self.u0 * self.k_critical 
+        self.model_type = model_type
+
+    def __call__(self, density: float) -> float:
+        """Calculate the travel speed for a given density."""
+        # type1: linear density speed fundamental diagram
+        if self.model_type == 1:
+            if density <= self.k_critical:
+                return self.v_f
+            elif self.k_critical < density:
+                return max(0, -self.v_f * (density - self.k_jam) / (self.k_jam - self.k_critical))
+
+        # type2: triangular density flow fundamental diagram
+        elif self.model_type == 2:
+            if density <= self.k_critical:
+                return self.v_f
+            elif self.k_critical < density:
+                return max(0, (self.k_critical * self.v_f) / (self.k_jam - self.k_critical) * (self.k_jam / density - 1))
+
+        # type3: Smulders’ fundamental diagram vehiclar
+        elif self.model_type == 3:
+            if density <= self.k_critical:
+                return self.u0 * (1 - density / self.k_jam)
+            elif self.k_critical < density:
+                return max(0, self.gamma * (1 / density - 1 / self.k_jam))
+        
+        raise ValueError(f"Unknown model type: {self.model_type}")
+
+
 def travel_cost(link, inflow, outflow):
     """Calculate the travel time of a link"""
     return link.length / (link.free_flow_speed * (1 - (inflow + outflow) / link.capacity))

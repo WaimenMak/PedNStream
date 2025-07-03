@@ -1,5 +1,5 @@
 import numpy as np
-from src.utils.functions import cal_travel_speed, cal_free_flow_speed, cal_link_flow_fd, cal_link_flow_kv
+from src.utils.functions import SpeedDensityFd, cal_free_flow_speed, cal_link_flow_fd, cal_link_flow_kv
 
 class BaseLink:
     """Base class for all link types"""
@@ -58,6 +58,11 @@ class Link(BaseLink):
         self.shockwave_speed = self.capacity / (self.k_jam - self.k_critical)
         self.current_speed = self.free_flow_speed
         self.max_travel_time = self.length / 0.01  # Jam threshold, equivalent to speed of 0.01 m/s
+        self.speed_density_fd = SpeedDensityFd(
+            v_f=self.free_flow_speed,
+            k_critical=self.k_critical,
+            k_jam=self.k_jam
+        )
 
         self.travel_time = np.zeros(simulation_steps, dtype=np.float32)
         self.travel_time[0] = min(self.length / self.free_flow_speed, self.max_travel_time)
@@ -66,7 +71,7 @@ class Link(BaseLink):
         self.free_flow_tau = round(self.travel_time[0] / self.unit_time)
 
         # For efficient moving average calculation
-        self.avg_travel_time_window = round(60 / self.unit_time)
+        self.avg_travel_time_window = round(40 / self.unit_time)
         self.avg_travel_time = np.zeros(simulation_steps, dtype=np.float32)
         self.avg_travel_time[:self.avg_travel_time_window] = self.travel_time[0] # initialize the first window
 
@@ -104,7 +109,8 @@ class Link(BaseLink):
         # Calculate new speed using density ratio formula
         # density = self.density[time_step] + reverse_density
         density = (self.num_pedestrians[time_step] + reverse_num_peds) / self.area  # this link area is the same as the reverse link, they share the same area
-        speed = cal_travel_speed(density, self.free_flow_speed, k_critical=self.k_critical, k_jam=self.k_jam)
+        # speed = cal_travel_speed(density, self.free_flow_speed, k_critical=self.k_critical, k_jam=self.k_jam)
+        speed = self.speed_density_fd(density)
         # speed = cal_free_flow_speed(
         #     density_i=self.density[time_step],
         #     density_j=reverse_density,

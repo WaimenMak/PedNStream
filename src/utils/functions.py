@@ -22,6 +22,7 @@ class SpeedDensityFd:
         self.gamma = self.u0 * self.k_critical 
         self.model_type = model_type
         self.add_noise = add_noise
+        
     def __call__(self, density: float) -> float:
         """Calculate the travel speed for a given density."""
         # type1: linear density speed fundamental diagram (Greenshields)
@@ -49,7 +50,7 @@ class SpeedDensityFd:
             raise ValueError(f"Unknown model type: {self.model_type}")
         
         if self.add_noise:
-            v += np.random.normal(0, 0.01)
+            v += np.random.normal(0, 0.1)
 
         return max(0, v)
 

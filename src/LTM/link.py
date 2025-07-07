@@ -49,8 +49,9 @@ class Link(BaseLink):
         
         # Physical attributes
         self.length = kwargs['length']
-        self.width = kwargs['width']
-        self.area = self.length * self.width
+        self._width = kwargs['width']  # width of the link
+        self._front_gate_width = self.width  # width of the gate, for gate control in the head
+        self._back_gate_width = self.width  # width of the gate, for gate control in the tail
         self.free_flow_speed = kwargs['free_flow_speed']
         self.capacity = self.free_flow_speed * kwargs['k_critical']
         self.k_jam = kwargs['k_jam']
@@ -86,6 +87,37 @@ class Link(BaseLink):
         self.reverse_link = None
         self.activity_probability = kwargs.get('activity_probability', 0.0)
 
+    @property
+    def width(self):
+        return self._width
+
+    @property
+    def front_gate_width(self):
+        return self._front_gate_width
+
+    @front_gate_width.setter
+    def front_gate_width(self, value: float):
+        self._front_gate_width = value
+        if self.reverse_link:
+            # Set the private attribute on the reverse link to avoid recursion
+            self.reverse_link._back_gate_width = value
+
+    @property
+    def back_gate_width(self):
+        return self._back_gate_width
+
+    @back_gate_width.setter
+    def back_gate_width(self, value: float):
+        self._back_gate_width = value
+        if self.reverse_link:
+            # Set the private attribute on the reverse link to avoid recursion
+            self.reverse_link._front_gate_width = value
+
+    @property
+    def area(self):
+        """Calculates the area of the link dynamically based on its width and length."""
+        return self.length * self.width
+
     def update_link_density_flow(self, time_step: int):
         num_peds = self.inflow[time_step] - self.outflow[time_step]
         self.num_pedestrians[time_step] = self.num_pedestrians[time_step - 1] + num_peds
@@ -97,20 +129,20 @@ class Link(BaseLink):
     def update_speeds(self, time_step: int):
         """
         Update the speed of the link based on the density
-        :param time_step:
+        :param time_step: current time step + 1, is the future time step
         :return:
         """
 
         # Get reverse link density
         reverse_num_peds = 0
-        if self.reverse_link is not None:
-            reverse_num_peds = self.reverse_link.num_pedestrians[time_step]
+        # if self.reverse_link is not None:
+        #     reverse_num_peds = self.reverse_link.num_pedestrians[time_step]
             # reverse_area = self.reverse_link.area
 
         # Calculate new speed using density ratio formula
-        # density = self.density[time_step] + reverse_density
-        density = (self.num_pedestrians[time_step] + reverse_num_peds) / self.area  # this link area is the same as the reverse link, they share the same area
+        # density = (self.num_pedestrians[time_step] + reverse_num_peds) / self.area  # this link area is the same as the reverse link, they share the same area
         # speed = cal_travel_speed(density, self.free_flow_speed, k_critical=self.k_critical, k_jam=self.k_jam)
+        density = self.get_density(time_step) # density and num_pedestrians of all incoming and outgoing links are already updated before updating the speed
         speed = self.speed_density_fd(density)
         # speed = cal_free_flow_speed(
         #     density_i=self.density[time_step],
@@ -130,6 +162,15 @@ class Link(BaseLink):
             self._travel_time_running_sum -= self.travel_time[time_step - self.avg_travel_time_window]
             self.avg_travel_time[time_step] = self._travel_time_running_sum / self.avg_travel_time_window
 
+    def get_density(self, time_step: int):
+        """
+        Get the density of the link
+        """
+        reverse_num_peds = 0
+        if self.reverse_link is not None:
+            reverse_num_peds = self.reverse_link.num_pedestrians[time_step]
+        return (self.num_pedestrians[time_step] + reverse_num_peds) / self.area
+
     def get_outflow(self, time_step: int, tau: int) -> int:
         """
         Get outflow with diffusion behavior
@@ -148,16 +189,17 @@ class Link(BaseLink):
     def cal_sending_flow(self, time_step: int) -> float:
         """
         Calculate the sending flow of the link at a given time step
-        :param time_step: Current time step - 1
+        :param time_step: Current time step (t - 1)
         """
-        # if time_step == 8:
-        #     pass
+        if time_step == 250 and self.link_id == '1_2':
+            pass
 
         # get the total density
-        reverse_num_peds = 0
-        if self.reverse_link is not None:
-            reverse_num_peds = self.reverse_link.num_pedestrians[time_step]
-        density = (self.num_pedestrians[time_step] + reverse_num_peds) / self.area
+        density = self.get_density(time_step)
+        # reverse_num_peds = 0
+        # if self.reverse_link is not None:
+        #     reverse_num_peds = self.reverse_link.num_pedestrians[time_step]
+        # density = (self.num_pedestrians[time_step] + reverse_num_peds) / self.area
 
         ''' for the jam stage '''
         # if self.travel_time[time_step] == float('inf'): # speed is 0
@@ -168,7 +210,7 @@ class Link(BaseLink):
             # extrusion people using binomial distribution
             sending_flow_boundary = self.num_pedestrians[time_step]
             # sending_flow_max = self.k_critical * self.free_flow_speed * self.unit_time
-            sending_flow_max = self.width * self.k_critical * self.free_flow_speed * self.unit_time
+            sending_flow_max = self.front_gate_width * self.k_critical * self.free_flow_speed * self.unit_time
             sending_flow = min(sending_flow_boundary, sending_flow_max)
             num_peds = int(np.floor(sending_flow))
             num_stay = np.random.binomial(n=num_peds, p=0.1) # 10% of the people will leave
@@ -200,7 +242,7 @@ class Link(BaseLink):
 
             # sending_flow_boundary = self.num_pedestrians[time_step]
             # sending_flow_max = self.k_critical * self.free_flow_speed * self.unit_time
-            sending_flow_max = self.width * self.k_critical * self.free_flow_speed * self.unit_time
+            sending_flow_max = self.front_gate_width * self.k_critical * self.free_flow_speed * self.unit_time
             sending_flow = min(sending_flow_boundary, sending_flow_max)
             # TODO: fix the flow release logic: if sending flow >0, then use diffusion flow
             # if (self.sending_flow < 0) and (self.speed[time_step - 1] < 0.2):
@@ -282,7 +324,7 @@ class Link(BaseLink):
                               + self.k_jam * self.area - self.cumulative_inflow[time_step])
 
         # receiving_flow_max = self.k_critical * self.free_flow_speed * self.unit_time
-        receiving_flow_max = self.width * self.k_critical * self.free_flow_speed * self.unit_time
+        receiving_flow_max = self.back_gate_width * self.k_critical * self.free_flow_speed * self.unit_time
         receiving_flow = min(receiving_flow_boundary, receiving_flow_max)
         if receiving_flow < 0:
             print(f"Negative receiving flow detected, {receiving_flow} at {time_step}")
@@ -295,3 +337,33 @@ class Link(BaseLink):
         # self.receiving_flow[time_step] = receiving_flow
 
         return receiving_flow
+    
+class Separator(Link):
+    """Separator: control object in the network, it adjust the width of the bidirection link"""
+    def __init__(self, link_id, start_node, end_node, simulation_steps, unit_time, **kwargs):
+        super().__init__(link_id, start_node, end_node, simulation_steps, unit_time, **kwargs)
+        self._separator_width = self._width / 2
+
+    def get_density(self, time_step: int):
+        return self.density[time_step]
+    
+    @property
+    def area(self):
+        return self.length * self._separator_width
+
+    @property
+    def separator_width(self):
+        return self._separator_width
+
+    @separator_width.setter
+    def separator_width(self, value):
+        """
+        Sets the width of this link and dynamically adjusts the reverse link's width
+        to maintain a constant total corridor width.
+        value: float, the width of the separator, has minimum and maximum value
+        """
+        self._separator_width = value
+        if self.reverse_link:
+            self.reverse_link._separator_width = self._width - value
+
+

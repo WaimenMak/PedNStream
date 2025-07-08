@@ -6,7 +6,7 @@
 
 from .network import Network
 from .node import Node, OneToOneNode, RegularNode
-from .link import Link, BaseLink
+from .link import Link, Separator
 from .od_manager import ODManager
 from .path_finder import PathFinder
 
@@ -16,7 +16,7 @@ __all__ = [
     'OneToOneNode',
     'RegularNode',
     'Link',
-    'BaseLink',
+    'Separator',
     'ODManager',
     'PathFinder'
 ]

@@ -16,7 +16,8 @@ from handlers.output_handler import OutputHandler
 
 # Now you can import using the project structure
 from src.utils.visualizer import NetworkVisualizer, progress_callback
-from src.LTM.network import Network
+# from src.LTM.network import Network
+from src.LTM import Network
 
 if __name__ == "__main__":
     # Network configuration
@@ -52,7 +53,8 @@ if __name__ == "__main__":
             'fd_type': 'yperman',
         },
         'links': {
-            '1_2': {'length': 100, 'width': 1, 'free_flow_speed': 1.5, 'k_critical': 2, 'k_jam': 6, 'speed_noise': True, 'fd_type': 'yperman'},
+            '1_2': {'length': 100, 'width': 1, 'free_flow_speed': 1.5, 'k_critical': 2, 'k_jam': 6,
+                    'speed_noise': True, 'fd_type': 'yperman', 'controller_type': 'gate'},
             '2_3': {'length': 50, 'width': 1, 'free_flow_speed': 1.5, 'k_critical': 2, 'k_jam': 6, 'speed_noise': True, 'fd_type': 'yperman'},
         },
         'demand': {

@@ -2,7 +2,7 @@ import numpy as np
 import networkx as nx
 import matplotlib.pyplot as plt
 from .node import Node, OneToOneNode, RegularNode
-from .link import Link
+from .link import Link, Separator
 from .od_manager import ODManager, DemandGenerator
 from .path_finder import PathFinder
 from typing import Callable, List
@@ -157,9 +157,18 @@ class Network:
                     link_params = self.params.get('links', {}).get(f'{i}_{j}', 
                                 self.params.get('default_link', {}))
                     
-                    # Create forward and reverse links, with same length
-                    forward_link = Link(f"{i}_{j}", node, self.nodes[j], self.simulation_steps, self.unit_time, **link_params)
-                    reverse_link = Link(f"{j}_{i}", self.nodes[j], node, self.simulation_steps, self.unit_time, **link_params)
+                    # Determine link type - check if this link pair should be separators
+                    link_type = link_params.get('controller_type', 'gate')  # Default to 'gate'
+                    
+                    # Create forward and reverse links based on type
+                    if link_type == 'separator':
+                        forward_link = Separator(f"{i}_{j}", node, self.nodes[j], self.simulation_steps, self.unit_time, **link_params)
+                        reverse_link = Separator(f"{j}_{i}", self.nodes[j], node, self.simulation_steps, self.unit_time, **link_params)
+                    elif link_type == 'gate': # link_type == 'gate'
+                        forward_link = Link(f"{i}_{j}", node, self.nodes[j], self.simulation_steps, self.unit_time, **link_params)
+                        reverse_link = Link(f"{j}_{i}", self.nodes[j], node, self.simulation_steps, self.unit_time, **link_params)
+                    else:
+                        raise ValueError(f"Invalid controller type: {link_type}")
                     
                     # Add links to nodes
                     node.outgoing_links.append(forward_link)

@@ -208,6 +208,8 @@ class Node:
                 # if l.link_id == "2_3" and l.reverse_link.cal_sending_flow(time_step-1) > 0:
                 #     pass
 
+        # if self.node_id == 2 and s[0] > 30:
+        #     pass
         # raise Warining if s and r has negative values
         if np.any(s < 0) or np.any(r < 0):
             raise Warning(f"Negative flows detected at time step {time_step}: s={s}, r={r}")
@@ -267,14 +269,27 @@ class RegularNode(Node):
             # use the update method originally from LTM paper
             s_tiled = np.tile(s, (self.source_num, 1))
             p = self.turning_fractions.reshape(self.dest_num, self.source_num - 1)
-            weighted_s = np.sum(s_tiled[self.mask].reshape(self.source_num, self.source_num - 1) * p, axis=1)
-            weighted_sr = r / (weighted_s + 1e-5)
+            # Add zero diagonal elements to make it a square matrix (m x m)
+            p_square = np.zeros((self.dest_num, self.source_num))
+            # Fill non-diagonal elements with the reshaped turning fractions
+            p_square[self.mask] = p.flatten()
+            p = p_square
+            # weighted_s = np.sum(s_tiled[self.mask].reshape(self.source_num, self.source_num - 1) * p, axis=1)
+            # weighted_s = np.sum(p * s_tiled.T, axis=0)  # 1
+            # weighted_sr = r / (weighted_s + 1e-5)       # 1
+
+            weighted_s_frac = p * s_tiled.T  # 2
+            row_sums = np.sum(weighted_s_frac, axis=0, keepdims=True)  # 2
+            weighted_s = weighted_s_frac / np.where(row_sums != 0, row_sums, 1e-5) # 2
+            weighted_sr = r * weighted_s        # 2
+
             flows_list = []
             for i in range(self.edge_num):
                 source_idx = i // (self.dest_num - 1)
                 destination_idx = i % (self.dest_num - 1)
                 # g_ij = self.turning_fractions[i] * np.min([s[source_idx], np.min(weighted_sr[self.mask[source_idx, :]] * s[source_idx])]) # use min according to the equation in the paper.
-                g_ij = self.turning_fractions[i] * min(s[source_idx], weighted_sr[self.mask[source_idx, :]][destination_idx] * s[source_idx]) # do not use min
+                # g_ij = self.turning_fractions[i] * min(s[source_idx], weighted_sr[self.mask[source_idx, :]][destination_idx] * s[source_idx]) # do not use min # 1
+                g_ij = min(self.turning_fractions[i] * s[source_idx], weighted_sr[source_idx][self.mask[source_idx, :]][destination_idx]) # do not use min # 2
                 flows_list.append(g_ij)
             flows = self.A_ub[:,:self.edge_num] @ np.floor(np.array(flows_list))
             self.q = np.maximum(0, flows)

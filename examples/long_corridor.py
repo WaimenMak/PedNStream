@@ -49,10 +49,11 @@ if __name__ == "__main__":
     #     'simulation_steps': 600,
     #     'default_link': {
     #         'length': 100,  # make it to 50 to see spillback
-    #         'width': 1,
+    #         'width': 2,
     #         'free_flow_speed': 1.1,
     #         'k_critical': 2,
     #         'k_jam': 6,
+    #         'controller_type': 'gate',  # type of controller
     #     },
     #     'demand': {
     #         "origin_0": {
@@ -67,10 +68,11 @@ if __name__ == "__main__":
     #
     # }
     # network_env = Network(adj, params, origin_nodes=[5, 0])
-    ''' Scenario 2 '''
+    # ''' Scenario 2 '''
     params = {
         'unit_time': 10,
         'simulation_steps': 600,
+        'assign_flows_type': 'classic',
         'default_link': {
             'length': 50,  # make it to 50 to see spillback
             'width': 1,
@@ -79,7 +81,21 @@ if __name__ == "__main__":
             'k_jam': 6,
             'activity_probability': 0,  # probability of activity on the link
             'fd_type': 'greenshields',  # type of fundamental diagram
-            'speed_noise': True,  # whether to add noise to the speed
+            'speed_noise': False,  # whether to add noise to the speed
+            'controller_type': 'gate',  # type of controller
+        },
+        'links': {
+            '2_3': {
+                'length': 50,
+                'width': 1,
+                'free_flow_speed': 1.1,
+                'k_critical': 2,
+                'k_jam': 6,
+                'activity_probability': 0,  # probability of activity on the link
+                'fd_type': 'greenshields',  # type of fundamental diagram
+                'speed_noise': False,  # whether to add noise to the speed
+                'controller_type': 'gate',  # type of controller
+            },
         },
         'demand': {
             "origin_3": {

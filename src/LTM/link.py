@@ -191,8 +191,8 @@ class Link(BaseLink):
         Calculate the sending flow of the link at a given time step
         :param time_step: Current time step (t - 1)
         """
-        if time_step == 250 and self.link_id == '1_2':
-            pass
+        # if time_step == 100 and self.link_id == '2_3':
+        #     pass
 
         # get the total density
         density = self.get_density(time_step)
@@ -315,6 +315,8 @@ class Link(BaseLink):
         Calculate the receiving flow of the link at a given time step
         :param time_step: Current time step - 1
         """
+        # if self.link_id == '2_3' and time_step == 110:
+        #     pass
         #TODO: is using length the correct way to calculate receiving flow?
         tau_shockwave = round(self.length/(self.shockwave_speed * self.unit_time))
         if time_step + 1 - tau_shockwave < 0:
@@ -343,6 +345,8 @@ class Separator(Link):
     def __init__(self, link_id, start_node, end_node, simulation_steps, unit_time, **kwargs):
         super().__init__(link_id, start_node, end_node, simulation_steps, unit_time, **kwargs)
         self._separator_width = self._width / 2
+        self._front_gate_width = self._width / 2
+        self._back_gate_width = self._width / 2
 
     def get_density(self, time_step: int):
         return self.density[time_step]

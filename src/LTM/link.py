@@ -64,7 +64,7 @@ class Link(BaseLink):
             k_critical=self.k_critical,
             k_jam=self.k_jam,
             model_type=kwargs.get('fd_type', 'greenshields'),
-            add_noise=kwargs.get('speed_noise', False)
+            noise_std=kwargs.get('speed_noise_std', 0)
         )
 
         self.travel_time = np.zeros(simulation_steps, dtype=np.float32)
@@ -340,6 +340,17 @@ class Link(BaseLink):
 
         return receiving_flow
     
+    def cal_receiving_flow_with_reverse(self, time_step: int, reverse_sending_flow: float) -> float:
+        """Calculate receiving flow considering reverse link interaction"""
+        forward_receiving_flow = self.cal_receiving_flow(time_step)
+        
+        # Simulate people squeeze in and out of the link
+        if forward_receiving_flow <= reverse_sending_flow:
+            reverse_sending_flow -= np.random.binomial(n=int(reverse_sending_flow), p=0.2)
+        
+        receiving_flow = forward_receiving_flow - reverse_sending_flow
+        return max(receiving_flow, 0)
+
 class Separator(Link):
     """Separator: control object in the network, it adjust the width of the bidirection link"""
     def __init__(self, link_id, start_node, end_node, simulation_steps, unit_time, **kwargs):
@@ -367,7 +378,19 @@ class Separator(Link):
         value: float, the width of the separator, has minimum and maximum value
         """
         self._separator_width = value
+        # Update gate widths to match separator width
+        self._front_gate_width = value
+        self._back_gate_width = value
+        
         if self.reverse_link:
             self.reverse_link._separator_width = self._width - value
+            # Also update the reverse link's gate widths
+            self.reverse_link._front_gate_width = self._width - value
+            self.reverse_link._back_gate_width = self._width - value
+
+    def cal_receiving_flow_with_reverse(self, time_step: int, reverse_sending_flow: float) -> float:
+        """Calculate receiving flow for separator (no reverse link interaction)"""
+        forward_receiving_flow = self.cal_receiving_flow(time_step)
+        return max(forward_receiving_flow, 0)
 
 

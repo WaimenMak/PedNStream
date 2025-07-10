@@ -49,7 +49,7 @@ if __name__ == "__main__":
             'k_critical': 2,
             'k_jam': 6,
             'gamma': 0,
-            'speed_noise': True,
+            'speed_noise_std': 0.05,
             'fd_type': 'yperman',
         },
         'links': {

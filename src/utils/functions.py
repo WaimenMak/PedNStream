@@ -5,7 +5,7 @@ class SpeedDensityFd:
     A callable class to model travel speed based on traffic density.
     This encapsulates the fundamental diagram parameters.
     """
-    def __init__(self, v_f, k_critical, k_jam, model_type=1, add_noise=False):
+    def __init__(self, v_f, k_critical, k_jam, model_type=1, noise_std=0):
         """
         Initializes the travel speed model with hyperparameters.
         :param v_f: Free-flow speed.
@@ -21,8 +21,8 @@ class SpeedDensityFd:
         self.u0 = 1.5
         self.gamma = self.u0 * self.k_critical 
         self.model_type = model_type
-        self.add_noise = add_noise
-        
+        self.noise_std = noise_std
+
     def __call__(self, density: float) -> float:
         """Calculate the travel speed for a given density."""
         # type1: linear density speed fundamental diagram (Greenshields)
@@ -49,8 +49,8 @@ class SpeedDensityFd:
         else:
             raise ValueError(f"Unknown model type: {self.model_type}")
         
-        if self.add_noise:
-            v += np.random.normal(0, 0.1)
+        if self.noise_std > 0:
+            v += np.random.normal(0, self.noise_std)
 
         return max(0, v)
 

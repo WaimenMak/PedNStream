@@ -171,8 +171,9 @@ class Node:
         # Calculate sending flows
         for i, l in enumerate(self.incoming_links):
             if hasattr(self, 'virtual_incoming_link') and l == self.virtual_incoming_link:
-                sending_flow_max = 33 # for origin node, the sending flow is limited by the capacity of the entrance, we now set it by default to 33
-                s[i] = min(self.demand[time_step-1], sending_flow_max)
+                # sending_flow_max = 50 # for origin node, the sending flow is limited by the capacity of the entrance, we now set it by default to 33
+                # s[i] = min(self.demand[time_step-1], sending_flow_max)
+                s[i] = self.demand[time_step-1]
             else:
                 s[i] = l.cal_sending_flow(time_step-1)
                 # if l.link_id == "2_3":
@@ -192,13 +193,16 @@ class Node:
                     print(reverse_sending_flow)
                     raise Warning(f"Negative reverse sending flow detected at time step {time_step}: {reverse_sending_flow}")
 
-                forward_receiving_flow = l.cal_receiving_flow(time_step-1)
-                ''' simulate people any squeeze in and out of the link (Added)'''
-                if forward_receiving_flow <= reverse_sending_flow:
-                    reverse_sending_flow -= np.random.binomial(n=reverse_sending_flow, p=0.2)
+                # forward_receiving_flow = l.cal_receiving_flow(time_step-1)
+                # ''' simulate people any squeeze in and out of the link (Added)'''
+                # if forward_receiving_flow <= reverse_sending_flow:
+                #     reverse_sending_flow -= np.random.binomial(n=reverse_sending_flow, p=0.2)
 
-                receiving_flow = forward_receiving_flow - reverse_sending_flow
-                r[j] = max(receiving_flow, 0) # consider the flow from the reverse link
+                # receiving_flow = forward_receiving_flow - reverse_sending_flow
+                # r[j] = max(receiving_flow, 0) # consider the flow from the reverse link
+                # l.receiving_flow[time_step-1] = r[j]
+
+                r[j] = l.cal_receiving_flow_with_reverse(time_step-1, reverse_sending_flow)
                 l.receiving_flow[time_step-1] = r[j]
                 # r[j] = max(l.cal_receiving_flow(time_step-1) - l.reverse_link.cal_sending_flow(time_step-1), 0) # consider the flow from the reverse link
                 # r[j] = max(0, l.cal_receiving_flow(time_step-1))

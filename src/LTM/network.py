@@ -132,6 +132,31 @@ class Network:
                 self._create_origin_destination(node)
         return node
 
+    def _get_link_params(self, i: int, j: int) -> dict:
+        """
+        Get link-specific parameters, checking both direction keys.
+        
+        Args:
+            i: First node
+            j: Second node
+            
+        Returns:
+            dict: Link parameters (same for both directions)
+        """
+        links_config = self.params.get('links', {})
+        default_params = self.params.get('default_link', {})
+        
+        # Check both possible keys: i_j and j_i
+        forward_key = f'{i}_{j}'
+        reverse_key = f'{j}_{i}'
+        
+        if forward_key in links_config:
+            return {**default_params, **links_config[forward_key]}
+        elif reverse_key in links_config:
+            return {**default_params, **links_config[reverse_key]}
+        else:
+            return default_params
+
     def init_nodes_and_links(self):
         """Initialize nodes and links based on the adjacency matrix."""
         num_nodes = self.adjacency_matrix.shape[0]
@@ -153,20 +178,21 @@ class Network:
                         created_nodes.append(j)
                         self.nodes[j] = node_j
                     
-                    # Get link-specific parameters
-                    link_params = self.params.get('links', {}).get(f'{i}_{j}', 
-                                self.params.get('default_link', {}))
+                    # Get shared parameters for both directions
+                    link_params = self._get_link_params(i, j)
+                    link_type = link_params.get('controller_type', 'gate')
                     
-                    # Determine link type - check if this link pair should be separators
-                    link_type = link_params.get('controller_type', 'gate')  # Default to 'gate'
-                    
-                    # Create forward and reverse links based on type
+                    # Create both links with identical parameters
                     if link_type == 'separator':
-                        forward_link = Separator(f"{i}_{j}", node, self.nodes[j], self.simulation_steps, self.unit_time, **link_params)
-                        reverse_link = Separator(f"{j}_{i}", self.nodes[j], node, self.simulation_steps, self.unit_time, **link_params)
-                    elif link_type == 'gate': # link_type == 'gate'
-                        forward_link = Link(f"{i}_{j}", node, self.nodes[j], self.simulation_steps, self.unit_time, **link_params)
-                        reverse_link = Link(f"{j}_{i}", self.nodes[j], node, self.simulation_steps, self.unit_time, **link_params)
+                        forward_link = Separator(f"{i}_{j}", node, self.nodes[j], 
+                                               self.simulation_steps, self.unit_time, **link_params)
+                        reverse_link = Separator(f"{j}_{i}", self.nodes[j], node, 
+                                               self.simulation_steps, self.unit_time, **link_params)
+                    elif link_type == 'gate':
+                        forward_link = Link(f"{i}_{j}", node, self.nodes[j], 
+                                          self.simulation_steps, self.unit_time, **link_params)
+                        reverse_link = Link(f"{j}_{i}", self.nodes[j], node, 
+                                          self.simulation_steps, self.unit_time, **link_params)
                     else:
                         raise ValueError(f"Invalid controller type: {link_type}")
                     

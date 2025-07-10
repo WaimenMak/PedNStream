@@ -52,23 +52,23 @@ if __name__ == "__main__":
     #         'width': 2,
     #         'free_flow_speed': 1.1,
     #         'k_critical': 2,
-    #         'k_jam': 6,
+    #         'k_jam': 10,
     #         'controller_type': 'gate',  # type of controller
     #     },
     #     'demand': {
     #         "origin_0": {
-    #             "peak_lambda": 15,
+    #             "peak_lambda": 25,
     #             "base_lambda": 5,
     #         },
     #         "origin_5": {
-    #             "peak_lambda": 15,
+    #             "peak_lambda": 25,
     #             "base_lambda": 5,
     #         }
     #     }
     #
     # }
     # network_env = Network(adj, params, origin_nodes=[5, 0])
-    # ''' Scenario 2 '''
+    ''' Scenario 2 '''
     params = {
         'unit_time': 10,
         'simulation_steps': 600,
@@ -81,7 +81,7 @@ if __name__ == "__main__":
             'k_jam': 6,
             'activity_probability': 0,  # probability of activity on the link
             'fd_type': 'greenshields',  # type of fundamental diagram
-            'speed_noise': False,  # whether to add noise to the speed
+            'speed_noise_std': 0.05,  # whether to add noise to the speed
             'controller_type': 'gate',  # type of controller
         },
         'links': {
@@ -93,17 +93,17 @@ if __name__ == "__main__":
                 'k_jam': 6,
                 'activity_probability': 0,  # probability of activity on the link
                 'fd_type': 'greenshields',  # type of fundamental diagram
-                'speed_noise': False,  # whether to add noise to the speed
+                'speed_noise_std': 0.05,  # whether to add noise to the speed
                 'controller_type': 'gate',  # type of controller
             },
         },
         'demand': {
             "origin_3": {
-                "peak_lambda": 30,
+                "peak_lambda": 20,
                 "base_lambda": 8,
             },
             "origin_2": {
-                "peak_lambda": 30,
+                "peak_lambda": 20,
                 "base_lambda": 8,
             }
         }

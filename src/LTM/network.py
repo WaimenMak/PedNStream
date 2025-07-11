@@ -87,7 +87,7 @@ class Network:
         
             self.path_finder = PathFinder(self.links)
             self.path_finder.find_od_paths(od_pairs=self.od_manager.od_flows.keys(), 
-                                         nodes=self.nodes)
+                                         nodes=self.nodes, k_paths=params.get('k_paths', 1))
 
     def _create_origin_destination(self, node: Node):
         """Create virtual links for origin/destination nodes and set demand"""

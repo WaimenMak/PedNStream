@@ -37,7 +37,7 @@ if __name__ == "__main__":
                     [0, 1, 0, 0, 0],
                     ])
 
-
+    '''Scenario 1:'''
     params = {
         'unit_time': 10,
         'simulation_steps': 700,
@@ -54,8 +54,8 @@ if __name__ == "__main__":
         },
         'links': {
             '1_2': {'length': 100, 'width': 1, 'free_flow_speed': 1.5, 'k_critical': 2, 'k_jam': 6,
-                    'speed_noise': True, 'fd_type': 'yperman', 'controller_type': 'gate'},
-            '2_3': {'length': 50, 'width': 1, 'free_flow_speed': 1.5, 'k_critical': 2, 'k_jam': 6, 'speed_noise': True, 'fd_type': 'yperman'},
+                    'speed_noise_std': 0.05, 'fd_type': 'yperman', 'controller_type': 'gate'},
+            '2_3': {'length': 50, 'width': 1, 'free_flow_speed': 1.5, 'k_critical': 2, 'k_jam': 6, 'speed_noise_std': 0.05, 'fd_type': 'yperman'},
         },
         'demand': {
             "origin_0": {
@@ -68,20 +68,47 @@ if __name__ == "__main__":
             }
         }
     }
+    network_env = Network(adj, params, origin_nodes=[0, 4])
+    network_env.update_turning_fractions_per_node(node_ids=[1],
+                                                  new_turning_fractions=np.array([[1, 0, 0.5, 0.5, 0, 1]])) #[1_2, 1_4, 1_0, 1_4, 1_0, 1_2]
+    # '''Scenario 2:'''
+    # params = {
+    #     'unit_time': 10,
+    #     'simulation_steps': 700,
+    #     'assign_flows_type': 'classic',
+    #     'k_paths': 1,  # number of paths from origin to destination, if set to 1, it will use the shortest path
+    #     'default_link': {
+    #         'length': 100,
+    #         'width': 1,
+    #         'free_flow_speed': 1.5,
+    #         'k_critical': 2,
+    #         'k_jam': 6,
+    #         'gamma': 0,
+    #         'speed_noise_std': 0.05,
+    #         'fd_type': 'yperman',
+    #     },
+    #     'demand': {
+    #         "origin_3": {
+    #             "peak_lambda": 20,
+    #             "base_lambda": 5,
+    #         },
+    #     }
+    # }
+    # od_flows = {
+    #     (3, 0): 10,
+    #     (3, 4): 5,
+    # }
+    # network_env = Network(adj, params, origin_nodes=[3], destination_nodes=[0, 4], od_flows=od_flows)
 
-    # Initialize and run simulation
-    # network_env = Network(adj, params, origin_nodes=[5, 4]) # no dead end
-    network_env = Network(adj, params, origin_nodes=[0, 4]) # no dead end
+
     network_env.visualize()
 
     # Run simulation
     network_env.links[(1,2)].front_gate_width = 0.5
     for t in range(1, params['simulation_steps']):
         network_env.network_loading(t)
-        if t == 10:
-            network_env.update_turning_fractions_per_node(node_ids=[1],
-                                                          new_turning_fractions=np.array([[1, 0, 0.5, 0.5, 0, 1]])) #[1_2, 1_4, 1_0, 1_4, 1_0, 1_2]
         if t == 300: # adjust the width of link 2_3, simulate remove the bottleneck
+            # pass
             network_env.links[(1,2)].front_gate_width = 2
             # network_env.links[(2,3)].area = 2 * network_env.links[(2,3)].length  # adjust the area of the link to match the new width
             # network_env.links[(2,3)].k_critical = 2

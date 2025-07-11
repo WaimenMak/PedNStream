@@ -85,9 +85,9 @@ class Network:
             self.od_manager = ODManager(self.simulation_steps, logger=self.logger)
             self.od_manager.init_od_flows(origin_nodes, destination_nodes, od_flows)
         
-            self.path_finder = PathFinder(self.links)
+            self.path_finder = PathFinder(self.links, params=self.params)  # Pass params here
             self.path_finder.find_od_paths(od_pairs=self.od_manager.od_flows.keys(), 
-                                         nodes=self.nodes, k_paths=params.get('k_paths', 1))
+                                         nodes=self.nodes)
 
     def _create_origin_destination(self, node: Node):
         """Create virtual links for origin/destination nodes and set demand"""

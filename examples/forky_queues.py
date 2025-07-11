@@ -38,45 +38,10 @@ if __name__ == "__main__":
                     ])
 
     '''Scenario 1:'''
-    params = {
-        'unit_time': 10,
-        'simulation_steps': 700,
-        'assign_flows_type': 'classic',
-        'default_link': {
-            'length': 100,
-            'width': 1,
-            'free_flow_speed': 1.5,
-            'k_critical': 2,
-            'k_jam': 6,
-            'gamma': 0,
-            'speed_noise_std': 0.05,
-            'fd_type': 'yperman',
-        },
-        'links': {
-            '1_2': {'length': 100, 'width': 1, 'free_flow_speed': 1.5, 'k_critical': 2, 'k_jam': 6,
-                    'speed_noise_std': 0.05, 'fd_type': 'yperman', 'controller_type': 'gate'},
-            '2_3': {'length': 50, 'width': 1, 'free_flow_speed': 1.5, 'k_critical': 2, 'k_jam': 6, 'speed_noise_std': 0.05, 'fd_type': 'yperman'},
-        },
-        'demand': {
-            "origin_0": {
-                "peak_lambda": 15,
-                "base_lambda": 5,
-            },
-            "origin_4": {
-                "peak_lambda": 15,
-                "base_lambda": 5,
-            }
-        }
-    }
-    network_env = Network(adj, params, origin_nodes=[0, 4])
-    network_env.update_turning_fractions_per_node(node_ids=[1],
-                                                  new_turning_fractions=np.array([[1, 0, 0.5, 0.5, 0, 1]])) #[1_2, 1_4, 1_0, 1_4, 1_0, 1_2]
-    # '''Scenario 2:'''
     # params = {
     #     'unit_time': 10,
     #     'simulation_steps': 700,
     #     'assign_flows_type': 'classic',
-    #     'k_paths': 1,  # number of paths from origin to destination, if set to 1, it will use the shortest path
     #     'default_link': {
     #         'length': 100,
     #         'width': 1,
@@ -87,18 +52,58 @@ if __name__ == "__main__":
     #         'speed_noise_std': 0.05,
     #         'fd_type': 'yperman',
     #     },
+    #     'links': {
+    #         '1_2': {'length': 100, 'width': 1, 'free_flow_speed': 1.5, 'k_critical': 2, 'k_jam': 6,
+    #                 'speed_noise_std': 0.05, 'fd_type': 'yperman', 'controller_type': 'gate'},
+    #         '2_3': {'length': 50, 'width': 1, 'free_flow_speed': 1.5, 'k_critical': 2, 'k_jam': 6, 'speed_noise_std': 0.05, 'fd_type': 'yperman'},
+    #     },
     #     'demand': {
-    #         "origin_3": {
-    #             "peak_lambda": 20,
+    #         "origin_0": {
+    #             "peak_lambda": 15,
     #             "base_lambda": 5,
     #         },
+    #         "origin_4": {
+    #             "peak_lambda": 15,
+    #             "base_lambda": 5,
+    #         }
     #     }
     # }
-    # od_flows = {
-    #     (3, 0): 10,
-    #     (3, 4): 5,
-    # }
-    # network_env = Network(adj, params, origin_nodes=[3], destination_nodes=[0, 4], od_flows=od_flows)
+    # network_env = Network(adj, params, origin_nodes=[0, 4])
+    # network_env.update_turning_fractions_per_node(node_ids=[1],
+    #                                               new_turning_fractions=np.array([[1, 0, 0.5, 0.5, 0, 1]])) #[1_2, 1_4, 1_0, 1_4, 1_0, 1_2]
+    '''Scenario 2:'''
+    params = {
+        'unit_time': 10,
+        'simulation_steps': 700,
+        'assign_flows_type': 'classic',
+        'path_finder': {
+            'k_paths': 1,  # number of paths from origin to destination, if set to 1, it will use the shortest path
+            'theta': 0.5,  # weight for the path length in the cost function
+            'alpha': 0.5,  # weight for the path travel time in the cost function
+            'beta': 0.1,
+        },
+        'default_link': {
+            'length': 100,
+            'width': 1,
+            'free_flow_speed': 1.5,
+            'k_critical': 2,
+            'k_jam': 6,
+            'gamma': 0,
+            'speed_noise_std': 0.05,
+            'fd_type': 'yperman',
+        },
+        'demand': {
+            "origin_3": {
+                "peak_lambda": 20,
+                "base_lambda": 5,
+            },
+        }
+    }
+    od_flows = {
+        (3, 0): 10,
+        (3, 4): 5,
+    }
+    network_env = Network(adj, params, origin_nodes=[3], destination_nodes=[0, 4], od_flows=od_flows)
 
 
     network_env.visualize()

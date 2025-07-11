@@ -3,7 +3,7 @@ import numpy as np
 from collections import defaultdict
 from heapq import heappush, heappop
 
-def k_shortest_paths(graph, origin, dest, k=1):
+def k_shortest_paths(graph, origin, dest, k):
     """
     Find k shortest paths using Yen's algorithm with priority queue
     """
@@ -111,7 +111,7 @@ def k_shortest_paths(graph, origin, dest, k=1):
 
 class PathFinder:
     """Handles path finding and path-related operations"""
-    def __init__(self, links):
+    def __init__(self, links, params=None):
         self.od_paths = {}  # {(origin, dest): [path1, path2, ...]}
         self.graph = self._create_graph(links)
         self.links = links
@@ -120,10 +120,12 @@ class PathFinder:
         self.node_to_od_pairs = {}  # {node_id: set((o1,d1), (o2,d2), ...)}, to get the relevant od pairs for the node
         self._initialized = False  # Add initialization flag
 
-        # parameters for the logit model
-        self.theta = 0.1  # like the temperature in the logit model
-        self.alpha = 1.0  # distance weight
-        self.beta = 0.05   # congestion weight
+        # Get parameters from config or use defaults
+        path_params = params.get('path_finder', {}) if params else {}
+        self.theta = path_params.get('theta', 0.1)  # like the temperature in the logit model
+        self.alpha = path_params.get('alpha', 1.0)  # distance weight
+        self.beta = path_params.get('beta', 0.05)   # congestion weight
+        self.k_paths = path_params.get('k_paths', 3)
 
     def _create_graph(self, links, time_step=0):
         """Convert network to NetworkX graph"""
@@ -132,14 +134,14 @@ class PathFinder:
             G.add_edge(start, end, weight=link.length, num_pedestrians=link.num_pedestrians[time_step])
         return G
 
-    def find_od_paths(self, od_pairs, nodes, k_paths=3):
+    def find_od_paths(self, od_pairs, nodes):
         """Find k shortest paths and track which nodes and their OD pairs"""
         # self.nodes_in_paths = set()
         # self.node_to_od_pairs = {}
         
         for origin, dest in od_pairs:
             try:
-                paths = k_shortest_paths(self.graph, origin, dest, k=k_paths)
+                paths = k_shortest_paths(self.graph, origin, dest, k=self.k_paths)
                 self.od_paths[(origin, dest)] = paths
                 
                 # Record which nodes are used in this OD pair

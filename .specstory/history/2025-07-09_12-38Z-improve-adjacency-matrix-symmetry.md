@@ -505,3 +505,80 @@ This is particularly useful in your code because each link can customize certain
 
 ---
 
+_**User**_
+
+change this code to get the param value from the links' params
+
+---
+
+_**Assistant**_
+
+I'll modify the code to get these parameters from the network configuration. Here's how we can do it:
+
+First, let's modify the PathFinder initialization in `path_finder.py`:
+
+```python:src/LTM/path_finder.py
+class PathFinder:
+    """Handles path finding and path-related operations"""
+    def __init__(self, links, params=None):
+        self.od_paths = {}  # {(origin, dest): [path1, path2, ...]}
+        self.graph = self._create_graph(links)
+        self.links = links
+        self.nodes_in_paths = set()
+        self.node_turn_probs = {}  # {node_id: {(o,d): {(up_node, down_node): probability}}}
+        self.node_to_od_pairs = {}  # {node_id: set((o1,d1), (o2,d2), ...)}, to get the relevant od pairs for the node
+        self._initialized = False  # Add initialization flag
+
+        # Get parameters from config or use defaults
+        path_params = params.get('path_finder', {}) if params else {}
+        self.theta = path_params.get('theta', 0.1)  # like the temperature in the logit model
+        self.alpha = path_params.get('alpha', 1.0)  # distance weight
+        self.beta = path_params.get('beta', 0.05)   # congestion weight
+```
+
+Then in `network.py`, we need to pass the parameters when creating the PathFinder:
+
+```python:src/LTM/network.py
+def init_nodes_and_links(self):
+    """Initialize network structure"""
+    # ... existing code ...
+
+    # Initialize managers if destination nodes are specified
+    if destination_nodes:
+        self.od_manager = ODManager(self.simulation_steps, logger=self.logger)
+        self.od_manager.init_od_flows(origin_nodes, destination_nodes, od_flows)
+    
+        self.path_finder = PathFinder(self.links, params=self.params)  # Pass params here
+```
+
+Now you can configure these parameters in your network configuration:
+
+```python
+params = {
+    'unit_time': 10,
+    'simulation_steps': 600,
+    'path_finder': {
+        'theta': 0.2,      # Custom temperature parameter
+        'alpha': 0.8,      # Custom distance weight
+        'beta': 0.1        # Custom congestion weight
+    },
+    'default_link': {
+        'length': 50,
+        'width': 1,
+        # ... other link parameters ...
+    }
+}
+```
+
+This change allows you to:
+1. Configure path finding parameters through the network configuration
+2. Keep default values if not specified
+3. Make the parameters easily adjustable without changing code
+
+The parameters will affect how paths are chosen:
+- `theta`: Controls the randomness in path selection (higher = more random)
+- `alpha`: Weight for distance-based costs (higher = more emphasis on shorter paths)
+- `beta`: Weight for congestion-based costs (higher = more emphasis on avoiding congested paths)
+
+---
+

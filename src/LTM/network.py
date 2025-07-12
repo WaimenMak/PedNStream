@@ -8,6 +8,7 @@ from .path_finder import PathFinder
 from typing import Callable, List
 import logging
 import os
+from pathlib import Path
 
 """
 A Link Transmission Model for the Pedestrian Traffic
@@ -15,10 +16,16 @@ A Link Transmission Model for the Pedestrian Traffic
 
 class Network:
     @staticmethod
-    def setup_logger(log_level=logging.INFO, log_dir=os.path.join("..", "outputs", "logs")):
+    def setup_logger(log_level=logging.INFO, log_dir=None):
         """Set up and configure logger"""
+        if log_dir is None:
+            project_root = Path(__file__).resolve().parent.parent.parent
+            log_dir = project_root / "outputs" / "logs"
+        else:
+            log_dir = Path(log_dir)
+
         # Create logs directory if it doesn't exist
-        os.makedirs(log_dir, exist_ok=True)
+        log_dir.mkdir(parents=True, exist_ok=True)
         
         logger = logging.getLogger(__name__)
         
@@ -35,7 +42,7 @@ class Network:
             logger.addHandler(console_handler)
             
             # File handler
-            file_handler = logging.FileHandler(os.path.join(log_dir, 'network.log'))
+            file_handler = logging.FileHandler(log_dir / 'network.log')
             file_handler.setFormatter(formatter)
             logger.addHandler(file_handler)
             

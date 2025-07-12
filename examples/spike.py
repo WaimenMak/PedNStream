@@ -12,6 +12,7 @@ sys.path.append(project_root)
 
 import numpy as np
 import matplotlib.pyplot as plt
+from pathlib import Path
 from handlers.output_handler import OutputHandler
 
 # Now you can import using the project structure
@@ -120,11 +121,12 @@ if __name__ == "__main__":
     # plt.show()
 
     # Construct paths relative to the project root
-    output_dir = os.path.join("..", "outputs")
+    project_root = Path(__file__).resolve().parent.parent
+    output_dir = project_root / "outputs"
 
     # Use the constructed paths
     simulation_dir = "spike"
-    output_handler = OutputHandler(base_dir=output_dir, simulation_dir=simulation_dir)
+    output_handler = OutputHandler(base_dir=str(output_dir), simulation_dir=simulation_dir)
     output_handler.save_network_state(network_env)
 
     import matplotlib

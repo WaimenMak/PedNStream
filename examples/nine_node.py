@@ -16,6 +16,7 @@ import matplotlib
 from handlers.output_handler import OutputHandler
 from src.utils.visualizer import NetworkVisualizer, progress_callback
 from src.LTM.network import Network
+from pathlib import Path
 
 if __name__ == "__main__":
     # Create 9x9 adjacency matrix for a grid network
@@ -84,8 +85,9 @@ if __name__ == "__main__":
         network_env.network_loading(t)
 
     # Save and visualize results
-    output_dir = os.path.join("..", "outputs")
-    output_handler = OutputHandler(base_dir=output_dir, simulation_dir="nine_node")
+    project_root = Path(__file__).resolve().parent.parent
+    output_dir = project_root / "outputs"
+    output_handler = OutputHandler(base_dir=str(output_dir), simulation_dir="nine_node")
     output_handler.save_network_state(network_env)
 
     # Create animation

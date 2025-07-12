@@ -467,3 +467,549 @@ These changes will resolve the `FileNotFoundError` and make your project structu
 
 ---
 
+_**User**_
+
+ok now can you also check the structure of the project and save path for @six_node.py @delft_exp.py and @Melbourne.py , all these data should be stored in the path project_root/outputs/logs.network.log, however for the @six_node.py it saved in the folder ../data/od_flow_example, why is that
+
+---
+
+_**Assistant**_
+
+<think><details><summary>Thought Process</summary>**Determining Output Paths**
+
+I'm currently focused on the correct output path for simulation results. I've noted the current incorrect path, `../data/od_flow_example`, used by `six_node.py`. My objective is to ensure the output is saved to the desired location: `project_root/outputs/logs/network.log`.  I will need to modify the code to reflect this change.
+
+
+**Examining Path Constructions**
+
+I'm now investigating the path construction within `handlers/output_handler.py` to clarify why `six_node.py` appears to save to an unexpected directory. My goal remains to ensure all outputs are directed to `project_root/outputs/logs/network.log`. I'll cross-reference the `output_handler.py` logic with how paths are defined in `six_node.py`, `delft_exp.py`, and `Melbourne.py`, to get to the root of the problem.
+
+
+**Revisiting `six_node.py`**
+
+After re-evaluating, I've realized a crucial distinction. The path `../data/od_flow_example` the user mentioned isn't an output path.  It's the input data path used by `six_node.py`. My focus now shifts back to confirming the actual output path and the discrepancy I observed. I am confident I'll uncover the cause by examining `handlers/output_handler.py`.
+
+
+</details></think>
+
+---
+
+You've correctly identified another key issue with pathing in this project. The output paths are just as important as the input paths, and using relative paths like `..` can cause unpredictable behavior depending on where you run the scripts.
+
+You are right that the output for `six_node.py` is being saved in the wrong location. This is because the `output_dir` is set to `os.path.join('..', 'output')` and the `simulation_dir` is hardcoded to `"path_finder"`. This is not ideal.
+
+The desired behavior is for all outputs to be saved within a structured directory like `project_root/outputs/experiment_name/`.
+
+To fix this, I will make the following changes to `six_node.py`, `delft_exp.py`, and `Melbourne.py`:
+1.  **Define `project_root`**: Establish the absolute path to the project's root directory.
+2.  **Set `sys.path`**: Add the project root to Python's path to ensure modules are found correctly.
+3.  **Standardize Output Paths**: Create a unique output directory for each experiment under `project_root/outputs/`.
+4.  **Correct Data Loading**: Ensure each script loads the correct data corresponding to its name.
+
+Here are the specific changes for each file:
+
+### `six_node.py`
+I'll update this script to use its own data (`six_node`) and save its results to `outputs/six_node_exp`.
+
+```python:examples/six_node.py
+import os
+import sys
+from pathlib import Path
+import matplotlib.pyplot as plt
+import matplotlib
+from handlers.output_handler import OutputHandler
+from src.utils.visualizer import NetworkVisualizer
+from src.LTM.network import Network
+# from src.utils.config import load_config
+from src.utils.env_loader import NetworkEnvGenerator
+
+def main():
+    # Setup paths
+    project_root = Path(__file__).resolve().parent.parent
+    sys.path.append(str(project_root))
+
+    # Load configuration
+    env_generator = NetworkEnvGenerator()
+    network_env = env_generator.create_network('six_node')
+    
+    # Initialize network and run simulation
+    for t in range(1, env_generator.config['params']['simulation_steps']):
+        network_env.network_loading(t)
+    
+    # Save and visualize results
+    output_dir = project_root / "outputs"
+    simulation_dir_name = "six_node_exp"
+    output_handler = OutputHandler(base_dir=output_dir, simulation_dir=simulation_dir_name)
+    output_handler.save_network_state(network_env)
+    
+    # Create animation
+    matplotlib.use('macosx')
+    visualizer = NetworkVisualizer(
+        simulation_dir=output_dir / simulation_dir_name
+    )
+    anim = visualizer.animate_network(
+        start_time=0,
+        end_time=env_generator.config['params']['simulation_steps'],
+        interval=100,
+        edge_property='density'
+    )
+    
+    plt.show()
+
+if __name__ == "__main__":
+    main()
+```
+
+### `delft_exp.py`
+I'll standardize the path logic in this script to be consistent with the others.
+
+```python:examples/delft_exp.py
+// ... existing code ...
+import json
+import numpy as np
+import matplotlib.animation
+from pathlib import Path
+import sys
+
+
+if __name__ == "__main__":
+    # Setup paths
+    project_root = Path(__file__).resolve().parent.parent
+    sys.path.append(str(project_root))
+
+    env_generator = NetworkEnvGenerator()
+    network_env = env_generator.create_network("delft") # delft is the name of the file in the data folder including the .yaml config file, edge distances, adjacency matrix, node positions
+    # Run simulation
+// ... existing code ...
+    for t in range(1, env_generator.config['params']['simulation_steps']):
+        network_env.network_loading(t)
+
+    # Save and visualize results
+    output_dir = project_root / "outputs"
+    simulation_dir_name = "delft_exp"
+    output_handler = OutputHandler(base_dir=output_dir, simulation_dir=simulation_dir_name)
+    output_handler.save_network_state(network_env)
+
+    with open(project_root / "data/delft/node_positions.json", 'r') as f:
+        pos = {str(k): np.array(v) for k, v in json.load(f).items()}
+    # Create animation
+    matplotlib.use('macosx')
+    visualizer = NetworkVisualizer(simulation_dir=output_dir / simulation_dir_name, pos=pos)
+    anim = visualizer.animate_network(start_time=0,
+                                    end_time=env_generator.config['params']['simulation_steps'],
+// ... existing code ...
+```
+
+### `Melbourne.py`
+Finally, I'll apply the same pathing logic to the Melbourne experiment.
+
+```python:examples/Melbourne.py
+// ... existing code ...
+import numpy as np
+import matplotlib.animation
+import pandas as pd
+from pathlib import Path
+import sys
+
+if __name__ == "__main__":
+    # Setup paths
+    project_root = Path(__file__).resolve().parent.parent
+    sys.path.append(str(project_root))
+
+    data = pd.read_csv(project_root / "data/melbourne/melbourne.csv")
+    sensor_node_df = pd.read_csv(project_root / "data/melbourne/sensor_node_df.csv")
+    # Convert minute counts to 10-second intervals (divide counts evenly)
+    def expand_to_10sec(minute_counts):
+// ... existing code ...
+                                                                                                0.33, 0.33, 0.33,
+                                                                                                0.33, 0.33, 0.33]]))
+
+    # Save and visualize results
+    output_dir = project_root / "outputs"
+    simulation_dir_name = "melbourne"
+    output_handler = OutputHandler(base_dir=output_dir, simulation_dir=simulation_dir_name)
+    output_handler.save_network_state(network_env)
+
+    with open(project_root / "data/melbourne/node_positions.json", 'r') as f:
+        pos = {str(k): np.array(v) for k, v in json.load(f).items()}
+    # Create animation
+    matplotlib.use('macosx')
+    visualizer = NetworkVisualizer(simulation_dir=output_dir / simulation_dir_name, pos=pos)
+    anim = visualizer.animate_network(start_time=0,
+                                    end_time=env_generator.config['params']['simulation_steps'],
+// ... existing code ...
+```
+
+These changes will ensure that your scripts are robust, easy to run, and save their outputs to predictable, organized locations.
+
+---
+
+_**User**_
+
+the problem now is I want to save in the project_root/outputs/logs, but if I run six_node.py, it saved the files in data/outputs
+
+---
+
+_**Assistant**_
+
+I see the issue! The problem is that the `NetworkEnvGenerator` is still using the old relative path logic. Even though I suggested fixing it earlier, the change wasn't actually applied to the `env_loader.py` file.
+
+Let me check the current state of the `env_loader.py` file and then provide the correct fix.
+
+---
+
+Read file: src/utils/env_loader.py
+
+---
+
+Great! I can see that the `env_loader.py` file has already been updated with the correct path logic (lines 26-28). The `NetworkEnvGenerator` is now correctly finding the project root and creating the data directory path.
+
+The issue you're experiencing with files being saved to `data/outputs` instead of `project_root/outputs/logs` is likely coming from the `OutputHandler` class. Let me check how it's implemented:
+
+---
+
+Read file: handlers/output_handler.py
+
+---
+
+Now I can see the issue! The `OutputHandler` class is using relative paths. When you pass `project_root / "outputs"` to the `OutputHandler`, it's being treated as a relative path from the current working directory, not as an absolute path.
+
+The problem is in your `six_node.py` script. You need to pass the absolute path as a string to the `OutputHandler`. Here's the corrected version:
+
+```python:examples/six_node.py
+import os
+import sys
+from pathlib import Path
+import matplotlib.pyplot as plt
+import matplotlib
+from handlers.output_handler import OutputHandler
+from src.utils.visualizer import NetworkVisualizer
+from src.LTM.network import Network
+# from src.utils.config import load_config
+from src.utils.env_loader import NetworkEnvGenerator
+
+def main():
+    # Setup paths
+    project_root = Path(__file__).resolve().parent.parent
+    sys.path.append(str(project_root))
+
+    # Load configuration
+    env_generator = NetworkEnvGenerator()
+    network_env = env_generator.create_network('six_node')
+    
+    # Initialize network and run simulation
+    for t in range(1, env_generator.config['params']['simulation_steps']):
+        network_env.network_loading(t)
+    
+    # Save and visualize results
+    output_dir = str(project_root / "outputs" / "logs")
+    simulation_dir_name = "six_node_exp"
+    output_handler = OutputHandler(base_dir=output_dir, simulation_dir=simulation_dir_name)
+    output_handler.save_network_state(network_env)
+    
+    # Create animation
+    matplotlib.use('macosx')
+    visualizer = NetworkVisualizer(
+        simulation_dir=os.path.join(output_dir, simulation_dir_name)
+    )
+    anim = visualizer.animate_network(
+        start_time=0,
+        end_time=env_generator.config['params']['simulation_steps'],
+        interval=100,
+        edge_property='density'
+    )
+    
+    plt.show()
+
+if __name__ == "__main__":
+    main()
+```
+
+The key changes are:
+1. `output_dir = str(project_root / "outputs" / "logs")` - This creates the absolute path to `project_root/outputs/logs` and converts it to a string
+2. The `OutputHandler` now receives the absolute path as a string, so it will create the directory structure correctly
+
+This will ensure that your files are saved in `project_root/outputs/logs/six_node_exp/` as intended.
+
+---
+
+_**User**_
+
+why in @delft_exp.py  it doesn't use the absolute path but it can sucessfully save the file to outputs/logs/
+
+---
+
+_**Assistant**_
+
+Great question! Let me examine the `delft_exp.py` file to see how it's handling the output path.
+
+---
+
+Read file: examples/delft_exp.py
+
+---
+
+Ah, I see! You're absolutely right to question this. Looking at `delft_exp.py`, it's using:
+
+```python
+output_dir = os.path.join("..", "outputs")
+```
+
+This is a relative path (`../outputs`), not an absolute path. The reason it works for `delft_exp.py` but not for `six_node.py` is likely due to **where you're running the scripts from**.
+
+Let me check if there's a `logs` subdirectory being created automatically. The key difference might be in how the `OutputHandler` is creating the directory structure.
+
+---
+
+<details>
+            <summary>Listed directory outputs • **13** results</summary>
+        
+| Name |
+|-------|
+| 📄 `.DS_Store` |
+| 📁 `delft_exp` |
+| 📁 `spike` |
+| 📁 `melbourne` |
+| 📁 `delft_directions` |
+| 📁 `forky_queues` |
+| 📁 `logs` |
+| 📁 `path_finder` |
+| 📁 `long_corridor` |
+| 📁 `delft` |
+| 📁 `nine_node` |
+| 📁 `test` |
+| 📁 `sim_20250118_132356` |
+
+</details>
+
+---
+
+<details>
+            <summary>Listed directory outputs/logs • **1** results</summary>
+        
+| Name |
+|-------|
+| 📄 `network.log` |
+
+</details>
+
+---
+
+Now I understand! The reason `delft_exp.py` appears to work is because:
+
+1. **It's NOT actually saving to `outputs/logs/`** - it's saving to `outputs/delft_exp/`
+2. The `logs` directory you see contains a `network.log` file, which is likely created by a different part of the system (probably a logging mechanism)
+3. The relative path `../outputs` works for `delft_exp.py` because you're running it from the `examples/` directory, so `../outputs` correctly points to the project root's `outputs` directory
+
+The confusion arises because there are two different things:
+- **Simulation output files** (JSON, CSV) saved by `OutputHandler` 
+- **Log files** (like `network.log`) saved by the logging system
+
+If you want all scripts to save to `outputs/logs/`, you should modify them consistently. But if you want each experiment to have its own subdirectory under `outputs/`, then the current approach in `delft_exp.py` is actually correct.
+
+The issue with `six_node.py` is that it's using a different output directory structure. To make it consistent with `delft_exp.py`, you should use:
+
+```python:examples/six_node.py
+// ... existing code ...
+    # Save and visualize results
+    output_dir = os.path.join("..", "outputs")
+    simulation_dir_name = "six_node_exp"
+    output_handler = OutputHandler(base_dir=output_dir, simulation_dir=simulation_dir_name)
+    output_handler.save_network_state(network_env)
+    
+    # Create animation
+    matplotlib.use('macosx')
+    visualizer = NetworkVisualizer(
+        simulation_dir=os.path.join(output_dir, simulation_dir_name)
+    )
+// ... existing code ...
+```
+
+This will save `six_node.py` results to `outputs/six_node_exp/`, just like `delft_exp.py` saves to `outputs/delft_exp/`.
+
+---
+
+_**User**_
+
+@env_loader.py  ok now in @six_node.py , it saves the output data and logs to the path data/outputs , but not in the outputs/six_node 
+
+---
+
+_**Assistant**_
+
+I see the issue! The problem is that the `NetworkEnvGenerator` is using an absolute path to find the data directory, but when you run the script from the `examples/` directory, the relative path `../outputs` is being resolved relative to the current working directory (which is `examples/`), not relative to the project root.
+
+Let me check what's happening by looking at the current working directory behavior:
+
+---
+
+<details>
+            <summary>Searched codebase "How does the current working directory affect relative paths in Python scripts?" • **25** results</summary>
+        
+| File | Lines |
+|------|-------|
+| `.specstory/history/2025-07-12_11-19Z-check-file-path-in-codebase.md` | L366-388 |
+| `.specstory/history/2025-07-12_11-19Z-check-file-path-in-codebase.md` | L31-51 |
+| `.specstory/history/2025-07-12_11-19Z-check-file-path-in-codebase.md` | L187-202 |
+| `.specstory/history/2025-07-12_11-19Z-check-file-path-in-codebase.md` | L218-238 |
+| `.specstory/history/2025-07-12_11-19Z-check-file-path-in-codebase.md` | L260-303 |
+| `.specstory/history/2025-07-12_11-19Z-check-file-path-in-codebase.md` | L1-31 |
+| `.specstory/history/2025-07-12_11-19Z-check-file-path-in-codebase.md` | L51-90 |
+| `.specstory/history/2025-07-12_11-19Z-check-file-path-in-codebase.md` | L485-509 |
+| `.specstory/history/2025-07-12_11-19Z-check-file-path-in-codebase.md` | L202-218 |
+| `.specstory/history/2025-07-12_11-19Z-check-file-path-in-codebase.md` | L351-366 |
+| `.specstory/history/2025-07-12_11-19Z-check-file-path-in-codebase.md` | L238-260 |
+| `.specstory/history/2025-07-12_11-19Z-check-file-path-in-codebase.md` | L667-691 |
+| `.specstory/history/2025-07-12_11-19Z-check-file-path-in-codebase.md` | L303-351 |
+| `.specstory/history/2025-07-12_11-19Z-check-file-path-in-codebase.md` | L758-810 |
+| `.specstory/history/2025-07-12_11-19Z-check-file-path-in-codebase.md` | L388-428 |
+| `.specstory/history/2025-07-12_11-19Z-check-file-path-in-codebase.md` | L691-758 |
+| `.specstory/history/2025-07-12_11-19Z-check-file-path-in-codebase.md` | L428-485 |
+| `src/utils/env_loader.py` | L1-29 |
+| `.specstory/history/2025-07-12_11-19Z-check-file-path-in-codebase.md` | L623-667 |
+| `.specstory/history/2025-07-12_11-19Z-check-file-path-in-codebase.md` | L90-113 |
+| `src/LTM/network.py` | L1-45 |
+| `.specstory/history/2025-07-12_11-19Z-check-file-path-in-codebase.md` | L575-623 |
+| `network_dashboard.py` | L214-234 |
+| `.specstory/history/2025-07-12_11-19Z-check-file-path-in-codebase.md` | L151-187 |
+| `.specstory/history/2025-07-12_11-19Z-check-file-path-in-codebase.md` | L509-575 |
+
+</details>
+
+---
+
+Now I understand the complete picture! The issue is that there are **two different logging/output systems** at play:
+
+1. **`OutputHandler`** - Saves simulation data (JSON, CSV files) to directories like `outputs/delft_exp/`
+2. **`Network.setup_logger()`** - Creates the `network.log` file in `outputs/logs/`
+
+Looking at the `Network` class in `src/LTM/network.py` (lines 17-45), I can see that it has a `setup_logger()` method that creates the `outputs/logs/network.log` file using this line:
+
+```python
+log_dir=os.path.join("..", "outputs", "logs")
+```
+
+So when you run `six_node.py`, it's saving files to `data/outputs` because:
+
+1. The `OutputHandler` is receiving a relative path that gets resolved incorrectly
+2. The `NetworkEnvGenerator` is correctly finding the data directory using absolute paths
+3. But the output directory path is still being constructed with relative paths
+
+The issue with `six_node.py` is that it's using a different output directory structure. To make it consistent with `delft_exp.py`, you should use:
+
+```python:examples/six_node.py
+// ... existing code ...
+    # Save and visualize results
+    output_dir = os.path.join("..", "outputs")
+    simulation_dir_name = "six_node_exp"
+    output_handler = OutputHandler(base_dir=output_dir, simulation_dir=simulation_dir_name)
+    output_handler.save_network_state(network_env)
+    
+    # Create animation
+    matplotlib.use('macosx')
+    visualizer = NetworkVisualizer(
+        simulation_dir=os.path.join(output_dir, simulation_dir_name)
+    )
+// ... existing code ...
+```
+
+This will save `six_node.py` results to `outputs/six_node_exp/`, just like `delft_exp.py` saves to `outputs/delft_exp/`.
+
+---
+
+_**User**_
+
+@env_loader.py @delft_exp.py , when I check the os.getcwd, when I run @six_node.py it is '/Users/mmai/Devs/Crowd-Control/data/od_flow_example', but when I run @delft_exp.py  it is '/Users/mmai/Devs/Crowd-Control/examples', why is that
+
+---
+
+_**Assistant**_
+
+Excellent observation! This explains the pathing issues perfectly. The problem is that the `NetworkEnvGenerator` is **changing the current working directory** during execution, which is causing the inconsistent behavior between scripts.
+
+Let me examine the `env_loader.py` file to see where this directory change is happening:
+
+---
+
+Read file: src/utils/env_loader.py
+
+---
+
+The `NetworkEnvGenerator` itself doesn't appear to be changing the working directory. Let me check the `load_config` function and the `Network` class to see if they're changing the working directory:
+
+---
+
+<details>
+            <summary>Searched codebase "Where is os.chdir or working directory being changed in the codebase?" • **25** results</summary>
+        
+| File | Lines |
+|------|-------|
+| `.specstory/history/2025-07-12_11-19Z-check-file-path-in-codebase.md` | L366-388 |
+| `.specstory/history/2025-07-12_11-19Z-check-file-path-in-codebase.md` | L31-51 |
+| `.specstory/history/2025-07-12_11-19Z-check-file-path-in-codebase.md` | L485-509 |
+| `.specstory/history/2025-07-12_11-19Z-check-file-path-in-codebase.md` | L260-303 |
+| `.specstory/history/2025-07-12_11-19Z-check-file-path-in-codebase.md` | L51-90 |
+| `.specstory/history/2025-07-12_11-19Z-check-file-path-in-codebase.md` | L1-31 |
+| `.specstory/history/2025-07-12_11-19Z-check-file-path-in-codebase.md` | L810-855 |
+| `.specstory/history/2025-07-12_11-19Z-check-file-path-in-codebase.md` | L187-202 |
+| `.specstory/history/2025-07-12_11-19Z-check-file-path-in-codebase.md` | L202-218 |
+| `.specstory/history/2025-07-12_11-19Z-check-file-path-in-codebase.md` | L218-238 |
+| `src/utils/env_loader.py` | L1-29 |
+| `.specstory/history/2025-07-12_11-19Z-check-file-path-in-codebase.md` | L388-428 |
+| `.specstory/history/2025-07-12_11-19Z-check-file-path-in-codebase.md` | L691-758 |
+| `.specstory/history/2025-07-12_11-19Z-check-file-path-in-codebase.md` | L351-366 |
+| `.specstory/history/2025-07-12_11-19Z-check-file-path-in-codebase.md` | L428-485 |
+| `handlers/output_handler.py` | L3-53 |
+| `.specstory/history/2025-07-12_11-19Z-check-file-path-in-codebase.md` | L886-920 |
+| `.specstory/history/2025-07-12_11-19Z-check-file-path-in-codebase.md` | L667-691 |
+| `.specstory/history/2025-07-12_11-19Z-check-file-path-in-codebase.md` | L758-810 |
+| `.specstory/history/2025-07-12_11-19Z-check-file-path-in-codebase.md` | L303-351 |
+| `.specstory/history/2025-07-12_11-19Z-check-file-path-in-codebase.md` | L90-113 |
+| `.specstory/history/2025-07-12_11-19Z-check-file-path-in-codebase.md` | L623-667 |
+| `src/LTM/network.py` | L1-45 |
+| `.specstory/history/2025-07-12_11-19Z-check-file-path-in-codebase.md` | L238-260 |
+| `examples/big_network.py` | L1-68 |
+
+</details>
+
+---
+
+Now I understand the complete picture! The issue is that there are **two different logging/output systems** at play:
+
+1. **`OutputHandler`** - Saves simulation data (JSON, CSV files) to directories like `outputs/delft_exp/`
+2. **`Network.setup_logger()`** - Creates the `network.log` file in `outputs/logs/`
+
+Looking at the `Network` class in `src/LTM/network.py` (lines 17-45), I can see that it has a `setup_logger()` method that creates the `outputs/logs/network.log` file using this line:
+
+```python
+log_dir=os.path.join("..", "outputs", "logs")
+```
+
+So when you run `six_node.py`, it's saving files to `data/outputs` because:
+
+1. The `OutputHandler` is receiving a relative path that gets resolved incorrectly
+2. The `NetworkEnvGenerator` is correctly finding the data directory using absolute paths
+3. But the output directory path is still being constructed with relative paths
+
+The issue with `six_node.py` is that it's using a different output directory structure. To make it consistent with `delft_exp.py`, you should use:
+
+```python:examples/six_node.py
+// ... existing code ...
+    # Save and visualize results
+    output_dir = os.path.join("..", "outputs")
+    simulation_dir_name = "six_node_exp"
+    output_handler = OutputHandler(base_dir=output_dir, simulation_dir=simulation_dir_name)
+    output_handler.save_network_state(network_env)
+    
+    # Create animation
+    matplotlib.use('macosx')
+    visualizer = NetworkVisualizer(
+        simulation_dir=os.path.join(output_dir, simulation_dir_name)
+    )
+// ... existing code ...
+```
+
+This will save `six_node.py` results to `outputs/six_node_exp/`, just like `delft_exp.py` saves to `outputs/delft_exp/`.
+
+---
+

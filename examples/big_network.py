@@ -7,8 +7,9 @@
 import os
 import sys
 import json
-project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(project_root)
+from pathlib import Path
+project_root = Path(__file__).resolve().parent.parent
+sys.path.append(str(project_root))
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -19,10 +20,10 @@ from src.LTM.network import Network
 
 if __name__ == "__main__":
     # Loading
-    with open("../data/delft/node_positions.json", 'r') as f:
+    with open(project_root / "data" / "delft" / "node_positions.json", 'r') as f:
         pos = {str(k): np.array(v) for k, v in json.load(f).items()}
 
-    adj = np.load("../data/delft/adj_matrix.npy", allow_pickle=False)
+    adj = np.load(project_root / "data" / "delft" / "adj_matrix.npy", allow_pickle=False)
     # params = {
     #     'length': 50,
     #     'width': 1,
@@ -60,13 +61,13 @@ if __name__ == "__main__":
         network_env.network_loading(t)
 
     # # Save and visualize results
-    output_dir = os.path.join("..", "outputs")
-    output_handler = OutputHandler(base_dir=output_dir, simulation_dir="delft")
+    output_dir = project_root / "outputs"
+    output_handler = OutputHandler(base_dir=str(output_dir), simulation_dir="delft")
     output_handler.save_network_state(network_env)
 
     # Create animation
     matplotlib.use('macosx')
-    visualizer = NetworkVisualizer(simulation_dir=os.path.join(output_dir, "delft"), pos=pos)
+    visualizer = NetworkVisualizer(simulation_dir=str(output_dir / "delft"), pos=pos)
     # visualizer.visualize_network_state(time_step=10)
     anim = visualizer.animate_network(start_time=0,
                                     end_time=params["simulation_steps"],

@@ -4,6 +4,7 @@ import os
 import json
 import pandas as pd
 from datetime import datetime
+from pathlib import Path
 
 class OutputHandler:
     def __init__(self, base_dir="outputs", simulation_dir=None):
@@ -11,15 +12,15 @@ class OutputHandler:
         Initialize output handler
         :param base_dir: Base directory for outputs
         """
-        self.base_dir = base_dir
+        self.base_dir = Path(base_dir)
         self.timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         if simulation_dir is not None:
-            self.simulation_dir = os.path.join(base_dir, simulation_dir)
+            self.simulation_dir = self.base_dir / simulation_dir
         else:
-            self.simulation_dir = os.path.join(base_dir, f"sim_{self.timestamp}")
+            self.simulation_dir = self.base_dir / f"sim_{self.timestamp}"
         
         # Create output directories if they don't exist
-        os.makedirs(self.simulation_dir, exist_ok=True)
+        self.simulation_dir.mkdir(parents=True, exist_ok=True)
         
     def save_network_state(self, network):
         """
@@ -94,11 +95,11 @@ class OutputHandler:
         
         # Save to CSV
         df = pd.DataFrame(link_series)
-        df.to_csv(os.path.join(self.simulation_dir, 'time_series.csv'), index=False)
+        df.to_csv(self.simulation_dir / 'time_series.csv', index=False)
     
     def _save_json(self, data, filename):
         """Helper method to save JSON data"""
-        filepath = os.path.join(self.simulation_dir, filename)
+        filepath = self.simulation_dir / filename
         with open(filepath, 'w') as f:
             json.dump(data, f, indent=2)
     
@@ -110,17 +111,18 @@ class OutputHandler:
         :return: Dictionary containing simulation data
         """
         data = {}
+        simulation_path = Path(simulation_dir)
         
         # Load JSON files
         for filename in ['link_data.json', 'node_data.json', 'network_params.json']:
-            filepath = os.path.join(simulation_dir, filename)
-            if os.path.exists(filepath):
+            filepath = simulation_path / filename
+            if filepath.exists():
                 with open(filepath, 'r') as f:
                     data[filename.replace('.json', '')] = json.load(f)
         
         # Load time series data if it exists
-        csv_path = os.path.join(simulation_dir, 'time_series.csv')
-        if os.path.exists(csv_path):
+        csv_path = simulation_path / 'time_series.csv'
+        if csv_path.exists():
             data['time_series'] = pd.read_csv(csv_path)
             
         return data

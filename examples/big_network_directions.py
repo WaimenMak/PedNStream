@@ -16,13 +16,15 @@ import matplotlib
 from handlers.output_handler import OutputHandler
 from src.utils.visualizer import NetworkVisualizer, progress_callback
 from src.LTM.network import Network
+from pathlib import Path
 
 if __name__ == "__main__":
+    project_root = Path(__file__).resolve().parent.parent
     # Loading
-    with open("../data/delft/node_positions.json", 'r') as f:
+    with open(project_root / "data" / "delft" / "node_positions.json", 'r') as f:
         pos = {str(k): np.array(v) for k, v in json.load(f).items()}
 
-    adj = np.load("../data/delft/adj_matrix.npy", allow_pickle=False)
+    adj = np.load(project_root / "data" / "delft" / "adj_matrix.npy", allow_pickle=False)
     params = {
         'unit_time': 10,
         'simulation_steps': 500,
@@ -66,8 +68,8 @@ if __name__ == "__main__":
         network_env.network_loading(t)
 
     # Save and visualize results
-    output_dir = os.path.join("..", "outputs")
-    output_handler = OutputHandler(base_dir=output_dir, simulation_dir="delft_directions")
+    output_dir = project_root / "outputs"
+    output_handler = OutputHandler(base_dir=str(output_dir), simulation_dir="delft_directions")
     output_handler.save_network_state(network_env)
 
     # Create animation

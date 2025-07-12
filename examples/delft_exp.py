@@ -18,6 +18,7 @@ import os
 import json
 import numpy as np
 import matplotlib.animation
+from pathlib import Path
 
 
 if __name__ == "__main__":
@@ -28,11 +29,12 @@ if __name__ == "__main__":
         network_env.network_loading(t)
 
     # Save and visualize results
-    output_dir = os.path.join("..", "outputs")
-    output_handler = OutputHandler(base_dir=output_dir, simulation_dir="delft_exp")
+    project_root = Path(__file__).resolve().parent.parent
+    output_dir = project_root / "outputs"
+    output_handler = OutputHandler(base_dir=str(output_dir), simulation_dir="delft_exp")
     output_handler.save_network_state(network_env)
 
-    with open("../data/delft/node_positions.json", 'r') as f:
+    with open(project_root / "data" / "delft" / "node_positions.json", 'r') as f:
         pos = {str(k): np.array(v) for k, v in json.load(f).items()}
     # Create animation
     matplotlib.use('macosx')

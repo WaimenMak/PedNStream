@@ -11,6 +11,10 @@ from src.utils.env_loader import NetworkEnvGenerator
 
 def main():
 
+    # Setup paths
+    project_root = Path(__file__).resolve().parent.parent
+    sys.path.append(str(project_root))
+
     # Load configuration
     # config_path = os.path.join(project_root, 'sim_params.yaml')
     # config = load_config(config_path)
@@ -24,15 +28,15 @@ def main():
         network_env.network_loading(t)
     
     # Save and visualize results
-    # output_dir = os.path.join(project_root, "outputs")
-    output_dir = os.path.join('..', 'output')
-    output_handler = OutputHandler(base_dir=output_dir, simulation_dir="path_finder")
+    output_dir = project_root / "outputs"
+    simulation_dir_name = "six_node_exp"
+    output_handler = OutputHandler(base_dir=str(output_dir), simulation_dir=simulation_dir_name)
     output_handler.save_network_state(network_env)
     
     # Create animation
     matplotlib.use('macosx')
     visualizer = NetworkVisualizer(
-        simulation_dir=os.path.join(output_dir, "path_finder")
+        simulation_dir=os.path.join(output_dir, simulation_dir_name)
     )
     anim = visualizer.animate_network(
         start_time=0,

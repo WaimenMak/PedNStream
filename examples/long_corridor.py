@@ -17,6 +17,7 @@ from handlers.output_handler import OutputHandler
 # Now you can import using the project structure
 from src.utils.visualizer import NetworkVisualizer, progress_callback
 from src.LTM.network import Network
+from pathlib import Path
 
 if __name__ == "__main__":
     # Network configuration
@@ -129,10 +130,11 @@ if __name__ == "__main__":
     # plt.show()
 
     # Construct paths relative to the project root
-    output_dir = os.path.join("..", "outputs")
+    project_root = Path(__file__).resolve().parent.parent
+    output_dir = project_root / "outputs"
 
     # Use the constructed paths
-    output_handler = OutputHandler(base_dir=output_dir, simulation_dir="long_corridor")
+    output_handler = OutputHandler(base_dir=str(output_dir), simulation_dir="long_corridor")
     output_handler.save_network_state(network_env)
 
     import matplotlib

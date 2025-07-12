@@ -17,13 +17,15 @@ import numpy as np
 import pickle
 from src.utils.config import load_config
 from typing import List, Callable
+
 class NetworkEnvGenerator:
     """The input of this class is the simulation parameters, and the output is the network environment."""
 
     def __init__(self, data_dir="data"):
         # self.simulation_params = simulation_params
-
-        self.data_dir = Path(os.path.join("..", data_dir))
+        # create the data directory 'project_root/data'
+        project_root = Path(__file__).resolve().parent.parent.parent
+        self.data_dir = project_root / data_dir
         self.data_dir.mkdir(parents=True, exist_ok=True)
 
     def load_network_data(self, data_path: str) -> dict:
@@ -44,12 +46,18 @@ class NetworkEnvGenerator:
         # load the simulation parameters
         self.config = load_config(yaml_file_path)
 
-        # load the edge distances
-        with open(os.path.join(self.data_dir, f"{data_path}", "edge_distances.pkl"), 'rb') as f:
-            edge_distances = pickle.load(f)
+        #if exists, load the edge distances
+        if os.path.exists(os.path.join(self.data_dir, f"{data_path}", "edge_distances.pkl")):
+            with open(os.path.join(self.data_dir, f"{data_path}", "edge_distances.pkl"), 'rb') as f:
+                edge_distances = pickle.load(f)
+        else:
+            edge_distances = None
 
-        # load the adjacency matrix
-        adjacency_matrix = np.load(os.path.join(self.data_dir, f"{data_path}", "adj_matrix.npy"))
+        #if adj not in yaml, load the adjacency matrix
+        if 'adjacency_matrix' not in self.config:
+            adjacency_matrix = np.load(os.path.join(self.data_dir, f"{data_path}", "adj_matrix.npy"))
+        else:
+            adjacency_matrix = self.config['adjacency_matrix']
 
         # load the node positions if it exists
         if os.path.exists(os.path.join(self.data_dir, f"{data_path}", "node_positions.json")):
@@ -78,24 +86,25 @@ class NetworkEnvGenerator:
         if 'links' not in self.config['params']:
             self.config['params']['links'] = {}
 
-        for (u, v), distance in network_data['edge_distances'].items():
-            link_id = f"{u}_{v}"
-            
-            # Get existing link-specific params, or an empty dict if none
-            link_specific_params = self.config['params']['links'].get(link_id, {})
-            
-            # Build the parameters for the link, starting with defaults and overriding
-            final_params = default_link_params.copy()
-            final_params.update(link_specific_params)
-            
-            # Explicitly set length from distance data and ensure width uses the default
-            final_params['length'] = distance
-            # final_params['width'] = default_link_params['width']
+        if network_data['edge_distances']:
+            for (u, v), distance in network_data['edge_distances'].items():
+                link_id = f"{u}_{v}"
 
-            self.config['params']['links'][link_id] = final_params
-            # if reverse link not in the config, add it
-            if f"{v}_{u}" not in self.config['params']['links']:
-                self.config['params']['links'][f"{v}_{u}"] = final_params
+                # Get existing link-specific params, or an empty dict if none
+                link_specific_params = self.config['params']['links'].get(link_id, {})
+
+                # Build the parameters for the link, starting with defaults and overriding
+                final_params = default_link_params.copy()
+                final_params.update(link_specific_params)
+
+                # Explicitly set length from distance data and ensure width uses the default
+                final_params['length'] = distance
+                # final_params['width'] = default_link_params['width']
+
+                self.config['params']['links'][link_id] = final_params
+                # if reverse link not in the config, add it
+                if f"{v}_{u}" not in self.config['params']['links']:
+                    self.config['params']['links'][f"{v}_{u}"] = final_params
 
         # Create network
         network = Network(
@@ -118,7 +127,7 @@ class NetworkEnvGenerator:
             network: Network object
             randomize_params: Dictionary containing randomization parameters
         """
-        # Implement randomization logic here
+        #TODO: Implement randomization logic here
         pass
 
 if __name__ == "__main__":

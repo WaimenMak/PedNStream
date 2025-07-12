@@ -78,9 +78,9 @@ if __name__ == "__main__":
         'assign_flows_type': 'classic',
         'path_finder': {
             'k_paths': 1,  # number of paths from origin to destination, if set to 1, it will use the shortest path
-            'theta': 0.5,  # weight for the path length in the cost function
-            'alpha': 0.5,  # weight for the path travel time in the cost function
-            'beta': 0.1,
+            # 'theta': 0.5,  # temperature parameter for the path finding algorithm
+            # 'alpha': 0.5,  # weight for the path length in the cost function
+            # 'beta': 0.5,   # weight for the path travel time in the cost function
         },
         'default_link': {
             'length': 100,
@@ -94,14 +94,14 @@ if __name__ == "__main__":
         },
         'demand': {
             "origin_3": {
-                "peak_lambda": 20,
+                "peak_lambda": 15,
                 "base_lambda": 5,
             },
         }
     }
     od_flows = {
         (3, 0): 10,
-        (3, 4): 5,
+        (3, 4): 10,
     }
     network_env = Network(adj, params, origin_nodes=[3], destination_nodes=[0, 4], od_flows=od_flows)
 
@@ -109,12 +109,14 @@ if __name__ == "__main__":
     network_env.visualize()
 
     # Run simulation
-    network_env.links[(1,2)].front_gate_width = 0.5
+    # network_env.links[(1,2)].front_gate_width = 0.5
+    # network_env.links[(1,0)].front_gate_width = 0.1
     for t in range(1, params['simulation_steps']):
         network_env.network_loading(t)
         if t == 300: # adjust the width of link 2_3, simulate remove the bottleneck
-            # pass
-            network_env.links[(1,2)].front_gate_width = 2
+            pass
+            # network_env.links[(1,2)].front_gate_width = 2
+            # network_env.links[(1,0)].front_gate_width = 1
             # network_env.links[(2,3)].area = 2 * network_env.links[(2,3)].length  # adjust the area of the link to match the new width
             # network_env.links[(2,3)].k_critical = 2
             # network_env.links[(2,3)].k_jam = 6

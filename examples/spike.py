@@ -21,13 +21,6 @@ from src.LTM.network import Network
 
 if __name__ == "__main__":
     # Network configuration
-    # adj = np.array([[0, 1],
-    #                 [1, 0]])
-    
-    # adj = np.array([[0, 1, 1, 1],
-    #                 [1, 0, 1, 1],
-    #                 [1, 1, 0, 1],
-    #                 [1, 1, 1, 0]])
 
     adj = np.array([[0, 1, 1, 1, 0, 0],
                     [1, 0, 1, 1, 0, 0],
@@ -36,25 +29,6 @@ if __name__ == "__main__":
                     [0, 0, 0, 1, 0, 1],
                     [0, 0, 0, 0, 1, 0]])
 
-    # adj = np.array([[0, 0, 0, 1, 0, 0],
-    #                 [0, 0, 0, 1, 0, 0],
-    #                 [0, 0, 0, 1, 0, 0],
-    #                 [1, 1, 1, 0, 1, 0],
-    #                 [0, 0, 0, 1, 0, 1],
-    #                 [0, 0, 0, 0, 1, 0]])
-
-
-    # params = {
-    #     'length': 100,
-    #     'width': 1,
-    #     'free_flow_speed': 1.5,
-    #     'k_critical': 2,
-    #     'k_jam': 10,
-    #     'unit_time': 10,
-    #     'peak_lambda': 10,
-    #     'base_lambda': 5,
-    #     'simulation_steps': 1000,
-    # }
     params = {
         'unit_time': 10,
         'simulation_steps': 1200,

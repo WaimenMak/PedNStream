@@ -59,7 +59,7 @@ class NetworkVisualizer:
 
     def _visualize_network_nx(self, time_step, edge_property='density', with_colorbar=False):
         """
-        Visualize network state at a specific time step using networkx
+        Visualize network state at a specific time step using networkx, for the small network
         :param time_step: Time step to visualize
         :param edge_property: Property to visualize ('density', 'flow', or 'speed')
         """
@@ -131,7 +131,7 @@ class NetworkVisualizer:
             self.pos = nx.spring_layout(G, k=1, iterations=50, seed=seed)
         
         # Draw nodes
-        node_sizes = [G.nodes[node]['size'] * 50 + 100 for node in G.nodes()]
+        node_sizes = [G.nodes[node]['size'] * 50 + 500 for node in G.nodes()]
         # Color nodes: red for origins, pink for destinations, lightblue for others
         node_colors = ['red' if int(node) in self.network_params['origin_nodes'] 
                       else 'pink' if int(node) in self.network_params['destination_nodes'] 
@@ -139,6 +139,12 @@ class NetworkVisualizer:
         nx.draw_networkx_nodes(G, self.pos, node_size=node_sizes,
                              node_color=node_colors,
                              ax=ax)
+        
+        # Add node labels
+        nx.draw_networkx_labels(G, self.pos, 
+                              font_size=18,
+                              font_weight='bold',
+                              ax=ax)
         
         # Draw edges
         edges = list(G.edges())
@@ -629,12 +635,18 @@ def progress_callback(current_frame, total_frames):
 
 if __name__ == "__main__":
     import matplotlib
-    matplotlib.use('TkAgg')
+    # matplotlib.use('TkAgg')
     # Example usage
-    simulation_dir = "/Users/mmai/Devs/Crowd-Control/outputs/delft" # Replace with actual timestamp
-    visualizer = NetworkVisualizer(simulation_dir=simulation_dir)
+    # simulation_dir = "/Users/mmai/Devs/Crowd-Control/outputs/delft" # Replace with actual timestamp
+    # visualizer = NetworkVisualizer(simulation_dir=simulation_dir)
     # ani = visualizer.animate_network(start_time=0, interval=100, edge_property='speed')
-    m = visualizer.visualize_network_state(time_step=100, edge_property='num_pedestrians')
-    m.save('../../network_state_t100.html')
+    # m = visualizer.visualize_network_state(time_step=100, edge_property='num_pedestrians')
+    # m.save('../../network_state_t100.html')
     # m = visualizer.visualize_network_state(time_step=499, edge_property='density')
     # plt.show()
+
+    output_dir = os.path.join("..", "..", "outputs")
+    visualizer = NetworkVisualizer(simulation_dir=os.path.join(output_dir, "forky_queues"))
+    # visualizer = NetworkVisualizer(simulation_dir=os.path.join(output_dir, "delft_directions"), pos=pos)
+    time_step = 200
+    fig, ax = visualizer.visualize_network_state(time_step=time_step, edge_property='density', with_colorbar=False)

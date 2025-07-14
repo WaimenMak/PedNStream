@@ -8,6 +8,7 @@
 *.json
 /cache
 *.mp4
+*.csv
 /outputs
 /fig
 /.cursor

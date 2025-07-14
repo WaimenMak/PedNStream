@@ -1,0 +1,63 @@
+# Network Configuration
+network:
+  adjacency_matrix: [
+    [0, 1, 1, 0, 0, 0],  # node 0
+    [1, 0, 0, 1, 0, 0],  # node 1
+    [1, 0, 0, 1, 1, 0],  # node 2
+    [0, 1, 1, 0, 0, 1],  # node 3
+    [0, 0, 1, 0, 0, 1],  # node 4
+    [0, 0, 0, 1, 1, 0]   # node 5
+  ]
+  origin_nodes: [1]
+  destination_nodes: [5]
+
+# Simulation Parameters
+simulation:
+  simulation_steps: 500
+  unit_time: 10
+  assign_flows_type: "classic"
+  path_finder:
+    k_paths: 2
+    theta: 0.1
+    alpha: 1
+    beta: 0.5
+
+# Default Link Parameters
+default_link:
+  length: 100
+  width: 1
+  free_flow_speed: 1.5
+  k_critical: 2
+  k_jam: 10
+
+# Link-specific Parameters (optional)
+links:
+  "1_2":
+    length: 120
+    width: 1.5
+    free_flow_speed: 1.5
+    k_critical: 2
+    k_jam: 10
+
+  "2_4":
+    length: 80
+    width: 2.0
+    free_flow_speed: 1.5
+    k_critical: 2
+    k_jam: 10
+
+# Demand Configuration
+demand:
+#  origin_1:
+#    pattern: "constant"
+#    value: 8
+  origin_1:
+    pattern: "gaussian_peaks"
+    peak_lambda: 35
+    base_lambda: 5
+    seed: 42
+
+#OD Flow Configuration
+od_flows:
+#  "1_4": 30
+  "1_5": 30

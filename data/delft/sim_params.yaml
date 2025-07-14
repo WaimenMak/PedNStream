@@ -1,0 +1,65 @@
+# Network Configuration, origin and destination and adjacency matrix
+network:
+  origin_nodes: [0, 8, 80, 13]
+  destination_nodes: [0, 8, 74, 136]
+
+# Simulation Parameters
+simulation:
+  simulation_steps: 500
+  unit_time: 10
+  assign_flows_type: "classic"
+
+# Default Link Parameters
+default_link:
+  length: 50
+  width: 2
+  free_flow_speed: 1.1
+  k_critical: 2
+  k_jam: 7
+  gamma: 0.01
+  speed_noise_std: 0.05
+  fd_type: "greenshields"
+
+# Link-specific Parameters (optional)
+#links:
+#  "1_2":
+#    length: 120
+#    width: 1.5
+#    free_flow_speed: 1.5
+#    k_critical: 2
+#    k_jam: 10
+#
+#  "2_4":
+#    length: 80
+#    width: 2.0
+#    free_flow_speed: 1.5
+#    k_critical: 2
+#    k_jam: 10
+
+# Demand Configuration
+demand:
+#  origin_1:
+#    pattern: "constant"
+#    value: 8
+  origin_0:
+    pattern: "sudden_demand"
+    peak_lambda: 20
+    base_lambda: 5
+    seed: 42
+
+  origin_80:
+    pattern: "gaussian_peaks"
+    peak_lambda: 15
+    base_lambda: 6
+    seed: 42
+
+  origin_13:
+    pattern: "sudden_demand"
+    peak_lambda: 25
+    base_lambda: 5
+    seed: 42
+
+#OD Flow Configuration
+#od_flows:
+#  "1_4": 30
+#  "1_5": 5

@@ -3,7 +3,7 @@
 *.pyc
 /__pycache__
 *.xlsx
-data/*
+#data/*
 .DS_Store
 *.json
 /cache

@@ -108,9 +108,13 @@ if __name__ == "__main__":
     network_env.nodes[0].demand[300:] = np.zeros(600 - 300)
     network_env.nodes[5].demand[300:] = np.zeros(600 - 300)
     # Run simulation
+    network_env.links[(3,4)].back_gate_width = 0
+    network_env.links[(2,1)].back_gate_width = 0
     for t in range(1, params['simulation_steps']):
         network_env.network_loading(t)
-        # if t == 200:
+        if t == 200:
+            network_env.links[(3,4)].back_gate_width = 1
+            network_env.links[(2,1)].back_gate_width = 1
         #     network_env.nodes[0].demand[201:251] = np.random.poisson(lam=np.ones(50) * 10, size=50)
 
     # # Plot inflow and outflow

@@ -36,18 +36,19 @@ if __name__ == "__main__":
         'custom_pattern': 'spike_pattern', # the name should be the same as the function name
         'default_link': {
             'length': 100,
-            'width': 1,
+            'width': 2,
             'free_flow_speed': 1.1,
             'k_critical': 2,
             'k_jam': 6,
             'speed_noise_std': 0.05,
-            'fd_type': "greenshields"
+            'fd_type': "greenshields",
+            'controller_type': 'gate',  # type of controller
         },
         'demand': {
             'origin_5': {
                 'pattern': "spike_pattern",
-                'peak_lambda': 10,
-                'base_lambda': 5,
+                'peak_lambda': 20,
+                'base_lambda': 10,
             }
         }
     }

@@ -55,6 +55,9 @@ if __name__ == "__main__":
     #
     # }
     # network_env = Network(adj, params, origin_nodes=[5, 0])
+    # # Set demand for nodes to zero after a certain time step
+    # network_env.nodes[0].demand[300:] = np.zeros(600 - 300)
+    # network_env.nodes[5].demand[300:] = np.zeros(600 - 300)
     ''' Scenario 2 '''
     params = {
         'unit_time': 10,
@@ -68,7 +71,7 @@ if __name__ == "__main__":
             'k_jam': 6,
             'activity_probability': 0,  # probability of activity on the link
             'fd_type': 'greenshields',  # type of fundamental diagram
-            'speed_noise_std': 0.05,  # whether to add noise to the speed
+            'speed_noise_std': 0,  # whether to add noise to the speed
             'controller_type': 'gate',  # type of controller
         },
         'links': {
@@ -80,7 +83,7 @@ if __name__ == "__main__":
                 'k_jam': 6,
                 'activity_probability': 0,  # probability of activity on the link
                 'fd_type': 'greenshields',  # type of fundamental diagram
-                'speed_noise_std': 0.05,  # whether to add noise to the speed
+                'speed_noise_std': 0,  # whether to add noise to the speed
                 'controller_type': 'gate',  # type of controller
             },
         },
@@ -100,21 +103,21 @@ if __name__ == "__main__":
     network_env.update_turning_fractions_per_node(node_ids=[2, 3],
                                                           new_turning_fractions=np.array([[0, 1, 0.5, 0.5, 0, 1],
                                                                                           [1, 0, 0, 1, 0.5, 0.5]]))
-
+    # Set demand for nodes to zero after a certain time step
+    network_env.nodes[2].demand[0:40] = np.zeros(40)
+    network_env.nodes[3].demand[40:] = np.zeros(600 - 40)
 
     network_env.visualize()
 
-    # Set demand for nodes to zero after a certain time step
-    network_env.nodes[0].demand[300:] = np.zeros(600 - 300)
-    network_env.nodes[5].demand[300:] = np.zeros(600 - 300)
+
     # Run simulation
-    network_env.links[(3,4)].back_gate_width = 0
+    network_env.links[(3,4)].back_gate_width = 1
     network_env.links[(2,1)].back_gate_width = 0
     for t in range(1, params['simulation_steps']):
         network_env.network_loading(t)
-        if t == 200:
-            network_env.links[(3,4)].back_gate_width = 1
-            network_env.links[(2,1)].back_gate_width = 1
+        # if t == 300:
+            # network_env.links[(3,4)].back_gate_width = 1
+            # network_env.links[(2,1)].back_gate_width = 1
         #     network_env.nodes[0].demand[201:251] = np.random.poisson(lam=np.ones(50) * 10, size=50)
 
     # # Plot inflow and outflow

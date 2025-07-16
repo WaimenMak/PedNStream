@@ -109,13 +109,13 @@ if __name__ == "__main__":
     network_env.visualize()
 
     # Run simulation
-    # network_env.links[(1,2)].front_gate_width = 0.5
+    network_env.links[(1,2)].front_gate_width = 0.5
     # network_env.links[(1,0)].front_gate_width = 0.1
     for t in range(1, params['simulation_steps']):
         network_env.network_loading(t)
         if t == 300: # adjust the width of link 2_3, simulate remove the bottleneck
-            pass
-            # network_env.links[(1,2)].front_gate_width = 2
+            # pass
+            network_env.links[(1,2)].front_gate_width = 1
             # network_env.links[(1,0)].front_gate_width = 1
             # network_env.links[(2,3)].area = 2 * network_env.links[(2,3)].length  # adjust the area of the link to match the new width
             # network_env.links[(2,3)].k_critical = 2

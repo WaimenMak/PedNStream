@@ -40,3 +40,141 @@ This change will help users better identify specific nodes in the network visual
 
 ---
 
+_**User**_
+
+, add one more condition if time_step + 1 - tau out of the bound of the array
+
+---
+
+_**Assistant**_
+
+I need to see more context around the code you're referring to. Let me examine the link.py file to understand the full context of this condition and the `tau` variable.
+
+---
+
+Read file: src/LTM/link.py
+
+---
+
+Let me look for the `tau` variable definition and see more context around this function:
+
+---
+
+<details>
+            <summary>Grep search for "tau" • **3** files</summary>
+        
+| File | Line | Match |
+|------|------|-------|
+| `file:///Users/mmai/Devs/Crowd-Control/src/LTM/link.py` | L73 | `self.free_flow_tau = round(self.travel_time[0] / self.unit_time)` |
+| `file:///Users/mmai/Devs/Crowd-Control/src/LTM/link.py` | L173 | `def get_outflow(self, time_step: int, tau: int) -> int:` |
+| `file:///Users/mmai/Devs/Crowd-Control/src/LTM/link.py` | L177 | `# tau = self.congestion_tau if self.speed[time_step] < self.free_flow_speed else self.free_flow_tau` |
+| `file:///Users/mmai/Devs/Crowd-Control/src/LTM/link.py` | L178 | `# tau = self.congestion_tau` |
+| `file:///Users/mmai/Devs/Crowd-Control/src/LTM/link.py` | L182 | `sending_flow = (F * self.inflow[time_step - tau] + F * (1 - F) * self.inflow[time_step - tau - 1] +` |
+| `file:///Users/mmai/Devs/Crowd-Control/src/LTM/link.py` | L183 | `F * (1 - F) ** 2 * self.inflow[time_step - tau - 2] +` |
+| `file:///Users/mmai/Devs/Crowd-Control/src/LTM/link.py` | L184 | `F * (1 - F) ** 3 * self.inflow[time_step - tau - 3])` |
+| `file:///Users/mmai/Devs/Crowd-Control/src/LTM/link.py` | L203 | `tau = round(self.avg_travel_time[time_step] / self.unit_time)` |
+| `file:///Users/mmai/Devs/Crowd-Control/src/LTM/link.py` | L227 | `# tau = round(self.avg_travel_time[time_step] / self.unit_time) # use average travel time to calculate tau` |
+| `file:///Users/mmai/Devs/Crowd-Control/src/LTM/link.py` | L228 | `# tau = round(self.travel_time[time_step] / self.unit_time)  # use real-time travel time to calculate tau` |
+| `file:///Users/mmai/Devs/Crowd-Control/src/LTM/link.py` | L231 | `# if time_step - tau < 0:` |
+| `file:///Users/mmai/Devs/Crowd-Control/src/LTM/link.py` | L232 | `if time_step < self.free_flow_tau:` |
+| `file:///Users/mmai/Devs/Crowd-Control/src/LTM/link.py` | L237 | `# if time_step - tau + 1 < 0: # congestion stage` |
+| `file:///Users/mmai/Devs/Crowd-Control/src/LTM/link.py` | L242 | `#     sending_flow_boundary = max(0, self.cumulative_inflow[time_step + 1 - tau] - self.cumulative_outflow[time_step]) # +1 is the delta t` |
+| `file:///Users/mmai/Devs/Crowd-Control/src/LTM/link.py` | L244 | `sending_flow_boundary = self.cumulative_inflow[time_step + 1 - tau] - self.cumulative_outflow[time_step] # +1 is the delta t` |
+| `file:///Users/mmai/Devs/Crowd-Control/src/LTM/link.py` | L249 | `# sending_flow_boundary = max(0, self.cumulative_inflow[time_step + 1 - self.free_flow_tau] - self.cumulative_outflow[time_step]) # +1 is the delta t` |
+| `file:///Users/mmai/Devs/Crowd-Control/src/LTM/link.py` | L273 | `diffusion_flow = self.get_outflow(time_step, tau)` |
+| `file:///Users/mmai/Devs/Crowd-Control/src/LTM/link.py` | L329 | `tau_shockwave = round(self.length/(self.shockwave_speed * self.unit_time))` |
+| `file:///Users/mmai/Devs/Crowd-Control/src/LTM/link.py` | L330 | `if time_step + 1 - tau_shockwave < 0:` |
+| `file:///Users/mmai/Devs/Crowd-Control/src/LTM/link.py` | L333 | `receiving_flow_boundary = (self.cumulative_outflow[time_step + 1 - tau_shockwave]` |
+| `file:///Users/mmai/Devs/Crowd-Control/LTM1.py` | L81 | `#         self.travel_time = length / free_flow_speed  # Tau` |
+| `file:///Users/mmai/Devs/Crowd-Control/LTM1.py` | L83 | `#         self.free_flow_tau = round(self.travel_time / unit_time)  # Tau in time steps` |
+| `file:///Users/mmai/Devs/Crowd-Control/LTM1.py` | L149 | `#                 tau = (round(self.travel_time / self.unit_time))` |
+| `file:///Users/mmai/Devs/Crowd-Control/LTM1.py` | L150 | `#                 t_prime = time_step + tau` |
+| `file:///Users/mmai/Devs/Crowd-Control/LTM1.py` | L164 | `#             self.outflow_buffer[time_step + self.free_flow_tau] = sending_flow` |
+| `file:///Users/mmai/Devs/Crowd-Control/LTM1.py` | L165 | `#             # tau = (round(self.travel_time / self.unit_time))` |
+| `file:///Users/mmai/Devs/Crowd-Control/LTM1.py` | L166 | `#             # t_prime = time_step + tau` |
+| `file:///Users/mmai/Devs/Crowd-Control/LTM1.py` | L190 | `self.travel_time = length / free_flow_speed  # Tau` |
+| `file:///Users/mmai/Devs/Crowd-Control/LTM1.py` | L192 | `self.free_flow_tau = round(self.travel_time / unit_time)  # Tau in time steps` |
+| `file:///Users/mmai/Devs/Crowd-Control/LTM1.py` | L230 | `tau = round(self.travel_time / self.unit_time)` |
+| `file:///Users/mmai/Devs/Crowd-Control/LTM1.py` | L231 | `if time_step - tau < 0:` |
+| `file:///Users/mmai/Devs/Crowd-Control/LTM1.py` | L234 | `sending_flow_boundary = self.cumulative_inflow[time_step - tau] - self.cumulative_outflow[time_step - 1]` |
+| `file:///Users/mmai/Devs/Crowd-Control/src/LTM/link.py` | L73 | `self.free_flow_tau = round(self.travel_time[0] / self.unit_time)` |
+| `file:///Users/mmai/Devs/Crowd-Control/src/LTM/link.py` | L173 | `def get_outflow(self, time_step: int, tau: int) -> int:` |
+| `file:///Users/mmai/Devs/Crowd-Control/src/LTM/link.py` | L177 | `# tau = self.congestion_tau if self.speed[time_step] < self.free_flow_speed else self.free_flow_tau` |
+| `file:///Users/mmai/Devs/Crowd-Control/src/LTM/link.py` | L178 | `# tau = self.congestion_tau` |
+| `file:///Users/mmai/Devs/Crowd-Control/src/LTM/link.py` | L182 | `sending_flow = (F * self.inflow[time_step - tau] + F * (1 - F) * self.inflow[time_step - tau - 1] +` |
+| `file:///Users/mmai/Devs/Crowd-Control/src/LTM/link.py` | L183 | `F * (1 - F) ** 2 * self.inflow[time_step - tau - 2] +` |
+| `file:///Users/mmai/Devs/Crowd-Control/src/LTM/link.py` | L184 | `F * (1 - F) ** 3 * self.inflow[time_step - tau - 3])` |
+| `file:///Users/mmai/Devs/Crowd-Control/src/LTM/link.py` | L203 | `tau = round(self.avg_travel_time[time_step] / self.unit_time)` |
+| `file:///Users/mmai/Devs/Crowd-Control/src/LTM/link.py` | L227 | `# tau = round(self.avg_travel_time[time_step] / self.unit_time) # use average travel time to calculate tau` |
+| `file:///Users/mmai/Devs/Crowd-Control/src/LTM/link.py` | L228 | `# tau = round(self.travel_time[time_step] / self.unit_time)  # use real-time travel time to calculate tau` |
+| `file:///Users/mmai/Devs/Crowd-Control/src/LTM/link.py` | L231 | `# if time_step - tau < 0:` |
+| `file:///Users/mmai/Devs/Crowd-Control/src/LTM/link.py` | L232 | `if time_step < self.free_flow_tau:` |
+| `file:///Users/mmai/Devs/Crowd-Control/src/LTM/link.py` | L237 | `# if time_step - tau + 1 < 0: # congestion stage` |
+| `file:///Users/mmai/Devs/Crowd-Control/src/LTM/link.py` | L242 | `#     sending_flow_boundary = max(0, self.cumulative_inflow[time_step + 1 - tau] - self.cumulative_outflow[time_step]) # +1 is the delta t` |
+| `file:///Users/mmai/Devs/Crowd-Control/src/LTM/link.py` | L244 | `sending_flow_boundary = self.cumulative_inflow[time_step + 1 - tau] - self.cumulative_outflow[time_step] # +1 is the delta t` |
+| `file:///Users/mmai/Devs/Crowd-Control/src/LTM/link.py` | L249 | `# sending_flow_boundary = max(0, self.cumulative_inflow[time_step + 1 - self.free_flow_tau] - self.cumulative_outflow[time_step]) # +1 is the delta t` |
+| `file:///Users/mmai/Devs/Crowd-Control/src/LTM/link.py` | L273 | `diffusion_flow = self.get_outflow(time_step, tau)` |
+| `file:///Users/mmai/Devs/Crowd-Control/src/LTM/link.py` | L329 | `tau_shockwave = round(self.length/(self.shockwave_speed * self.unit_time))` |
+| `file:///Users/mmai/Devs/Crowd-Control/src/LTM/link.py` | L330 | `if time_step + 1 - tau_shockwave < 0:` |
+| `file:///Users/mmai/Devs/Crowd-Control/src/LTM/link.py` | L333 | `receiving_flow_boundary = (self.cumulative_outflow[time_step + 1 - tau_shockwave]` |
+
+</details>
+
+---
+
+Now let me see the full context of the function where this code appears:
+
+---
+
+Read file: src/LTM/link.py
+
+---
+
+Now I can see the context. The issue is that `time_step + 1 - tau` could potentially be negative (out of bounds) when accessing the `cumulative_inflow` array. Let me check if there are similar boundary checks elsewhere:
+
+---
+
+<details>
+            <summary>Grep search for "time_step.*\+.*1.*-.*tau.*<.*0" • **2** files</summary>
+        
+| File | Line | Match |
+|------|------|-------|
+| `file:///Users/mmai/Devs/Crowd-Control/src/LTM/link.py` | L330 | `if time_step + 1 - tau_shockwave < 0:` |
+| `file:///Users/mmai/Devs/Crowd-Control/src/LTM/link.py` | L330 | `if time_step + 1 - tau_shockwave < 0:` |
+
+</details>
+
+---
+
+Perfect! I can see there's already a similar boundary check for `tau_shockwave`. Let me look at that implementation:
+
+---
+
+Read file: src/LTM/link.py
+
+---
+
+Now I understand the pattern. When `time_step + 1 - tau < 0`, we need to provide a fallback value instead of accessing an array index that would be out of bounds. Based on the existing pattern and the current logic, here's the fix:
+
+```python:src/LTM/link.py
+// ... existing code ...
+            # if time_step - tau + 1 < 0: # congestion stage
+            ''' for the normal stage or the congestion stage '''
+            # if density > self.k_critical:  # congestion stage
+            #     sending_flow_boundary = self.num_pedestrians[time_step]
+            # else:  # free flow stage
+            #     sending_flow_boundary = max(0, self.cumulative_inflow[time_step + 1 - tau] - self.cumulative_outflow[time_step]) # +1 is the delta t
+
+            if time_step + 1 - tau < 0:
+                sending_flow_boundary = self.num_pedestrians[time_step]
+            else:
+                sending_flow_boundary = self.cumulative_inflow[time_step + 1 - tau] - self.cumulative_outflow[time_step] # +1 is the delta t
+                if sending_flow_boundary < 0:
+                    sending_flow_boundary = self.num_pedestrians[time_step]
+// ... existing code ...
+```
+
+This change adds a boundary check before accessing `self.cumulative_inflow[time_step + 1 - tau]`. When the index would be negative (out of bounds), it uses `self.num_pedestrians[time_step]` as a fallback, which is consistent with the existing logic pattern and the current fallback when `sending_flow_boundary < 0`.
+
+---
+

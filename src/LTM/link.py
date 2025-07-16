@@ -132,9 +132,10 @@ class Link(BaseLink):
         :param time_step: current time step + 1, is the future time step
         :return:
         """
-
+        # if time_step > 80 and self.link_id == '2_3':
+        #     pass
         # Get reverse link density
-        reverse_num_peds = 0
+        # reverse_num_peds = 0
         # if self.reverse_link is not None:
         #     reverse_num_peds = self.reverse_link.num_pedestrians[time_step]
             # reverse_area = self.reverse_link.area
@@ -208,16 +209,25 @@ class Link(BaseLink):
             # if density > self.k_critical:
             # self.sending_flow = np.random.randint(0, 10)
             # extrusion people using binomial distribution
+            # if self.density[time_step] > 1:
+            #     sending_flow_boundary = self.num_pedestrians[time_step]
+            # else:
+            #     sending_flow_boundary = self.link_flow[time_step] * self.unit_time * self.front_gate_width  # use link flow to calculate sending flow, this is the case when the link is not congested
             sending_flow_boundary = self.num_pedestrians[time_step]
-            # sending_flow_max = self.k_critical * self.free_flow_speed * self.unit_time
             sending_flow_max = self.front_gate_width * self.k_critical * self.free_flow_speed * self.unit_time
             sending_flow = min(sending_flow_boundary, sending_flow_max)
             num_peds = int(np.floor(sending_flow))
-            num_stay = np.random.binomial(n=num_peds, p=0.1) # 10% of the people will leave
-            self.sending_flow[time_step] = num_peds - num_stay
+            releasing_factor = np.clip(self.density[time_step] / self.k_jam, 0, 1)
+            releasing_prob = 0 + (0.8 - 0) * releasing_factor ** 0.5
+            # if self.link_id == '2_3':
+            #     print(releasing_prob)
+            sending_flow = np.random.binomial(n=num_peds, p=releasing_prob) # 10% of the people will leave
+            # sending_flow = num_peds - num_stay
+            # self.sending_flow[time_step] = num_peds - num_stay
             # self.sending_flow[time_step] = num_peds
             # else:
             #     self.sending_flow = 0
+            self.sending_flow[time_step] = min(np.floor(0.8 * sending_flow + 0.2 * self.sending_flow[time_step - 1]), sending_flow)
             return self.sending_flow[time_step]
 
         tau = round(self.avg_travel_time[time_step] / self.unit_time) # use average travel time to calculate tau
@@ -232,10 +242,20 @@ class Link(BaseLink):
         else:   
             # if time_step - tau + 1 < 0: # congestion stage
             ''' for the normal stage or the congestion stage '''
-            if density > self.k_critical:  # congestion stage
-                sending_flow_boundary = self.num_pedestrians[time_step]
-            else:  # free flow stage
-                sending_flow_boundary = max(0, self.cumulative_inflow[time_step + 1 - tau] - self.cumulative_outflow[time_step]) # +1 is the delta t
+            idx = max(0, time_step + 1 - tau)
+            # sending_flow_boundary = max(0, self.cumulative_inflow[idx] - self.cumulative_outflow[time_step])
+            # if density > self.k_critical and self.density[time_step] > 3:  # congestion stage
+            #     sending_flow_boundary = self.num_pedestrians[time_step]
+            # else:  # free flow stage
+            #     sending_flow_boundary = max(0, self.cumulative_inflow[idx] - self.cumulative_outflow[time_step]) # +1 is the delta t
+
+            congestion_factor = np.clip((density - self.k_critical) / (self.k_jam - self.k_critical), 0, 1)
+
+            boundary_congestion = self.num_pedestrians[time_step]
+            boundary_freeflow = max(0, self.cumulative_inflow[idx] - self.cumulative_outflow[time_step])
+
+            sending_flow_boundary = (congestion_factor * boundary_congestion +
+                                     (1 - congestion_factor) * boundary_freeflow)
 
             ''' original method from the paper '''
             # sending_flow_boundary = max(0, self.cumulative_inflow[time_step + 1 - self.free_flow_tau] - self.cumulative_outflow[time_step]) # +1 is the delta t
@@ -258,6 +278,8 @@ class Link(BaseLink):
         ''' The purpose is to mitigate the maximum sending flow to avoid unrealistic high flow (Added)'''
         original_sending_flow = sending_flow
         if sending_flow > 0:
+            releasing_factor = np.clip((density - self.k_critical) / (self.k_jam - self.k_critical), 0, 1)
+            releasing_prob = 0.7 + (0.9 - 0.7) * releasing_factor ** 0.5
             # if the sending flow is positive, then use diffusion flow. outcome: the flow is propagated more slowly
             # last_flow = self.sending_flow[time_step - 1] if time_step - 1 >= 0 else 0
             # free flow stage
@@ -275,13 +297,13 @@ class Link(BaseLink):
             #         # smooth_factor = density / self.k_critical
             #         # smooth_factor = 0.5
                     num_passing_peds = int(np.floor(sending_flow))
-                    num_leave = np.random.binomial(n=num_passing_peds, p=0.7)  # 70% of the people will leave
+                    num_leave = np.random.binomial(n=num_passing_peds, p=releasing_prob)  # 70% of the people will leave
                     sending_flow = num_leave
             #         # self.sending_flow[time_step] = smooth_factor * num_leave + (1 - smooth_factor) * last_flow
             else:
             #     # smooth_factor = np.clip((density - self.k_critical) / (self.k_jam - self.k_critical), 0.5, 1) # smooth factor is between 0.5 and 1
                 num_passing_peds = int(np.floor(sending_flow))
-                num_leave = np.random.binomial(n=num_passing_peds, p=0.7) # 70% of the people will leave
+                num_leave = np.random.binomial(n=num_passing_peds, p=releasing_prob) # 70% of the people will leave
                 sending_flow = num_leave
             if sending_flow < 0:
                 raise ValueError(f"Negative sending flow detected, {sending_flow} at {time_step}")
@@ -345,9 +367,9 @@ class Link(BaseLink):
         forward_receiving_flow = self.cal_receiving_flow(time_step)
         
         # Simulate people squeeze in and out of the link
-        if forward_receiving_flow <= reverse_sending_flow:
-            reverse_sending_flow -= np.random.binomial(n=int(reverse_sending_flow), p=0.2)
-        
+        # if forward_receiving_flow <= reverse_sending_flow:
+        #     reverse_sending_flow -= np.random.binomial(n=int(reverse_sending_flow), p=0.2)
+
         receiving_flow = forward_receiving_flow - reverse_sending_flow
         return max(receiving_flow, 0)
 

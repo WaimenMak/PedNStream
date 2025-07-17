@@ -28,30 +28,7 @@ if __name__ == "__main__":
                     [1, 1, 1, 0, 1, 0],
                     [0, 0, 0, 1, 0, 1],
                     [0, 0, 0, 0, 1, 0]])
-
-    params = {
-        'unit_time': 10,
-        'simulation_steps': 1200,
-        'assign_flows_type': 'classic',
-        'custom_pattern': 'spike_pattern', # the name should be the same as the function name
-        'default_link': {
-            'length': 100,
-            'width': 2,
-            'free_flow_speed': 1.1,
-            'k_critical': 2,
-            'k_jam': 6,
-            'speed_noise_std': 0.05,
-            'fd_type': "greenshields",
-            'controller_type': 'gate',  # type of controller
-        },
-        'demand': {
-            'origin_5': {
-                'pattern': "spike_pattern",
-                'peak_lambda': 20,
-                'base_lambda': 10,
-            }
-        }
-    }
+    
 
     # set the demand pattern for origin 5, 4
     def spike_pattern(origin_id, params):
@@ -68,13 +45,67 @@ if __name__ == "__main__":
         # np.random.seed(seed)
 
         demand = np.random.poisson(lam=lambda_t)
-        demand[200:250] = 30
+        demand[200:220] = 30
         demand[300:] = 0
         return demand
 
+    '''Scenario 1:'''
+    # params = {
+    #     'unit_time': 10,
+    #     'simulation_steps': 1200,
+    #     'assign_flows_type': 'classic',
+    #     'custom_pattern': 'spike_pattern', # the name should be the same as the function name
+    #     'default_link': {
+    #         'length': 100,
+    #         'width': 2,
+    #         'free_flow_speed': 1.1,
+    #         'k_critical': 2,
+    #         'k_jam': 6,
+    #         'speed_noise_std': 0.05,
+    #         'fd_type': "greenshields",
+    #         'controller_type': 'gate',  # type of controller
+    #     },
+    #     'demand': {
+    #         'origin_5': {
+    #             'pattern': "spike_pattern",
+    #             'peak_lambda': 20,
+    #             'base_lambda': 10,
+    #         }
+    #     }
+    # }
+    # network_env = Network(adj, params, origin_nodes=[5], demand_pattern=[spike_pattern])
+
+    '''Scenario 2:'''
+    params = {
+        'unit_time': 10,
+        'simulation_steps': 1200,
+        'assign_flows_type': 'classic',
+        'custom_pattern': 'spike_pattern', # the name should be the same as the function name
+        'default_link': {
+            'length': 100,
+            'width': 2,
+            'free_flow_speed': 1.1,
+            'k_critical': 2,
+            'k_jam': 6,
+            'speed_noise_std': 0.05,
+            'fd_type': "greenshields",
+            'controller_type': 'gate',  # type of controller
+        },
+        'demand': {
+            'origin_4': {
+                'pattern': "spike_pattern",
+                'peak_lambda': 20,
+                'base_lambda': 10,
+            }
+        }
+    }
+    network_env = Network(adj, params, origin_nodes=[4], demand_pattern=[spike_pattern])
+    network_env.update_turning_fractions_per_node(node_ids=[4],
+                                                  new_turning_fractions=np.array([[1, 0, 0, 1, 0, 1]]))
+
+
     # Initialize and run simulation
     # network_env = Network(adj, params, od_nodes=[5], origin_nodes=[5])
-    network_env = Network(adj, params, origin_nodes=[5], demand_pattern=[spike_pattern])
     network_env.visualize()
 
     

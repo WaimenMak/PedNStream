@@ -67,7 +67,7 @@ class Link(BaseLink):
             model_type=kwargs.get('fd_type', 'greenshields'),
             noise_std=kwargs.get('speed_noise_std', 0)
         )
-        self.exponent = 1 # private attribute for the releasing factor exponent, default is 1
+        self.exponent = 0.8 # private attribute for the releasing factor exponent, default is 1
 
         self.travel_time = np.zeros(simulation_steps, dtype=np.float32)
         self.travel_time[0] = min(self.length / self.free_flow_speed, self.max_travel_time)
@@ -194,8 +194,8 @@ class Link(BaseLink):
         Calculate the sending flow of the link at a given time step
         :param time_step: Current time step (t - 1)
         """
-        # if time_step == 100 and self.link_id == '2_3':
-        #     pass
+        if time_step > 200 and self.link_id == '2_3':
+            pass
 
         # get the total density
         density = self.get_density(time_step)
@@ -247,12 +247,13 @@ class Link(BaseLink):
             ''' for the normal stage or the congestion stage '''
             idx = max(0, time_step + 1 - tau)
             # sending_flow_boundary = max(0, self.cumulative_inflow[idx] - self.cumulative_outflow[time_step])
-            # if density > self.k_critical and self.density[time_step] > 3:  # congestion stage
+            # if density > self.k_critical:  # congestion stage
             #     sending_flow_boundary = self.num_pedestrians[time_step]
             # else:  # free flow stage
             #     sending_flow_boundary = max(0, self.cumulative_inflow[idx] - self.cumulative_outflow[time_step]) # +1 is the delta t
 
-            congestion_factor = np.clip((density - self.k_critical) / (self.k_jam - self.k_critical), 0, 1)
+            # congestion_factor = np.clip((density - self.k_critical) / (self.k_jam - self.k_critical), 0, 1)
+            congestion_factor = np.clip((self.density[time_step] - self.k_critical) / (self.k_jam - self.k_critical), 0, 1)
 
             boundary_congestion = self.num_pedestrians[time_step]
             boundary_freeflow = max(0, self.cumulative_inflow[idx] - self.cumulative_outflow[time_step])
@@ -284,7 +285,7 @@ class Link(BaseLink):
             # releasing_factor = np.clip((density - self.k_critical) / (self.k_jam - self.k_critical), 0, 1)
             releasing_factor = np.clip((self.density[time_step] - self.k_critical) / (self.k_jam - self.k_critical), 0, 1)
             # releasing_factor = np.clip(density / self.k_jam, 0, 1)
-            releasing_prob = 0.7 + (0.9 - 0.7) * releasing_factor ** self.exponent # min_prob + (max_prob - min_prob) * releasing_factor ** exponent for the releasing probability
+            releasing_prob = 0.7 + (0.85 - 0.7) * releasing_factor ** self.exponent # min_prob + (max_prob - min_prob) * releasing_factor ** exponent for the releasing probability
             # if self.link_id == '3_2':
             #     print(releasing_prob)
             # if the sending flow is positive, then use diffusion flow. outcome: the flow is propagated more slowly

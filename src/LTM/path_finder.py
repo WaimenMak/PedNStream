@@ -125,6 +125,7 @@ class PathFinder:
         self.theta = path_params.get('theta', 0.1)  # like the temperature in the logit model
         self.alpha = path_params.get('alpha', 1.0)  # distance weight
         self.beta = path_params.get('beta', 0.05)   # congestion weight
+        self.omega = path_params.get('omega', 0.05)   # capacity weight
         self.k_paths = path_params.get('k_paths', 3)
 
     def _create_graph(self, links, time_step=0):
@@ -388,13 +389,24 @@ class PathFinder:
             if down_nodes:
                 turns = list((up_node, down_node) for down_node in down_nodes)
                 distances = list(down_nodes.values())
-                num_pedestrians = []
+                # num_pedestrians = []
+                densities = []
+                capacities = []
                 for down_node in down_nodes:
                     try:
-                        num_pedestrians.append(self.links[(node.node_id, down_node)].num_pedestrians[time_step-1]) # use the previous time step, current time step is not available is not updated yet
+                        link = self.links[(node.node_id, down_node)]
+                        # num_pedestrians.append(self.links[(node.node_id, down_node)].num_pedestrians[time_step-1]) # use the previous time step, current time step is not available is not updated yet
+                        densities.append(link.get_density(time_step-1))
+                        capacity = link.receiving_flow[time_step-1]
+                        capacities.append(capacity if capacity > 0 else link.back_gate_width * link.free_flow_speed * link.k_critical)
                     except KeyError:
-                        num_pedestrians.append(0)
-                utilities = self.alpha * np.array(distances) + self.beta * np.array(num_pedestrians)
+                        densities.append(0)
+                        capacities.append(30) # set a high capacity for origin/destination nodes
+                # utilities = self.alpha * np.array(distances) + self.beta * np.array(num_pedestrians)
+                norm_densities = np.maximum(np.array(densities) - 2, 0) / (10 - 2) # 2: k_critical, 10: max density
+                utilities = (self.alpha * np.array(distances)/(np.sum(distances)+1e-6)
+                             + self.beta * norm_densities
+                             - self.omega * np.array(capacities)/(np.sum(capacities)+1e-6))
                 exp_utilities = np.exp(-self.theta * utilities)
                 probs = exp_utilities / np.sum(exp_utilities)
                 node.node_turn_probs[od_pair].update(dict(zip(turns, probs)))

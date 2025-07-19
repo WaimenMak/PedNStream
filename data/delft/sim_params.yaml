@@ -15,10 +15,11 @@ default_link:
   width: 2
   free_flow_speed: 1.1
   k_critical: 2
-  k_jam: 7
+  k_jam: 6
   gamma: 0.01
   speed_noise_std: 0.05
   fd_type: "greenshields"
+  activity_probability: 0
 
 # Link-specific Parameters (optional)
 #links:

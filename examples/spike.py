@@ -45,8 +45,8 @@ if __name__ == "__main__":
         # np.random.seed(seed)
 
         demand = np.random.poisson(lam=lambda_t)
-        demand[200:220] = 30
-        demand[300:] = 0
+        demand[200:230] = 30
+        demand[310:] = 0
         return demand
 
     '''Scenario 1:'''
@@ -87,7 +87,7 @@ if __name__ == "__main__":
             'free_flow_speed': 1.1,
             'k_critical': 2,
             'k_jam': 6,
-            'speed_noise_std': 0.05,
+            'speed_noise_std': 0.01,
             'fd_type': "greenshields",
             'controller_type': 'gate',  # type of controller
         },

@@ -18,9 +18,10 @@ simulation:
   assign_flows_type: "classic"
   path_finder:
     k_paths: 2
-    theta: 0.1
+    theta: 10
     alpha: 1
     beta: 0.5
+    omega: 0.8
 
 # Default Link Parameters
 default_link:

@@ -194,8 +194,8 @@ class Link(BaseLink):
         Calculate the sending flow of the link at a given time step
         :param time_step: Current time step (t - 1)
         """
-        if time_step > 200 and self.link_id == '2_3':
-            pass
+        # if time_step > 200 and self.link_id == '2_3':
+        #     pass
 
         # get the total density
         density = self.get_density(time_step)

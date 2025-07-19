@@ -17,7 +17,7 @@ simulation:
   unit_time: 10
   assign_flows_type: "classic"
   path_finder:
-    k_paths: 2
+    k_paths: 3
     theta: 10
     alpha: 1
     beta: 0.5
@@ -27,9 +27,11 @@ simulation:
 default_link:
   length: 100
   width: 1
-  free_flow_speed: 1.5
+  free_flow_speed: 1.1
   k_critical: 2
   k_jam: 10
+  gamma: 0.01
+
 
 # Link-specific Parameters (optional)
 links:

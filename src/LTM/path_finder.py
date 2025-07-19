@@ -383,8 +383,8 @@ class PathFinder:
 
     def update_node_turn_probs(self, node, od_pair, time_step):
         """Update the turn probabilities for the node, P(down|up,od)"""
-        # if time_step == 100:
-        #     pass
+        if time_step == 100 or time_step == 401 and node.node_id == 3:
+            pass
         for up_node, down_nodes in node.turns_distances[od_pair].items():
             if down_nodes:
                 turns = list((up_node, down_node) for down_node in down_nodes)
@@ -397,11 +397,11 @@ class PathFinder:
                         link = self.links[(node.node_id, down_node)]
                         # num_pedestrians.append(self.links[(node.node_id, down_node)].num_pedestrians[time_step-1]) # use the previous time step, current time step is not available is not updated yet
                         densities.append(link.get_density(time_step-1))
-                        capacity = link.receiving_flow[time_step-1]
-                        capacities.append(capacity if capacity > 0 else link.back_gate_width * link.free_flow_speed * link.k_critical)
+                        capacity = link.receiving_flow[time_step-2] # -2 steps otherwise it will be -1
+                        capacities.append(capacity if capacity >= 0 else link.back_gate_width * link.free_flow_speed * link.k_critical * link.unit_time)
                     except KeyError:
                         densities.append(0)
-                        capacities.append(30) # set a high capacity for origin/destination nodes
+                        capacities.append(100) # set a high capacity for origin/destination nodes
                 # utilities = self.alpha * np.array(distances) + self.beta * np.array(num_pedestrians)
                 norm_densities = np.maximum(np.array(densities) - 2, 0) / (10 - 2) # 2: k_critical, 10: max density
                 utilities = (self.alpha * np.array(distances)/(np.sum(distances)+1e-6)

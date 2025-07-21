@@ -8,6 +8,12 @@ simulation:
   simulation_steps: 500
   unit_time: 10
   assign_flows_type: "classic"
+  path_finder:
+    k_paths: 3
+    theta: 10
+    alpha: 1
+    beta: 0.5
+    omega: 0.8
 
 # Default Link Parameters
 default_link:

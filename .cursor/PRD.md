@@ -2,7 +2,7 @@
 
 ## 1. Introduction
 
-Crowd Control is a pedestrian traffic simulation tool based on the Link Transmission Model (LTM). It is designed to model and simulate the movement of pedestrians through a network of interconnected links and nodes, representing pathways and decision points. The simulation incorporates traffic dynamics to provide insights into pedestrian flow behavior under various conditions. And it can be wraped up as a training environment for Reinforcement Learning.
+PyCrowd is a pedestrian traffic simulation tool based on the Link Transmission Model (LTM). It is designed to model and simulate the movement of pedestrians through a network of interconnected links and nodes, representing pathways and decision points. The simulation incorporates traffic dynamics to provide insights into pedestrian flow behavior under various conditions. And it can be wraped up as a training environment for Reinforcement Learning.
 
 ## 2. Goals
 

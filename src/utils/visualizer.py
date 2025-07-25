@@ -195,7 +195,7 @@ class NetworkVisualizer:
         if with_colorbar:
             cbar = plt.colorbar(sm, ax=ax, label=edge_property.capitalize())
             cbar.ax.tick_params(labelsize=12)  # Enlarge tick labels
-            cbar.set_label(edge_property.capitalize(), size=14)  # Enlarge colorbar label
+            cbar.set_label(edge_property.capitalize(), size=20)  # Enlarge colorbar label
         
         # Turn off axis
         ax.set_axis_off()

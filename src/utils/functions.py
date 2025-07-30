@@ -1,11 +1,11 @@
 import numpy as np
 
-class SpeedDensityFd:
+class UniSpeedDensityFd:
     """
     A callable class to model travel speed based on traffic density.
     This encapsulates the fundamental diagram parameters.
     """
-    def __init__(self, v_f, k_critical, k_jam, model_type=1, noise_std=0):
+    def __init__(self, v_f, k_critical, k_jam, model_type='yperman', noise_std=0):
         """
         Initializes the travel speed model with hyperparameters.
         :param v_f: Free-flow speed.
@@ -99,3 +99,36 @@ def cal_link_flow_kv(density, v):
     Link flow q = v * density
     """
     return v * density
+
+class BiDirectionalFd:
+    def __init__(self, v_f, k_critical, k_jam, model_type='yperman', bi_factor=1.5, noise_std=0):
+        self.v_f, self.k_critical, self.k_jam, self.bi_factor = v_f, k_critical, k_jam, bi_factor
+        self.model_type = model_type
+        self.u0 = v_f # max speed
+        self.gamma = self.u0 * self.k_critical
+
+        self.noise_std = noise_std
+
+    def __call__(self, k_self, k_opp):
+        k_eff = k_self + self.bi_factor * k_opp
+        if self.model_type == 'greenshields':
+            if k_eff <= self.k_critical:
+                v = self.v_f
+            elif self.k_critical < k_eff:
+                v = max(0, -self.v_f * (k_eff - self.k_jam) / (self.k_jam - self.k_critical))
+        elif self.model_type == 'yperman':
+            if k_eff <= self.k_critical:
+                v = self.v_f
+            elif self.k_critical < k_eff:
+                v = max(0, (self.k_critical * self.v_f) / (self.k_jam - self.k_critical) * (self.k_jam / k_eff - 1))
+        elif self.model_type == 'smulders':
+            if k_eff <= self.k_critical:
+                v = self.v_f * (1 - k_eff / self.k_jam)
+            elif self.k_critical < k_eff:
+                v = max(0, self.gamma * (1 / k_eff - 1 / self.k_jam))
+        else:
+            raise ValueError(f"Unknown model type: {self.model_type}")
+
+        if self.noise_std > 0:
+            v += np.random.normal(0, self.noise_std)
+        return max(0, v)

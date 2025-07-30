@@ -49,7 +49,7 @@ if __name__ == "__main__":
         demand[310:] = 0
         return demand
 
-    '''Scenario 1:'''
+    # '''Scenario 1:'''
     # params = {
     #     'unit_time': 10,
     #     'simulation_steps': 1200,
@@ -61,8 +61,9 @@ if __name__ == "__main__":
     #         'free_flow_speed': 1.1,
     #         'k_critical': 2,
     #         'k_jam': 6,
-    #         'speed_noise_std': 0.05,
+    #         'speed_noise_std': 0.01,
     #         'fd_type': "greenshields",
+    #         'bi_factor': 1,  # factor for bi-directional FD
     #         'controller_type': 'gate',  # type of controller
     #     },
     #     'demand': {
@@ -87,8 +88,9 @@ if __name__ == "__main__":
             'free_flow_speed': 1.1,
             'k_critical': 2,
             'k_jam': 6,
-            'speed_noise_std': 0.01,
-            'fd_type': "greenshields",
+            'speed_noise_std': 0,
+            'fd_type': "greenshields",  # type of fundamental diagram
+            'bi_factor': 1,  # factor for bi-directional FD
             'controller_type': 'gate',  # type of controller
         },
         'demand': {

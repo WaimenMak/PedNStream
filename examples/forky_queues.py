@@ -6,7 +6,6 @@
 
 import os
 import sys
-from src.utils.functions import SpeedDensityFd
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(project_root)
 
@@ -51,6 +50,7 @@ if __name__ == "__main__":
             'gamma': 0,
             'speed_noise_std': 0.05,
             'fd_type': 'yperman',
+            'bi_factor': 1.2,  #
         },
         'links': {
             '1_2': {'length': 100, 'width': 1, 'free_flow_speed': 1.5, 'k_critical': 2, 'k_jam': 6,

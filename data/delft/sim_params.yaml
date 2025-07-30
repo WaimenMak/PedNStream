@@ -26,6 +26,7 @@ default_link:
   speed_noise_std: 0.05
   fd_type: "greenshields"
   activity_probability: 0
+  bi_factor: 1
 
 # Link-specific Parameters (optional)
 #links:

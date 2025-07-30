@@ -1,5 +1,5 @@
 import numpy as np
-from src.utils.functions import SpeedDensityFd, cal_free_flow_speed, cal_link_flow_fd, cal_link_flow_kv
+from src.utils.functions import BiDirectionalFd, UniSpeedDensityFd, cal_free_flow_speed, cal_link_flow_fd, cal_link_flow_kv
 
 class BaseLink:
     """Base class for all link types"""
@@ -60,13 +60,22 @@ class Link(BaseLink):
         self.shockwave_speed = self.capacity / (self.k_jam - self.k_critical)
         self.current_speed = self.free_flow_speed
         self.max_travel_time = self.length / 0.01  # Jam threshold, equivalent to speed of 0.01 m/s
-        self.speed_density_fd = SpeedDensityFd(
+        # self.speed_density_fd = UniSpeedDensityFd(
+        #     v_f=self.free_flow_speed,
+        #     k_critical=self.k_critical,
+        #     k_jam=self.k_jam,
+        #     model_type=kwargs.get('fd_type', 'yperman'),
+        #     noise_std=kwargs.get('speed_noise_std', 0)
+        # )
+        self.speed_density_fd = BiDirectionalFd(
             v_f=self.free_flow_speed,
             k_critical=self.k_critical,
             k_jam=self.k_jam,
-            model_type=kwargs.get('fd_type', 'greenshields'),
+            bi_factor=kwargs.get('bi_factor', 1),
+            model_type=kwargs.get('fd_type', 'yperman'),
             noise_std=kwargs.get('speed_noise_std', 0)
         )
+
         self.exponent = 0.8 # private attribute for the releasing factor exponent, default is 1
 
         self.travel_time = np.zeros(simulation_steps, dtype=np.float32)
@@ -145,14 +154,14 @@ class Link(BaseLink):
         # Calculate new speed using density ratio formula
         # density = (self.num_pedestrians[time_step] + reverse_num_peds) / self.area  # this link area is the same as the reverse link, they share the same area
         # speed = cal_travel_speed(density, self.free_flow_speed, k_critical=self.k_critical, k_jam=self.k_jam)
-        density = self.get_density(time_step) # density and num_pedestrians of all incoming and outgoing links are already updated before updating the speed
-        speed = self.speed_density_fd(density)
-        # speed = cal_free_flow_speed(
-        #     density_i=self.density[time_step],
-        #     density_j=reverse_density,
-        #     v_f=self.free_flow_speed
-        # )
+        # density = self.get_density(time_step) # density and num_pedestrians of all incoming and outgoing links are already updated before updating the speed
+        # speed = self.speed_density_fd(density)
+        k_self = self.density[time_step]
+        k_opp  = 0
+        if self.reverse_link:
+            k_opp = self.reverse_link.density[time_step]
 
+        speed = self.speed_density_fd(k_self, k_opp)
         # Update travel time and speed
         self.speed[time_step] = speed
         self.travel_time[time_step] = self.length / speed if speed > 0 else self.max_travel_time # avoid infinite travel time
@@ -397,6 +406,27 @@ class Separator(Link):
     def get_density(self, time_step: int):
         return self.density[time_step]
     
+    def update_speeds(self, time_step: int):
+        """
+        Update the speed of the link based on the density
+        :param time_step: current time step + 1, is the future time step
+        :return:
+        """
+
+        k_self = self.density[time_step]
+        speed = self.speed_density_fd(k_self, 0)
+        # Update travel time and speed
+        self.speed[time_step] = speed
+        self.travel_time[time_step] = self.length / speed if speed > 0 else self.max_travel_time # avoid infinite travel time
+        # self.travel_time[time_step] = self.length / speed if speed > 0 else float('inf')
+
+        self.link_flow[time_step] = cal_link_flow_kv(self.density[time_step], self.speed[time_step])
+
+        self._travel_time_running_sum += self.travel_time[time_step]
+        if time_step >= self.avg_travel_time_window:
+            self._travel_time_running_sum -= self.travel_time[time_step - self.avg_travel_time_window]
+            self.avg_travel_time[time_step] = self._travel_time_running_sum / self.avg_travel_time_window
+
     @property
     def area(self):
         return self.length * self._separator_width

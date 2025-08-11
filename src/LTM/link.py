@@ -203,8 +203,8 @@ class Link(BaseLink):
         Calculate the sending flow of the link at a given time step
         :param time_step: Current time step (t - 1)
         """
-        # if time_step > 200 and self.link_id == '2_3':
-        #     pass
+        if time_step > 200 and self.link_id == '2_3':
+            pass
 
         # get the total density
         density = self.get_density(time_step)
@@ -261,8 +261,8 @@ class Link(BaseLink):
             # else:  # free flow stage
             #     sending_flow_boundary = max(0, self.cumulative_inflow[idx] - self.cumulative_outflow[time_step]) # +1 is the delta t
 
-            # congestion_factor = np.clip((density - self.k_critical) / (self.k_jam - self.k_critical), 0, 1)
-            congestion_factor = np.clip((self.density[time_step] - self.k_critical) / (self.k_jam - self.k_critical), 0, 1)
+            # congestion_factor = np.clip(self.density[time_step] / self.k_jam, 0, 1)
+            congestion_factor = np.clip((self.density[time_step] - self.k_critical) / (self.k_jam - self.k_critical), 0, 1) # this one is theoratically more realistic for unidirectional condition
 
             boundary_congestion = self.num_pedestrians[time_step]
             boundary_freeflow = max(0, self.cumulative_inflow[idx] - self.cumulative_outflow[time_step])
@@ -292,7 +292,8 @@ class Link(BaseLink):
         original_sending_flow = sending_flow
         if sending_flow > 0:
             # releasing_factor = np.clip((density - self.k_critical) / (self.k_jam - self.k_critical), 0, 1)
-            releasing_factor = np.clip((self.density[time_step] - self.k_critical) / (self.k_jam - self.k_critical), 0, 1)
+            # releasing_factor = np.clip((self.density[time_step] - self.k_critical) / (self.k_jam - self.k_critical), 0, 1)
+            releasing_factor = np.clip(self.density[time_step] / self.k_jam, 0, 1)
             # releasing_factor = np.clip(density / self.k_jam, 0, 1)
             releasing_prob = 0.7 + (0.85 - 0.7) * releasing_factor ** self.exponent # min_prob + (max_prob - min_prob) * releasing_factor ** exponent for the releasing probability
             # if self.link_id == '3_2':

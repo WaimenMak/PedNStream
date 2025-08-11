@@ -57,14 +57,14 @@ class NetworkVisualizer:
         if os.path.exists(time_series_path):
             self.time_series = pd.read_csv(time_series_path)
 
-    def _visualize_network_nx(self, time_step, edge_property='density', with_colorbar=False):
+    def _visualize_network_nx(self, time_step, edge_property='density', with_colorbar=False, set_title=True, figsize=(10, 8)):
         """
         Visualize network state at a specific time step using networkx, for the small network
         :param time_step: Time step to visualize
         :param edge_property: Property to visualize ('density', 'flow', or 'speed')
         """
         # Create figure and axis
-        fig, ax = plt.subplots(figsize=(10, 8))
+        fig, ax = plt.subplots(figsize=figsize)
         # fix the size of the figure
                 # Calculate fixed axis limits once
         x_coords = [coord[0] for coord in self.pos.values()]
@@ -185,8 +185,9 @@ class NetworkVisualizer:
                                      ax=ax)
         
         # Add title
-        ax.set_title(f'Network State at Time Step {time_step}', 
-                    fontdict={'fontsize': 20, 'fontweight': 'bold'})
+        if set_title:
+            ax.set_title(f'Network State at Time Step {time_step}', 
+                        fontdict={'fontsize': 20, 'fontweight': 'bold'})
         
         # Update colorbar with same value range
         sm = plt.cm.ScalarMappable(cmap=plt.cm.RdYlGn_r,
@@ -207,13 +208,13 @@ class NetworkVisualizer:
         
         return fig, ax
 
-    def visualize_network_state(self, time_step, edge_property='density', use_folium=False, with_colorbar=True):
+    def visualize_network_state(self, time_step, edge_property='density', use_folium=False, with_colorbar=True, set_title=True, figsize=(10, 8)):
         """
         Visualize network state at a specific time step using either networkx or folium
         """
         if not use_folium:
             # Original networkx visualization code
-            return self._visualize_network_nx(time_step, edge_property, with_colorbar)
+            return self._visualize_network_nx(time_step, edge_property, with_colorbar, set_title, figsize)
 
         # Folium visualization
         import folium

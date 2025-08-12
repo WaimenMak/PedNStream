@@ -42,7 +42,7 @@ if __name__ == "__main__":
             'k_jam': 6,
             'fd_type': 'greenshields',  # type of fundamental diagram
             'bi_factor': 1,  # factor for bi-directional FD
-            'controller_type': 'separator',  # type of controller
+            'controller_type': 'gate',  # type of controller
         },
         'demand': {
             "origin_0": {

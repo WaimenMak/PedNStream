@@ -131,7 +131,7 @@ class NetworkVisualizer:
             self.pos = nx.spring_layout(G, k=1, iterations=50, seed=seed)
         
         # Draw nodes
-        node_sizes = [G.nodes[node]['size'] * 50 + 500 for node in G.nodes()]
+        node_sizes = [G.nodes[node]['size'] * 50 + 1000 for node in G.nodes()]
         # Color nodes: red for origins, pink for destinations, lightblue for others
         node_colors = ['red' if int(node) in self.network_params['origin_nodes'] 
                       else 'pink' if int(node) in self.network_params['destination_nodes'] 
@@ -142,7 +142,7 @@ class NetworkVisualizer:
         
         # Add node labels
         nx.draw_networkx_labels(G, self.pos, 
-                              font_size=18,
+                              font_size=22,
                               font_weight='bold',
                               ax=ax)
         
@@ -346,30 +346,38 @@ class NetworkVisualizer:
         # Add nodes to map
         for node_id in self.G.nodes():
             pos = self.pos[node_id]
-            # Calculate node size (similar to original)
-            size = self.G.nodes[node_id].get('size', 0) * 50 + 300 # there is not size in the node for now
-            radius = np.sqrt(size) / 10  # Convert size to reasonable radius
+            size = self.G.nodes[node_id].get('size', 0) * 50 + 300
+            radius = np.sqrt(size) / 10
 
-            if node_id in self.network_params['origin_nodes']:
-                node_color = 'lightred'
-            elif node_id in self.network_params['destination_nodes']:
-                node_color = 'pink'
+            is_origin = int(node_id) in self.network_params['origin_nodes']
+            is_destination = int(node_id) in self.network_params['destination_nodes']
+
+            if is_origin:
+                folium.Marker(
+                    location=[pos[1], pos[0]],
+                    popup=f"Node: {node_id}"
+                ).add_to(m)
+            elif is_destination:
+                folium.Marker(
+                    location=[pos[1], pos[0]],
+                    icon=folium.Icon(icon='flag', prefix='fa'),
+                    popup=f"Node: {node_id}"
+                ).add_to(m)
             else:
-                node_color = 'lightblue'
-
-            folium.CircleMarker(
-                location=[pos[1], pos[0]],
-                radius=radius,
-                color='blue',
-                fill=True,
-                fillColor=node_color,
-                fillOpacity=0.7,
-                popup=f"Node: {node_id}"
-            ).add_to(m)
+                folium.CircleMarker(
+                    location=[pos[1], pos[0]],
+                    radius=radius,
+                    color='blue',
+                    fill=True,
+                    fillColor='lightblue',
+                    fillOpacity=0.7,
+                    popup=f"Node: {node_id}"
+                ).add_to(m)
 
 
         # Add colormap to map
-        colormap.add_to(m)
+        if with_colorbar:
+            colormap.add_to(m)
         
         return m
 

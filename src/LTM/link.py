@@ -292,8 +292,8 @@ class Link(BaseLink):
         original_sending_flow = sending_flow
         if sending_flow > 0:
             # releasing_factor = np.clip((density - self.k_critical) / (self.k_jam - self.k_critical), 0, 1)
-            # releasing_factor = np.clip((self.density[time_step] - self.k_critical) / (self.k_jam - self.k_critical), 0, 1)
-            releasing_factor = np.clip(self.density[time_step] / self.k_jam, 0, 1)
+            releasing_factor = np.clip((self.density[time_step] - self.k_critical) / (self.k_jam - self.k_critical), 0, 1)
+            # releasing_factor = np.clip(self.density[time_step] / self.k_jam, 0, 1)
             # releasing_factor = np.clip(density / self.k_jam, 0, 1)
             releasing_prob = 0.7 + (0.85 - 0.7) * releasing_factor ** self.exponent # min_prob + (max_prob - min_prob) * releasing_factor ** exponent for the releasing probability
             # if self.link_id == '3_2':

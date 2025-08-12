@@ -76,24 +76,37 @@ class NetworkDashboard:
         
         # Add nodes (these don't change)
         for node_id, pos in self.pos.items():
-            if int(node_id) in self.network_params['origin_nodes']:
-                node_color = 'red'
-                edge_color = 'red'
-            elif int(node_id) in self.network_params['destination_nodes']:
-                node_color = 'black'
-                edge_color = 'black'
+            is_origin = int(node_id) in self.network_params['origin_nodes']
+            is_destination = int(node_id) in self.network_params['destination_nodes']
+
+            if is_origin and is_destination:
+                folium.Marker(
+                    location=[pos[1], pos[0]],
+                    icon=folium.Icon(icon='flag', prefix='fa', color='red'),
+                    popup=f"Node: {node_id}"
+                ).add_to(m)
+            elif is_origin:
+                folium.Marker(
+                    location=[pos[1], pos[0]],
+                    icon=folium.Icon(icon='map-marker', prefix='fa'),
+                    popup=f"Node: {node_id}"
+                ).add_to(m)
+            elif is_destination:
+                folium.Marker(
+                    location=[pos[1], pos[0]],
+                    icon=folium.Icon(icon='flag', prefix='fa'),
+                    popup=f"Node: {node_id}"
+                ).add_to(m)
             else:
-                node_color = 'lightblue'
-                edge_color = 'blue'
-            folium.CircleMarker(
-                location=[pos[1], pos[0]],
-                radius=5,
-                color=edge_color,
-                fill=True,
-                fillColor=node_color,
-                fillOpacity=0.7,
-                popup=f"Node: {node_id}"
-        ).add_to(m)
+                folium.CircleMarker(
+                    location=[pos[1], pos[0]],
+                    radius=5,
+                    color='blue',
+                    fill=True,
+                    fillColor='lightblue',
+                    fillOpacity=0.7,
+                    popup=f"Node: {node_id}"
+                ).add_to(m)
             
         return m
     

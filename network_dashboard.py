@@ -100,7 +100,7 @@ class NetworkDashboard:
             else:
                 folium.CircleMarker(
                     location=[pos[1], pos[0]],
-                    radius=5,
+                    radius=3,
                     color='blue',
                     fill=True,
                     fillColor='lightblue',
@@ -172,9 +172,9 @@ class NetworkDashboard:
             if variable == 'num_pedestrians':
                 width = min(10, value * 0.5)
             elif variable == 'speed':
-                width = max(1, min(10, value * 10))
+                width = max(1, min(10, value * 12))
             else: # density
-                width = min(10, value * 8)
+                width = min(20, value * 12)
             
             # Draw the link
             folium.PolyLine(

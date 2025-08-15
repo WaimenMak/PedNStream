@@ -7,15 +7,18 @@ network:
 simulation:
   simulation_steps: 1692
   unit_time: 10
+  path_finder:
+    k_paths: 1
+
 
 # Default Link Parameters
 default_link:
   length: 50
   width: 8
-  free_flow_speed: 1
+  free_flow_speed: 1.1
   k_critical: 2
   k_jam: 5
-  activity_probability: 0.6
+  activity_probability: 0.8
   gamma: 0.01
   speed_noise_std: 0.1
 

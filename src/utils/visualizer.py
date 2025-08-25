@@ -518,25 +518,51 @@ class NetworkVisualizer:
                     else:  # Reverse direction
                         reverse_labels[(u, v)] = label
                 
-                # Draw forward edge labels above the edge
+                # Filter forward labels to only show when value > 0
+                filtered_forward_labels = {}
                 if forward_labels:
+                    for edge, label in forward_labels.items():
+                        # Extract numeric value from label (assuming format like "2.34" or similar)
+                        try:
+                            value = float(label)
+                            if value > 0:
+                                filtered_forward_labels[edge] = label
+                        except (ValueError, TypeError):
+                            # If can't parse as number, show the label anyway
+                            filtered_forward_labels[edge] = label
+                
+                # Draw forward edge labels above the edge
+                if filtered_forward_labels:
                     nx.draw_networkx_edge_labels(
                         self.G, self.pos,
-                        edge_labels=forward_labels,
+                        edge_labels=filtered_forward_labels,
                         bbox=dict(facecolor='none', edgecolor='none', alpha=1),
-                        font_size=10,
-                        label_pos=0.4,
+                        font_size=12,
+                        label_pos=0.3,
                         rotate=False,
                         verticalalignment='bottom'  # Place above the edge
                     )
                 
-                # Draw reverse edge labels below the edge
+                # Filter reverse labels to only show when value > 0
+                filtered_reverse_labels = {}
                 if reverse_labels:
+                    for edge, label in reverse_labels.items():
+                        # Extract numeric value from label (assuming format like "2.34" or similar)
+                        try:
+                            value = float(label)
+                            if value > 0:
+                                filtered_reverse_labels[edge] = label
+                        except (ValueError, TypeError):
+                            # If can't parse as number, show the label anyway
+                            filtered_reverse_labels[edge] = label
+                
+                # Draw reverse edge labels below the edge
+                if filtered_reverse_labels:
                     nx.draw_networkx_edge_labels(
                         self.G, self.pos,
-                        edge_labels=reverse_labels,
+                        edge_labels=filtered_reverse_labels,
                         bbox=dict(facecolor='none', edgecolor='none', alpha=1),
-                        font_size=10,
+                        font_size=12,
                         label_pos=0.5,
                         rotate=False,
                         verticalalignment='top'  # Place below the edge

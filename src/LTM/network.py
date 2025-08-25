@@ -3,6 +3,8 @@ import networkx as nx
 import matplotlib.pyplot as plt
 from .node import Node, OneToOneNode, RegularNode
 from .link import Link, Separator
+# from .link_org import Link, Separator
+# from .link_bi import Link, Separator
 from .od_manager import ODManager, DemandGenerator
 from .path_finder import PathFinder
 from typing import Callable, List

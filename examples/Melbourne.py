@@ -37,13 +37,17 @@ if __name__ == "__main__":
 
 
     # Run simulation
+    import time
+    start_time = time.time()
     for t in range(1, env_generator.config['params']['simulation_steps']):
         network_env.network_loading(t)
         # adjust the turning fractions of the node, so that the input deamand only flows into one direction
-        network_env.update_turning_fractions_per_node(node_ids=[265], new_turning_fractions=np.array([[0.05, 0, 0.95,
-                                                                                                0.33, 0.33, 0.33,
-                                                                                                0.33, 0.33, 0.33,
-                                                                                                0.33, 0.33, 0.33]]))
+        # network_env.update_turning_fractions_per_node(node_ids=[265], new_turning_fractions=np.array([[0.05, 0, 0.95,
+        #                                                                                         0.33, 0.33, 0.33,
+        #                                                                                         0.33, 0.33, 0.33,
+        #                                                                                         0.33, 0.33, 0.33]]))
+    end_time = time.time()
+    print("Simulation time: {:.2f}".format(end_time - start_time))
 
     # Save and visualize results
     output_dir = os.path.join("..", "outputs")

@@ -383,8 +383,6 @@ class PathFinder:
 
     def update_node_turn_probs(self, node, od_pair, time_step):
         """Update the turn probabilities for the node, P(down|up,od)"""
-        if time_step == 100 or time_step == 401 and node.node_id == 3:
-            pass
         for up_node, down_nodes in node.turns_distances[od_pair].items():
             if down_nodes:
                 turns = list((up_node, down_node) for down_node in down_nodes)

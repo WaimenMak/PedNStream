@@ -4,7 +4,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import matplotlib
 from handlers.output_handler import OutputHandler
-from src.utils.visualizer import NetworkVisualizer
+from src.utils.visualizer import NetworkVisualizer, progress_callback
 from src.LTM.network import Network
 # from src.utils.config import load_config
 from src.utils.env_loader import NetworkEnvGenerator
@@ -28,7 +28,7 @@ def main():
         network_env.network_loading(t)
         if t in [100, 101, 102, 103, 104, 105, 106, 107, 108]:
             network_env.links[(3, 5)].back_gate_width -= 0.1
-        print(network_env.nodes[1].turning_fractions)
+        # print(network_env.nodes[1].turning_fractions)
     
     # Save and visualize results
     output_dir = project_root / "outputs"
@@ -47,7 +47,17 @@ def main():
         interval=100,
         edge_property='density'
     )
-    
+
+    from matplotlib.animation import PillowWriter
+    # GIf
+    sim_name = "six_node_exp"
+    writer = PillowWriter(fps=6, metadata=dict(artist='Me'))
+
+    # Save the animation with progress tracking
+    anim.save(os.path.join(output_dir, f"{sim_name}", "network_animation.gif"),
+              writer=writer,
+              progress_callback=progress_callback)
+
     plt.show()
 
 if __name__ == "__main__":

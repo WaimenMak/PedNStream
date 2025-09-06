@@ -73,7 +73,7 @@ if __name__ == "__main__":
             'k_jam': 6,
             'activity_probability': 0,  # probability of activity on the link
             'fd_type': 'yperman',  # type of fundamental diagram
-            'bi_factor': 1.2,  # factor for bi-directional FD
+            'bi_factor': 1,  # factor for bi-directional FD
             'speed_noise_std': 0,  # whether to add noise to the speed
             'controller_type': 'gate',  # type of controller
         },
@@ -86,7 +86,7 @@ if __name__ == "__main__":
                 'k_jam': 6,
                 'activity_probability': 0,  # probability of activity on the link
                 'fd_type': 'yperman',  # type of fundamental diagram
-                'bi_factor': 1.2,  # factor for bi-directional FD
+                'bi_factor': 1,  # factor for bi-directional FD
                 'speed_noise_std': 0,  # whether to add noise to the speed
                 'controller_type': 'gate',  # type of controller
             },
@@ -108,8 +108,8 @@ if __name__ == "__main__":
                                                           new_turning_fractions=np.array([[0, 1, 0.5, 0.5, 0, 1],
                                                                                           [1, 0, 0, 1, 0.5, 0.5]]))
     # Set demand for nodes to zero after a certain time step
-    network_env.nodes[2].demand[0:30] = np.zeros(30)
-    network_env.nodes[3].demand[40:] = np.zeros(1200 - 40)
+    # network_env.nodes[2].demand[0:10] = np.zeros(10)
+    # network_env.nodes[3].demand[40:] = np.zeros(1200 - 40)
     # network_env.nodes[2].demand[80:100] = np.zeros(20)
     # network_env.nodes[3].demand[30:] = np.zeros(600 - 30)
 
@@ -117,7 +117,7 @@ if __name__ == "__main__":
 
 
     # Run simulation
-    network_env.links[(3,4)].back_gate_width = 1
+    network_env.links[(3,4)].back_gate_width = 0
     network_env.links[(2,1)].back_gate_width = 0
     for t in range(1, params['simulation_steps']):
         network_env.network_loading(t)

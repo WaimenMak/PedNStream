@@ -140,6 +140,18 @@ if __name__ == "__main__":
     visualizer = NetworkVisualizer(simulation_dir=os.path.join(output_dir, "forky_queues"))
     anim = visualizer.animate_network(start_time=0, end_time=params["simulation_steps"], interval=100, edge_property='density', tag=True)
 
+    from matplotlib.animation import PillowWriter
+    from tqdm import tqdm
+
+    # GIf
+    sim_name = "forky_queues"
+    writer = PillowWriter(fps=6, metadata=dict(artist='Me'))
+
+    # Save the animation with progress tracking
+    anim.save(os.path.join(output_dir, f"{sim_name}", "network_animation.gif"),
+              writer=writer,
+              progress_callback=progress_callback)
+
     # # MP4
     # writer = matplotlib.animation.FFMpegWriter(fps=15, metadata=dict(artist='Me'),
     #                                          bitrate=2000)

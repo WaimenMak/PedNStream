@@ -25,9 +25,12 @@ if __name__ == "__main__":
     env_generator = NetworkEnvGenerator()
     network_env = env_generator.create_network("delft") # delft is the name of the file in the data folder including the .yaml config file, edge distances, adjacency matrix, node positions
     # Run simulation
+    import time
+    start_time = time.time()
     for t in range(1, env_generator.config['params']['simulation_steps']):
         network_env.network_loading(t)
-
+    end_time = time.time()
+    print("Simulation time: {:.2f}".format(end_time - start_time))
     # Save and visualize results
     project_root = Path(__file__).resolve().parent.parent
     output_dir = project_root / "outputs"

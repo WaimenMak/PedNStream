@@ -141,6 +141,19 @@ if __name__ == "__main__":
     matplotlib.use('macosx')
     visualizer = NetworkVisualizer(simulation_dir=os.path.join(output_dir, simulation_dir))
     anim = visualizer.animate_network(start_time=0, interval=100, edge_property='density', tag=True)
+
+    from matplotlib.animation import PillowWriter
+
+    # GIf
+    sim_name = "Spike"
+    writer = PillowWriter(fps=15, metadata=dict(artist='Me'))
+
+    # Save the animation with progress tracking
+    anim.save(os.path.join(output_dir, f"{sim_name}", "network_animation.gif"),
+              writer=writer,
+              progress_callback=progress_callback)
+
+
     # #  # MP4
     # writer = matplotlib.animation.FFMpegWriter(fps=15, metadata=dict(artist='Me'),
     #                                          bitrate=2000)

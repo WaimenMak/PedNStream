@@ -26,8 +26,9 @@ def main():
     
     for t in range(1, env_generator.config['params']['simulation_steps']):
         network_env.network_loading(t)
-        if t in [100, 101, 102, 103, 104, 105, 106, 107, 108]:
-            network_env.links[(3, 5)].back_gate_width -= 0.1
+        network_env.links[(3, 5)].back_gate_width -= 0.1
+        # if t in [100, 101, 102, 103, 104, 105, 106, 107, 108]:
+
         # print(network_env.nodes[1].turning_fractions)
     
     # Save and visualize results

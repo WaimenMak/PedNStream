@@ -122,4 +122,4 @@ Contributions are welcome! Please check the issues page for current development 
 
 ## License
 
-[Add your license information here]
+PedNStream is released under the MIT License. See the [LICENSE](./LICENSE) file for details.

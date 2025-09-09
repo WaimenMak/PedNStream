@@ -569,7 +569,7 @@ class NetworkVisualizer:
                     )
             
             # Draw node labels
-            nx.draw_networkx_labels(self.G, self.pos, ax=ax)
+            nx.draw_networkx_labels(self.G, self.pos,font_size=20, ax=ax)
             
             # Update colorbar
             sm = plt.cm.ScalarMappable(cmap=plt.cm.RdYlGn_r,

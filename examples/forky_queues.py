@@ -144,19 +144,19 @@ if __name__ == "__main__":
     from tqdm import tqdm
 
     # GIf
-    sim_name = "forky_queues"
-    writer = PillowWriter(fps=6, metadata=dict(artist='Me'))
+    # sim_name = "forky_queues"
+    # writer = PillowWriter(fps=6, metadata=dict(artist='Me'))
 
     # Save the animation with progress tracking
-    anim.save(os.path.join(output_dir, f"{sim_name}", "network_animation.gif"),
-              writer=writer,
-              progress_callback=progress_callback)
-
-    # # MP4
-    # writer = matplotlib.animation.FFMpegWriter(fps=15, metadata=dict(artist='Me'),
-    #                                          bitrate=2000)
-    # Save the animation as MP4
-    # anim.save(os.path.join(output_dir, "forky_queues", f"forky_queues_{params['assign_flows_type']}.mp4"),
+    # anim.save(os.path.join(output_dir, f"{sim_name}", "network_animation.gif"),
     #           writer=writer,
     #           progress_callback=progress_callback)
+
+    # # MP4
+    writer = matplotlib.animation.FFMpegWriter(fps=8, metadata=dict(artist='Me'),
+                                             bitrate=2000)
+    # Save the animation as MP4
+    anim.save(os.path.join(output_dir, "forky_queues", f"forky_queues_{params['assign_flows_type']}.mp4"),
+              writer=writer,
+              progress_callback=progress_callback)
     plt.show()

@@ -145,17 +145,17 @@ if __name__ == "__main__":
     from matplotlib.animation import PillowWriter
 
     # GIf
-    sim_name = "Spike"
-    writer = PillowWriter(fps=15, metadata=dict(artist='Me'))
+    # sim_name = "Spike"
+    # writer = PillowWriter(fps=15, metadata=dict(artist='Me'))
 
     # Save the animation with progress tracking
-    anim.save(os.path.join(output_dir, f"{sim_name}", "network_animation.gif"),
-              writer=writer,
-              progress_callback=progress_callback)
+    # anim.save(os.path.join(output_dir, f"{sim_name}", "network_animation.gif"),
+    #           writer=writer,
+    #           progress_callback=progress_callback)
 
 
     # #  # MP4
-    # writer = matplotlib.animation.FFMpegWriter(fps=15, metadata=dict(artist='Me'),
+    # writer = matplotlib.animation.FFMpegWriter(fps=18, metadata=dict(artist='Me'),
     #                                          bitrate=2000)
     #
     # # Save the animation as MP4

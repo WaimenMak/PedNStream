@@ -26,9 +26,8 @@ def main():
     
     for t in range(1, env_generator.config['params']['simulation_steps']):
         network_env.network_loading(t)
-        network_env.links[(3, 5)].back_gate_width -= 0.1
-        # if t in [100, 101, 102, 103, 104, 105, 106, 107, 108]:
-
+        if t in [100, 101, 102, 103, 104, 105, 106, 107, 108]:
+            network_env.links[(3, 5)].back_gate_width -= 0.1
         # print(network_env.nodes[1].turning_fractions)
     
     # Save and visualize results
@@ -52,7 +51,7 @@ def main():
     from matplotlib.animation import PillowWriter
     # GIf
     sim_name = "six_node_exp"
-    writer = PillowWriter(fps=6, metadata=dict(artist='Me'))
+    writer = PillowWriter(fps=7, metadata=dict(artist='Me'))
 
     # Save the animation with progress tracking
     anim.save(os.path.join(output_dir, f"{sim_name}", "network_animation.gif"),

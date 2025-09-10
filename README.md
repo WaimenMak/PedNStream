@@ -10,7 +10,7 @@ PedNStream is a light-weight/Python-native pedestrian traffic simulation tool ba
 - **Customizable Parameters**: Configure link properties, flow speeds, and capacity constraints
 - **Visualization Tools**: Analyze simulation outputs through interactive visualizations and animations
 
-## Core Components
+## Modularized Design
 
 ### Network Module (`src/LTM/network.py`)
 The central component managing the simulation network and execution:

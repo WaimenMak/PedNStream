@@ -1,5 +1,5 @@
 /.idea
-#*.ipynb
+*.ipynb
 *.pyc
 /__pycache__
 *.xlsx

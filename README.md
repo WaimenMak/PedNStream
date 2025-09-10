@@ -14,7 +14,7 @@ PedNStream is a light-weight/Python-native pedestrian traffic simulation tool ba
 
 ### Network Module (`src/LTM/network.py`)
 The central component managing the simulation network and execution:
-- Network initialization and state management
+- Flow assignment based in link's sending and receiving flow
 - Step-by-step simulation execution
 - Integration of links and nodes
 
@@ -28,14 +28,12 @@ Models physical pathways with properties like:
 ### Node Module (`src/LTM/node.py`)
 Handles intersection points and decision making:
 - Flow distribution between connected links
-- Turn probability management
-- Origin-Destination (OD) pair handling
+- Turning fraction calculation
 
 ### Path Finding (`src/LTM/path_finder.py`)
 Manages route choice and navigation:
-- Path discovery between origins and destinations
-- Turn probability calculations
-- Distance-based routing
+- K shortest paths between origins and destinations
+- Route choise based in utility function
 
 ## Quick Start
 
@@ -74,7 +72,7 @@ params:
     width: 1
     free_flow_speed: 1.5
     k_critical: 2
-    k_jam: 10
+    k_jam: 6
   demand:
     origin_0:
       peak_lambda: 15

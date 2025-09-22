@@ -1,0 +1,27 @@
+network:
+  origin_nodes: [2]
+  destination_nodes: [3]
+  adjacency_matrix: [[0,1,1,0], [1,0,1,1], [1,1,0,1], [0,1,1,0]]
+
+simulation:
+  simulation_steps: 500
+  unit_time: 10
+  assign_flows_type: classic
+
+default_link:
+  length: 100
+  width: 1.0
+  free_flow_speed: 1.1
+  k_critical: 2
+  k_jam: 10
+  gamma: 0.01
+
+demand:
+  origin_2:
+    pattern: gaussian_peaks
+    peak_lambda: 35
+    base_lambda: 5
+    seed: 42
+
+od_flows:
+  "2_3": 30

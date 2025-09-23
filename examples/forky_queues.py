@@ -43,7 +43,7 @@ if __name__ == "__main__":
         'assign_flows_type': 'classic',
         'default_link': {
             'length': 100,
-            'width': 1,
+            'width': 3,
             'free_flow_speed': 1.5,
             'k_critical': 2,
             'k_jam': 6,
@@ -113,9 +113,9 @@ if __name__ == "__main__":
     # network_env.links[(1,0)].front_gate_width = 0.1
     for t in range(1, params['simulation_steps']):
         network_env.network_loading(t)
-        if t == 300: # adjust the width of link 2_3, simulate remove the bottleneck
+        if t == 400: # adjust the width of link 2_3, simulate remove the bottleneck
             # pass
-            network_env.links[(1,2)].front_gate_width = 1
+            network_env.links[(1,2)].front_gate_width = 3
             # network_env.links[(1,0)].front_gate_width = 1
             # network_env.links[(2,3)].area = 2 * network_env.links[(2,3)].length  # adjust the area of the link to match the new width
             # network_env.links[(2,3)].k_critical = 2
@@ -138,25 +138,25 @@ if __name__ == "__main__":
     import matplotlib
     matplotlib.use('macosx')
     visualizer = NetworkVisualizer(simulation_dir=os.path.join(output_dir, "forky_queues"))
-    anim = visualizer.animate_network(start_time=0, end_time=params["simulation_steps"], interval=100, edge_property='density', tag=True)
+    anim = visualizer.animate_network(start_time=0, end_time=params["simulation_steps"], interval=100, edge_property='density', tag=False)
 
     from matplotlib.animation import PillowWriter
     from tqdm import tqdm
 
     # GIf
     # sim_name = "forky_queues"
-    # writer = PillowWriter(fps=6, metadata=dict(artist='Me'))
-
-    # Save the animation with progress tracking
+    # writer = PillowWriter(fps=15, metadata=dict(artist='Me'))
+    #
+    # # Save the animation with progress tracking
     # anim.save(os.path.join(output_dir, f"{sim_name}", "network_animation.gif"),
     #           writer=writer,
     #           progress_callback=progress_callback)
 
     # # MP4
-    writer = matplotlib.animation.FFMpegWriter(fps=8, metadata=dict(artist='Me'),
-                                             bitrate=2000)
-    # Save the animation as MP4
-    anim.save(os.path.join(output_dir, "forky_queues", f"forky_queues_{params['assign_flows_type']}.mp4"),
-              writer=writer,
-              progress_callback=progress_callback)
+    # writer = matplotlib.animation.FFMpegWriter(fps=8, metadata=dict(artist='Me'),
+    #                                          bitrate=2000)
+    # # Save the animation as MP4
+    # anim.save(os.path.join(output_dir, "forky_queues", f"forky_queues_{params['assign_flows_type']}.mp4"),
+    #           writer=writer,
+    #           progress_callback=progress_callback)
     plt.show()

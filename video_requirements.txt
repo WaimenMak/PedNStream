@@ -1,0 +1,5 @@
+# Additional requirements for video generation functionality
+selenium>=4.0.0
+opencv-python>=4.5.0
+webdriver-manager>=3.8.0
+imageio>=2.9.0

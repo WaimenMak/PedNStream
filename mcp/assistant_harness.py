@@ -28,7 +28,6 @@ from typing import Optional, Dict, Any
 from fastmcp import Client
 
 
-SERVER_URL = os.getenv("MCP_SERVER_URL", "http://127.0.0.1:8000/mcp")
 # BASE_CONFIG_NAME = os.getenv("BASE_CONFIG_NAME", "od_flow_example")
 ASSISTANT_MODEL = os.getenv("ASSISTANT_MODEL", "gpt-4o-mini")
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "openai")  # openai | anthropic | openai_compat

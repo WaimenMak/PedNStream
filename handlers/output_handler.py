@@ -5,6 +5,7 @@ import json
 import pandas as pd
 from datetime import datetime
 from pathlib import Path
+from src.LTM.network import Network
 
 class OutputHandler:
     def __init__(self, base_dir="outputs", simulation_dir=None):
@@ -22,9 +23,10 @@ class OutputHandler:
         # Create output directories if they don't exist
         self.simulation_dir.mkdir(parents=True, exist_ok=True)
         
-    def save_network_state(self, network):
+    def save_network_state(self, network: Network):
         """
         Save complete network state including link and node data
+        network: Network object
         """
         # Save link data
         link_data = {}
@@ -73,9 +75,10 @@ class OutputHandler:
         self._save_json(node_data, 'node_data.json')
         self._save_json(network_params, 'network_params.json')
         
-    def save_time_series(self, network):
+    def save_time_series(self, network: Network):
         """
         Save time series data in CSV format for easy analysis
+        network: Network object
         """
         # Prepare link time series data
         link_series = []
@@ -104,7 +107,7 @@ class OutputHandler:
             json.dump(data, f, indent=2)
     
     @staticmethod
-    def load_simulation(simulation_dir):
+    def load_simulation(simulation_dir: str):
         """
         Load saved simulation data
         :param simulation_dir: Directory containing simulation data

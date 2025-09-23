@@ -20,13 +20,14 @@ from typing import Any, Dict, List, Optional
 from fastmcp import Client
 
 # Reuse simple LLM adapter from assistant_harness
-from assistant_harness import llm_get_response, call_tool_data, SERVER_URL
+from assistant_harness import llm_get_response, call_tool_data
 
+SERVER_URL = os.getenv("MCP_SERVER_URL", "http://127.0.0.1:8000/mcp")
 MAX_TURNS = int(os.getenv("AGENT_MAX_TURNS", "15"))
 ALLOWED_TOOLS = os.getenv("AGENT_ALLOWED_TOOLS", "").split(",") if os.getenv("AGENT_ALLOWED_TOOLS") else None
 
 # Pseudo-tools handled by this client (not on the server)
-CLIENT_PSEUDO_TOOLS = {"client_save_yaml"}
+CLIENT_PSEUDO_TOOLS = {"client_save_yaml", "client_read_resource"}
 
 ACTION_SCHEMA = {
     "type": "object",
@@ -55,6 +56,12 @@ YAML REQUIREMENTS:
    {"tool": "validate_config_file", "args": {"yaml_file_path": "<full path>"}, "reason": "..."}
 4) Only if ok==true, create the environment and run simulations using:
    {"tool": "create_environment_from_file", ...}, then {"tool": "run_simulation", ...}, and {"tool": "save_outputs", ...}
+
+To analyze results after a simulation:
+- Read resources via a JSON action using the client-side resource reader:
+  {"tool": "client_read_resource", "args": {"uri": "sim://<sim_id>/link_data"}}
+  {"tool": "client_read_resource", "args": {"uri": "sim://<sim_id>/node_data"}}
+- The observation will contain the raw text; parse it and compute simple stats (e.g., number of links, mean density) before proposing follow-up actions.
 
 When you need to use a tool, briefly explain your reasoning in plain text, then output only the single JSON action in a ```json block. Do not chain multiple actions in one response.
 """.strip()
@@ -148,6 +155,24 @@ async def _client_save_yaml(args: Dict[str, Any]) -> Dict[str, Any]:
         return {"ok": True, "path": out_path}
     except Exception as e:
         return {"ok": False, "error": str(e)}
+
+
+async def _client_read_resource(args: Dict[str, Any], client: Client) -> Dict[str, Any]:
+    """Pseudo-tool: read a server resource URI and return text content."""
+    uri = args.get("uri")
+    if not isinstance(uri, str) or not uri:
+        return {"ok": False, "error": "uri must be a non-empty string"}
+    try:
+        content = await client.read_resource(uri)
+        # Prefer text if present
+        if content and hasattr(content[0], 'text'):
+            return {"ok": True, "uri": uri, "text": content[0].text}
+        # Binary fallback
+        if content and hasattr(content[0], 'blob'):
+            return {"ok": True, "uri": uri, "blob_len": len(content[0].blob)}
+        return {"ok": False, "error": "empty or unknown content type"}
+    except Exception as e:
+        return {"ok": False, "error": str(e), "uri": uri}
 
 
 async def main():
@@ -271,7 +296,12 @@ async def main():
 
             try:
                 if tool in CLIENT_PSEUDO_TOOLS:
-                    result = await _client_save_yaml(args)
+                    if tool == "client_save_yaml":
+                        result = await _client_save_yaml(args)
+                    elif tool == "client_read_resource":
+                        result = await _client_read_resource(args, client)
+                    else:
+                        result = {"ok": False, "error": f"unknown client pseudo-tool: {tool}"}
                 else:
                     result = await call_tool_data(client, tool, args)
                 observation = json.dumps(result)

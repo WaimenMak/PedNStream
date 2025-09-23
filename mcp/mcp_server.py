@@ -553,13 +553,13 @@ def get_time_series(sim_id: str) -> str:
 import re
 from copy import deepcopy
 
-def _deep_get(d, path, default=None):
-    cur = d
-    for p in path:
-        if not isinstance(cur, dict) or p not in cur:
-            return default
-        cur = cur[p]
-    return cur
+# def _deep_get(d, path, default=None):
+#     cur = d
+#     for p in path:
+#         if not isinstance(cur, dict) or p not in cur:
+#             return default
+#         cur = cur[p]
+#     return cur
 
 def _normalize_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -785,7 +785,7 @@ def list_config_schema() -> Dict[str, Any]:
     return {
         "schema": schema,
         "example_yaml": _example_yaml(),
-        "notes": "Use overrides via create_environment, or persist as data/<name>/sim_params.yaml for reuse."
+        "notes": " "
     }
 
 
@@ -854,7 +854,7 @@ def _sanitize_name(name: str) -> str:
 @mcp.tool
 def upsert_config(name: str, config: Dict[str, Any] = None, yaml_text: str = None) -> Dict[str, Any]:
     """
-    Validate, normalize, and persist a config to data/<name>/sim_params.yaml.
+    Validate, normalize, and persist a config to input/<name>.yaml.
     Returns: { ok, path, wrote_bytes, normalized_preview }
     """
     name = _sanitize_name(name)
@@ -871,11 +871,11 @@ def upsert_config(name: str, config: Dict[str, Any] = None, yaml_text: str = Non
     except Exception as e:
         return {"ok": False, "errors": [{"path": "", "message": f"PyYAML not available: {e}"}]}
 
-    data_root = project_root / "data"
-    target_dir = data_root / name
+    data_root = project_root / "mcp" / "input"
+    target_dir = data_root / name + ".yaml"
     target_dir.mkdir(parents=True, exist_ok=True)
     # target_path = target_dir / "sim_params.yaml"
-    target_path = target_dir
+    target_path = target_dir + ".yaml"
 
     # Write canonical YAML
     yaml_text_out = yaml.safe_dump(normalized, sort_keys=False)
@@ -891,54 +891,39 @@ def upsert_config(name: str, config: Dict[str, Any] = None, yaml_text: str = Non
 
 
 @mcp.tool
-def list_configs() -> Dict[str, Any]:
-    """
-    List available configs under data/ with a sim_params.yaml file.
-    Returns: { names: [...] }
-    """
-    data_root = project_root / "data"
-    names: List[str] = []
-    if data_root.exists():
-        for child in data_root.iterdir():
-            if child.is_dir() and (child / "sim_params.yaml").exists():
-                names.append(child.name)
-    return {"names": sorted(names)}
-
-
-@mcp.tool
 def read_config(name: str) -> Dict[str, Any]:
     """
-    Read the raw YAML text for data/<name>/sim_params.yaml.
+    Read the raw YAML text for input/<name>.yaml.
     Returns: { name, yaml_text }
     """
     name = _sanitize_name(name)
-    target = project_root / "data" / name / "sim_params.yaml"
+    target = project_root / "mcp" / "input" / name + ".yaml"
     if not target.exists():
         raise ValueError(f"Config not found: {target}")
     with open(target, "r", encoding="utf-8") as f:
         return {"name": name, "yaml_text": f.read()}
 
 
-@mcp.tool
-def create_environment_from_config(base_config_name: str, config: Dict[str, Any] = None, yaml_text: str = None) -> Dict[str, Any]:
-    """
-    Create an environment using a provided config (dict or YAML) applied as overrides
-    on top of a base dataset under data/<base_config_name>/, without persisting a new file.
-    Returns same shape as create_environment.
-    """
-    # Validate/normalize
-    val = _validate_config_impl(config=config, yaml_text=yaml_text)
-    if not val.get("ok"):
-        return {"ok": False, "errors": val.get("errors", [])}
-    overrides = val.get("normalized", {})
+# @mcp.tool
+# def create_environment_from_config(base_config_name: str, config: Dict[str, Any] = None, yaml_text: str = None) -> Dict[str, Any]:
+#     """
+#     Create an environment using a provided config (dict or YAML) applied as overrides
+#     on top of a base dataset under data/<base_config_name>/, without persisting a new file.
+#     Returns same shape as create_environment.
+#     """
+#     # Validate/normalize
+#     val = _validate_config_impl(config=config, yaml_text=yaml_text)
+#     if not val.get("ok"):
+#         return {"ok": False, "errors": val.get("errors", [])}
+#     overrides = val.get("normalized", {})
 
-    # Use core implementation to avoid calling tool-decorated functions directly
-    try:
-        result = _create_environment_impl(config_name=base_config_name, overrides=overrides)
-        result["ok"] = True
-        return result
-    except Exception as e:
-        return {"ok": False, "error": str(e)}
+#     # Use core implementation to avoid calling tool-decorated functions directly
+#     try:
+#         result = _create_environment_impl(config_name=base_config_name, overrides=overrides)
+#         result["ok"] = True
+#         return result
+#     except Exception as e:
+#         return {"ok": False, "error": str(e)}
 
 @mcp.tool
 def create_environment_from_file(yaml_file_path: str) -> Dict[str, Any]:

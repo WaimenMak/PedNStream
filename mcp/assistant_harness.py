@@ -33,6 +33,7 @@ ASSISTANT_MODEL = os.getenv("ASSISTANT_MODEL", "gpt-4o-mini")
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "openai")  # openai | anthropic | openai_compat
 SIM_STEPS = int(os.getenv("SIM_STEPS", "50"))
 PERSIST_CONFIG_NAME = os.getenv("PERSIST_CONFIG_NAME")
+SERVER_URL = os.getenv("MCP_SERVER_URL", "http://localhost:8000/mcp")
 
 
 def _extract_yaml(text: str) -> str:

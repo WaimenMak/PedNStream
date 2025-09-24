@@ -13,5 +13,5 @@
 /fig
 /.specstory
 /.cursorindexingignore
-/video_outputs
+video_outputs/
 Tables.xlsx

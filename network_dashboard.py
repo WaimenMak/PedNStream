@@ -231,7 +231,7 @@ class NetworkDashboard:
             
             # Load the map and wait for it to render
             driver.get(f"file://{temp_html_path}")
-            time.sleep(2)  # Wait for map tiles to load
+            time.sleep(3)  # Wait for map tiles to load
             
             # Take screenshot
             screenshot_path = temp_html_path.replace('.html', '.png')

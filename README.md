@@ -64,7 +64,18 @@ anim = visualizer.animate_network(
 
 ```yaml
 # sim_params.yaml
-params:
+network:
+  adjacency_matrix: [
+    [0, 1, 1, 0, 0, 0],  # node 0
+    [1, 0, 0, 1, 0, 0],  # node 1
+    [1, 0, 0, 1, 1, 0],  # node 2
+    [0, 1, 1, 0, 0, 1],  # node 3
+    [0, 0, 1, 0, 0, 1],  # node 4
+    [0, 0, 0, 1, 1, 0]   # node 5
+  ]
+  origin_nodes: [1]
+  destination_nodes: [5]
+simulation:
   unit_time: 10
   simulation_steps: 500
   default_link:
@@ -73,10 +84,10 @@ params:
     free_flow_speed: 1.5
     k_critical: 2
     k_jam: 6
-  demand:
-    origin_0:
-      peak_lambda: 15
-      base_lambda: 5
+demand:
+  origin_0:
+    peak_lambda: 15
+    base_lambda: 5
 ```
 
 ## Example Scenarios

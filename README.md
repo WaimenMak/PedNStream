@@ -107,9 +107,8 @@ PedNStream provides rich visualization capabilities:
 - Time-series analysis tools
 
 ![Network Animation Example](./README.assets/network_animation.gif)
-
 ## Demo on Delft Center
-<video src="./video_outputs/delft.mp4" controls></video>
+[Delft Center Simulation](./video_outputs/delft.mp4)
 
 ## Project Structure
 

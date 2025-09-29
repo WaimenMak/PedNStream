@@ -8,10 +8,10 @@
 #*.json
 /cache
 *.mp4
+!video_outputs/delft.mp4
 *.csv
 /outputs
 /fig
 /.specstory
 /.cursorindexingignore
-video_outputs
 Tables.xlsx

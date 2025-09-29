@@ -108,9 +108,6 @@ PedNStream provides rich visualization capabilities:
 
 ![Network Animation Example](./README.assets/network_animation.gif)
 
-## Demo on Delft center
-https://github.com/user-attachments/assets/ca17a773-e1e4-4163-843f-44158c0dd36c
-
 ## Project Structure
 
 ```

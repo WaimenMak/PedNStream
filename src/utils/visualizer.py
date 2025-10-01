@@ -16,6 +16,8 @@ class NetworkVisualizer:
         """
         if network is not None:
             self.network = network
+            self.node_data = network.nodes
+            self.link_data = network.links
             self.from_saved = False
         elif simulation_dir is not None:
             self.load_simulation_data(simulation_dir)
@@ -30,9 +32,14 @@ class NetworkVisualizer:
         # Initialize the graph structure
         for node_id in self.node_data:
             self.G.add_node(node_id, size=0)
-        for link_id, link_info in self.link_data.items():
-            start_node, end_node = link_id.split('-')
-            self.G.add_edge(start_node, end_node)
+        if self.network is not None:
+            for link_id, link_info in self.link_data.items():
+                start_node, end_node = link_id
+                self.G.add_edge(start_node, end_node)
+        else:
+            for link_id, link_info in self.link_data.items():
+                start_node, end_node = link_id.split('-')
+                self.G.add_edge(start_node, end_node)
             
         # If no position provided, calculate it once and store it
         if self.pos is None:
@@ -603,6 +610,145 @@ class NetworkVisualizer:
 
         
         return ani
+
+    def plot_od_paths(self, figsize=(10, 8), show_legend=True):
+        """Plot the OD paths"""
+        if self.network is None:
+            raise ValueError("plot_od_paths requires an active network object (not from saved files)")
+
+        # Collect OD paths
+        od_paths = getattr(self.network.path_finder, 'od_paths', {})
+        if not od_paths:
+            raise ValueError("No OD paths found on network.path_finder.od_paths")
+        
+        # Build a drawing graph from the live network
+        graph = nx.DiGraph()
+        for node_id in self.network.nodes:
+            graph.add_node(node_id)
+        for (u, v) in self.network.links:
+            graph.add_edge(u, v)
+
+        # Resolve positions
+        pos = self.pos
+        if pos is None and hasattr(self.network, 'pos') and self.network.pos is not None:
+            pos = self.network.pos
+        if pos is None:
+            pos = nx.spring_layout(graph, k=1, iterations=50, seed=42)
+
+        # Normalize pos keys to be ints if possible (handles cases where keys are str)
+        normalized_pos = {}
+        for k, v in pos.items():
+            try:
+                ik = int(k)
+            except (TypeError, ValueError):
+                ik = k
+            normalized_pos[ik] = v
+
+        # Compute axis bounds with padding
+        x_coords = [coord[0] for coord in normalized_pos.values()]
+        y_coords = [coord[1] for coord in normalized_pos.values()]
+        x_min, x_max = min(x_coords), max(x_coords)
+        y_min, y_max = min(y_coords), max(y_coords)
+        x_padding = (x_max - x_min) * 0.1
+        y_padding = (y_max - y_min) * 0.1
+        x_min -= x_padding
+        x_max += x_padding
+        y_min -= y_padding
+        y_max += y_padding
+
+        # Figure and axes
+        fig, ax = plt.subplots(figsize=figsize)
+
+        # Draw base nodes (origins red, destinations pink, others lightblue)
+        origin_nodes = set(getattr(self.network, 'origin_nodes', []))
+        destination_nodes = set(getattr(self.network, 'destination_nodes', []))
+        node_colors = [
+            'red' if node in origin_nodes else (
+                'pink' if node in destination_nodes else 'lightblue'
+            )
+            for node in graph.nodes()
+        ]
+        node_sizes = [400 for _ in graph.nodes()]
+        nx.draw_networkx_nodes(graph, normalized_pos, node_size=node_sizes, node_color=node_colors, ax=ax)
+        nx.draw_networkx_labels(graph, normalized_pos, font_size=22, font_weight='bold', ax=ax)
+
+        # Draw base edges in light gray
+        all_edges = list(graph.edges())
+        bidirectional = [(u, v) for (u, v) in all_edges if (v, u) in graph.edges()]
+        unidirectional = [(u, v) for (u, v) in all_edges if (v, u) not in graph.edges()]
+        if bidirectional:
+            nx.draw_networkx_edges(
+                graph, normalized_pos,
+                edgelist=bidirectional,
+                arrows=True,
+                arrowsize=8,
+                edge_color='lightgray',
+                width=1.5,
+                alpha=0.7,
+                ax=ax,
+                connectionstyle="arc3,rad=0.2"
+            )
+        if unidirectional:
+            nx.draw_networkx_edges(
+                graph, normalized_pos,
+                edgelist=unidirectional,
+                arrows=True,
+                arrowsize=8,
+                edge_color='lightgray',
+                width=1.5,
+                alpha=0.7,
+                ax=ax
+            )
+
+        # Prepare colors for OD pairs (one color per OD)
+        cmap = plt.get_cmap('tab20')
+        od_pairs = list(od_paths.keys())
+        color_map = {od: cmap(i % 20) for i, od in enumerate(od_pairs)}
+
+        # Draw OD paths overlay
+        legend_handles = []
+        from matplotlib.lines import Line2D
+        for od_pair, paths in od_paths.items():
+            color = color_map[od_pair]
+            # Create legend entry for this OD pair
+            legend_handles.append(Line2D([0], [0], color=color, lw=4, label=f"{od_pair[0]} → {od_pair[1]}"))
+
+            for path in paths or []:
+                # Convert any str node ids to int when possible to match normalized_pos keys
+                processed_path = []
+                for n in path:
+                    try:
+                        processed_path.append(int(n))
+                    except (TypeError, ValueError):
+                        processed_path.append(n)
+
+                # Draw each segment with arrows and slight arc for bidirectional pairs
+                for u, v in zip(processed_path[:-1], processed_path[1:]):
+                    has_reverse = (v, u) in graph.edges()
+                    nx.draw_networkx_edges(
+                        graph, normalized_pos,
+                        edgelist=[(u, v)],
+                        arrows=True,
+                        arrowsize=12,
+                        edge_color=color,
+                        width=4.0,
+                        alpha=0.8,
+                        ax=ax,
+                        connectionstyle=("arc3,rad=0.2" if has_reverse else None)
+                    )
+
+        # Legend
+        if legend_handles and show_legend:
+            ax.legend(handles=legend_handles, title="OD pairs", loc='upper right')
+
+        # Final touches
+        ax.set_axis_off()
+        ax.set_xlim(x_min, x_max)
+        ax.set_ylim(y_min, y_max)
+        ax.set_title('OD Paths', fontdict={'fontsize': 20, 'fontweight': 'bold'})
+        plt.tight_layout()
+
+        return fig, ax
 
     def plot_link_evolution(self, link_ids=None):
         """Plot the evolution of density, flow, and speed for selected links"""

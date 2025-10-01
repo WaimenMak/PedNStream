@@ -1,7 +1,9 @@
 # Network Configuration, origin and destination and adjacency matrix
 network:
-  origin_nodes: [0, 8, 80, 13]
-  destination_nodes: [0, 8, 74, 136]
+#  origin_nodes: [0, 8, 80, 13]
+#  destination_nodes: [0, 8, 74, 136]
+  origin_nodes: [0]
+  destination_nodes: [8]
 #  origin_nodes: [0, 8, 80, 13, 247, 266, 143, 249, 97, 146, 142, 294]
 #  destination_nodes: [0, 8, 74, 136, 10, 13, 182, 35, 216, 219, 80, 274]
 
@@ -11,7 +13,7 @@ simulation:
   unit_time: 10
   assign_flows_type: "classic"
   path_finder:
-    k_paths: 3
+    k_paths: 50
     theta: 10 # temperature parameter for softmax
     alpha: 1 # congestion weight
     beta: 0.5 # congestion weight

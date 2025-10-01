@@ -157,8 +157,24 @@ class PathFinder:
                 print(f"No path found between {origin} and {dest}")
                 self.od_paths[(origin, dest)] = []
                 
+        self.check_if_paths_are_different(self.od_paths)
         # Calculate and store turn probabilities for all nodes in paths
         self.calculate_all_turn_probs(nodes=nodes)
+    
+    def check_if_paths_are_different(self, od_paths):
+        """Check if the paths of a od pair are all different"""
+        # check if the paths of a od pair are all different
+        for od_pair, paths in od_paths.items():
+            def _norm_node(n):
+                try:
+                    return int(n)
+                except Exception:
+                    return str(n)
+            normalized = [tuple(_norm_node(n) for n in p) for p in (paths or [])]
+            unique = set(normalized)
+            if len(unique) != len(normalized):
+                dup_count = len(normalized) - len(unique)
+                print(f"Warning: duplicate paths detected for OD {od_pair}: {dup_count} duplicate(s)")
 
     def calculate_all_turn_probs(self, nodes):
         """Calculate and store turn probabilities for all nodes in paths"""

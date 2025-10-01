@@ -24,29 +24,34 @@ from pathlib import Path
 if __name__ == "__main__":
     env_generator = NetworkEnvGenerator()
     network_env = env_generator.create_network("delft") # delft is the name of the file in the data folder including the .yaml config file, edge distances, adjacency matrix, node positions
-    # Run simulation
-    import time
-    start_time = time.time()
-    for t in range(1, env_generator.config['params']['simulation_steps']):
-        network_env.network_loading(t)
-    end_time = time.time()
-    print("Simulation time: {:.2f}".format(end_time - start_time))
-    # Save and visualize results
-    project_root = Path(__file__).resolve().parent.parent
-    output_dir = project_root / "outputs"
-    output_handler = OutputHandler(base_dir=str(output_dir), simulation_dir="delft_exp")
-    output_handler.save_network_state(network_env)
-
-    with open(project_root / "data" / "delft" / "node_positions.json", 'r') as f:
+    # visualize the OD paths
+    with open(Path("..") / "data" / "delft" / "node_positions.json", 'r') as f:
         pos = {str(k): np.array(v) for k, v in json.load(f).items()}
-    # Create animation
-    matplotlib.use('macosx')
-    visualizer = NetworkVisualizer(simulation_dir=os.path.join(output_dir, "delft_exp"), pos=pos)
-    anim = visualizer.animate_network(start_time=0,
-                                    end_time=env_generator.config['params']['simulation_steps'],
-                                    # interval=1,
-                                    figsize=(14, 12),
-                                    edge_property='density')
+    visualizer = NetworkVisualizer(network_env, pos=pos)
+    visualizer.plot_od_paths(figsize=(22, 18), show_legend=False)
+    # Run simulation
+    # import time
+    # start_time = time.time()
+    # for t in range(1, env_generator.config['params']['simulation_steps']):
+    #     network_env.network_loading(t)
+    # end_time = time.time()
+    # print("Simulation time: {:.2f}".format(end_time - start_time))
+    # Save and visualize results
+    # project_root = Path(__file__).resolve().parent.parent
+    # output_dir = project_root / "outputs"
+    # output_handler = OutputHandler(base_dir=str(output_dir), simulation_dir="delft_exp")
+    # output_handler.save_network_state(network_env)
+
+    # with open(project_root / "data" / "delft" / "node_positions.json", 'r') as f:
+    #     pos = {str(k): np.array(v) for k, v in json.load(f).items()}
+    # # Create animation
+    # matplotlib.use('macosx')
+    # visualizer = NetworkVisualizer(simulation_dir=os.path.join(output_dir, "delft_exp"), pos=pos)
+    # anim = visualizer.animate_network(start_time=0,
+    #                                 end_time=env_generator.config['params']['simulation_steps'],
+    #                                 # interval=1,
+    #                                 figsize=(14, 12),
+    #                                 edge_property='density')
     # MP4
     # writer = matplotlib.animation.FFMpegWriter(fps=10, metadata=dict(artist='Me'),
     #                                          bitrate=2000)

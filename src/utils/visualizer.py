@@ -50,6 +50,11 @@ class NetworkVisualizer:
         # Load network parameters
         with open(os.path.join(simulation_dir, 'network_params.json'), 'r') as f:
             self.network_params = json.load(f)
+        # Load od paths
+        self.od_paths = self.network_params['od_paths']
+        # self.od_paths = {}
+        # for od_pair, paths in self.network_params['od_paths'].items():
+        #     self.od_paths[tuple(map(int, od_pair.split('-')))] = paths
         
         # Load link data
         with open(os.path.join(simulation_dir, 'link_data.json'), 'r') as f:
@@ -58,7 +63,7 @@ class NetworkVisualizer:
         # Load node data
         with open(os.path.join(simulation_dir, 'node_data.json'), 'r') as f:
             self.node_data = json.load(f)
-            
+        
         # Load time series if available
         time_series_path = os.path.join(simulation_dir, 'time_series.csv')
         if os.path.exists(time_series_path):
@@ -613,20 +618,26 @@ class NetworkVisualizer:
 
     def plot_od_paths(self, figsize=(10, 8), show_legend=True):
         """Plot the OD paths"""
-        if self.network is None:
-            raise ValueError("plot_od_paths requires an active network object (not from saved files)")
-
-        # Collect OD paths
-        od_paths = getattr(self.network.path_finder, 'od_paths', {})
-        if not od_paths:
-            raise ValueError("No OD paths found on network.path_finder.od_paths")
+        if self.from_saved:
+            od_paths = self.od_paths
+        elif self.network is not None:
+            od_paths = self.network.path_finder.od_paths
+        else:
+            raise ValueError("No OD paths found")
         
         # Build a drawing graph from the live network
         graph = nx.DiGraph()
-        for node_id in self.network.nodes:
-            graph.add_node(node_id)
-        for (u, v) in self.network.links:
-            graph.add_edge(u, v)
+        if self.from_saved:
+            for node_id in self.node_data:
+                graph.add_node(node_id)
+            for link_id in self.link_data:
+                u, v = link_id.split('-')
+                graph.add_edge(u, v)
+        else:
+            for node_id in self.network.nodes:
+                graph.add_node(node_id)
+            for (u, v) in self.network.links:
+                graph.add_edge(u, v)
 
         # Resolve positions
         pos = self.pos
@@ -636,17 +647,19 @@ class NetworkVisualizer:
             pos = nx.spring_layout(graph, k=1, iterations=50, seed=42)
 
         # Normalize pos keys to be ints if possible (handles cases where keys are str)
-        normalized_pos = {}
-        for k, v in pos.items():
-            try:
-                ik = int(k)
-            except (TypeError, ValueError):
-                ik = k
-            normalized_pos[ik] = v
+        # normalized_pos = {}
+        # for k, v in pos.items():
+        #     try:
+        #         ik = int(k)
+        #     except (TypeError, ValueError):
+        #         ik = k
+        #     normalized_pos[ik] = v
 
         # Compute axis bounds with padding
-        x_coords = [coord[0] for coord in normalized_pos.values()]
-        y_coords = [coord[1] for coord in normalized_pos.values()]
+        # x_coords = [coord[0] for coord in normalized_pos.values()]
+        # y_coords = [coord[1] for coord in normalized_pos.values()]
+        x_coords = [coord[0] for coord in pos.values()]
+        y_coords = [coord[1] for coord in pos.values()]
         x_min, x_max = min(x_coords), max(x_coords)
         y_min, y_max = min(y_coords), max(y_coords)
         x_padding = (x_max - x_min) * 0.1
@@ -660,8 +673,8 @@ class NetworkVisualizer:
         fig, ax = plt.subplots(figsize=figsize)
 
         # Draw base nodes (origins red, destinations pink, others lightblue)
-        origin_nodes = set(getattr(self.network, 'origin_nodes', []))
-        destination_nodes = set(getattr(self.network, 'destination_nodes', []))
+        origin_nodes = set(str(n) for n in getattr(self.network, 'origin_nodes', []))
+        destination_nodes = set(str(n) for n in getattr(self.network, 'destination_nodes', []))
         node_colors = [
             'red' if node in origin_nodes else (
                 'pink' if node in destination_nodes else 'lightblue'
@@ -669,8 +682,8 @@ class NetworkVisualizer:
             for node in graph.nodes()
         ]
         node_sizes = [400 for _ in graph.nodes()]
-        nx.draw_networkx_nodes(graph, normalized_pos, node_size=node_sizes, node_color=node_colors, ax=ax)
-        nx.draw_networkx_labels(graph, normalized_pos, font_size=22, font_weight='bold', ax=ax)
+        nx.draw_networkx_nodes(graph, pos, node_size=node_sizes, node_color=node_colors, ax=ax)
+        nx.draw_networkx_labels(graph, pos, font_size=22, font_weight='bold', ax=ax)
 
         # Draw base edges in light gray
         all_edges = list(graph.edges())
@@ -678,7 +691,7 @@ class NetworkVisualizer:
         unidirectional = [(u, v) for (u, v) in all_edges if (v, u) not in graph.edges()]
         if bidirectional:
             nx.draw_networkx_edges(
-                graph, normalized_pos,
+                graph, pos,
                 edgelist=bidirectional,
                 arrows=True,
                 arrowsize=8,
@@ -690,7 +703,7 @@ class NetworkVisualizer:
             )
         if unidirectional:
             nx.draw_networkx_edges(
-                graph, normalized_pos,
+                graph, pos,
                 edgelist=unidirectional,
                 arrows=True,
                 arrowsize=8,
@@ -715,18 +728,25 @@ class NetworkVisualizer:
 
             for path in paths or []:
                 # Convert any str node ids to int when possible to match normalized_pos keys
-                processed_path = []
-                for n in path:
-                    try:
-                        processed_path.append(int(n))
-                    except (TypeError, ValueError):
-                        processed_path.append(n)
+                # processed_path = []
+                # for n in path:
+                #     try:
+                #         processed_path.append(int(n))
+                #     except (TypeError, ValueError):
+                #         processed_path.append(n)
+                processed_path = path
 
                 # Draw each segment with arrows and slight arc for bidirectional pairs
                 for u, v in zip(processed_path[:-1], processed_path[1:]):
+                    if isinstance(u, int):
+                        u = str(u)
+        
+                    if isinstance(v, int):
+                        v = str(v)
+
                     has_reverse = (v, u) in graph.edges()
                     nx.draw_networkx_edges(
-                        graph, normalized_pos,
+                        graph, pos,
                         edgelist=[(u, v)],
                         arrows=True,
                         arrowsize=12,
@@ -747,6 +767,7 @@ class NetworkVisualizer:
         ax.set_ylim(y_min, y_max)
         ax.set_title('OD Paths', fontdict={'fontsize': 20, 'fontweight': 'bold'})
         plt.tight_layout()
+        plt.show()
 
         return fig, ax
 

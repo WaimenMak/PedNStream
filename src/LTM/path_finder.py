@@ -2,10 +2,12 @@ import networkx as nx
 import numpy as np
 from collections import defaultdict
 from heapq import heappush, heappop
+from src.LTM.node import Node
 
 def k_shortest_paths(graph, origin, dest, k):
     """
-    Find k shortest paths using Yen's algorithm with priority queue
+    Find k shortest paths using Yen's algorithm with priority queue.
+    Slower than the enumerate_all_simple_paths function.
     """
     # Initialize
     A = []  # List of shortest paths found
@@ -109,6 +111,37 @@ def k_shortest_paths(graph, origin, dest, k):
     
     return [path for _, path in A]
 
+def enumerate_shortest_simple_paths(graph, origin, dest, max_paths=None):
+    """
+    Enumerate all simple paths from origin to dest.
+
+    Args:
+        graph (nx.DiGraph): Directed graph.
+        origin (int): Source node id.
+        dest (int): Target node id.
+        cutoff (int, optional): Maximum path length (number of nodes) to consider.
+        max_paths (int, optional): Maximum number of paths to return (early stop).
+
+    Returns:
+        list[list[int]]: List of paths (each path is a list of node ids).
+
+    Notes:
+        - Enumerating all simple paths can be exponential; use cutoff/max_paths to bound.
+    """
+    try:
+        paths_iter = nx.shortest_simple_paths(graph, origin, dest, weight='weight')
+    except Exception:
+        print(f"No path found between {origin} and {dest}")
+        return []
+
+    paths = []
+    for path in paths_iter:
+        paths.append(path)
+        if max_paths is not None and len(paths) >= max_paths:
+            print(f"Early stopping: Found {len(paths)} paths")
+            break
+    return paths
+
 class PathFinder:
     """Handles path finding and path-related operations"""
     def __init__(self, links, params=None):
@@ -127,6 +160,17 @@ class PathFinder:
         self.beta = path_params.get('beta', 0.05)   # congestion weight
         self.omega = path_params.get('omega', 0.05)   # capacity weight
         self.k_paths = path_params.get('k_paths', 3)
+        
+        # Controller configuration
+        controller_config = path_params.get('controllers', {})
+        self.controllers_enabled = controller_config.get('enabled', False)
+        self.controller_nodes = set(controller_config.get('nodes', []))
+        self.controller_links = set(controller_config.get('links', []))
+        
+        # Detour exploration settings (hardcoded for now)
+        self.detour_exploration_mode = 'penalize'  # 'penalize' or 'remove' - penalize makes prefix edges expensive
+        self.detour_penalty_factor = 2  # Weight multiplier for penalized edges
+        self.max_detour_paths = 3  # Maximum alternative paths to try per neighbor
 
     def _create_graph(self, links, time_step=0):
         """Convert network to NetworkX graph"""
@@ -134,6 +178,21 @@ class PathFinder:
         for (start, end), link in links.items():
             G.add_edge(start, end, weight=link.length, num_pedestrians=link.num_pedestrians[time_step])
         return G
+    
+    def is_controller_node(self, node_id):
+        """
+        Args:
+            node_id: Node ID to check
+        Returns:
+            bool: True if node is a controller
+        """
+        if not self.controllers_enabled:
+            return False
+        
+        if node_id not in self.controller_nodes:
+            return False
+        
+        return True
 
     def find_od_paths(self, od_pairs, nodes):
         """Find k shortest paths and track which nodes and their OD pairs"""
@@ -142,7 +201,8 @@ class PathFinder:
         
         for origin, dest in od_pairs:
             try:
-                paths = k_shortest_paths(self.graph, origin, dest, k=self.k_paths)
+                # paths = k_shortest_paths(self.graph, origin, dest, k=self.k_paths)
+                paths = enumerate_shortest_simple_paths(self.graph, origin, dest, max_paths=self.k_paths)
                 self.od_paths[(origin, dest)] = paths
                 
                 # Record which nodes are used in this OD pair
@@ -156,12 +216,19 @@ class PathFinder:
             except nx.NetworkXNoPath:
                 print(f"No path found between {origin} and {dest}")
                 self.od_paths[(origin, dest)] = []
-                
-        self.check_if_paths_are_different(self.od_paths)
+
+        # expand the paths at controller nodes
+        if not self._initialized and self.controllers_enabled:
+            for node in self.controller_nodes:
+                for od_pair in self.node_to_od_pairs[node]:
+                    self.expand_controller_paths(nodes[node], od_pair)
+                    print(f"Controller node {node}: Added {len(self.od_paths[od_pair])} detour path(s) for OD {od_pair}")
+        # self.check_if_paths_are_different(self.od_paths)
         # Calculate and store turn probabilities for all nodes in paths
         self.calculate_all_turn_probs(nodes=nodes)
     
-    def check_if_paths_are_different(self, od_paths):
+    @staticmethod
+    def check_if_paths_are_different(od_paths):
         """Check if the paths of a od pair are all different"""
         # check if the paths of a od pair are all different
         for od_pair, paths in od_paths.items():
@@ -299,6 +366,160 @@ class PathFinder:
                         
     #                 self.turn_to_paths[turn][od_pair].append(tuple(path))
 
+    def expand_controller_paths(self, current_node: Node, od_pair):
+        """
+        Expand paths at controller nodes by adding detours through non-path neighbors.
+        
+        Args:
+            current_node: The controller node
+            od_pair: (origin, destination) tuple
+            
+        Returns:
+            list: New paths added for this OD pair
+        """
+        current_node_id = current_node.node_id
+        origin, dest = od_pair
+        paths = self.od_paths[od_pair]
+        new_paths = []
+        
+        # Get all outgoing neighbors of current node
+        all_outgoing_neighbors = set()
+        for link in current_node.outgoing_links:
+            if link.end_node is not None:
+                all_outgoing_neighbors.add(link.end_node.node_id)
+        
+        # Process each existing path that contains current node
+        for path in paths:
+            try:
+                node_idx = path.index(current_node_id)
+                
+                # Skip if this is the destination node (no downstream to expand)
+                if current_node_id == dest:
+                    continue
+                
+                # Get the upstream node
+                if current_node_id == origin:
+                    up_node = -1
+                else:
+                    up_node = path[node_idx - 1] if node_idx > 0 else -1
+                
+                # Get the on-path downstream node
+                on_path_down = path[node_idx + 1] if node_idx < len(path) - 1 else None
+                
+                # Check each outgoing neighbor that's NOT on the current path
+                for neighbor in all_outgoing_neighbors:
+                    if neighbor == on_path_down or neighbor == up_node:
+                        continue  # Skip the already-on-path neighbor
+                    
+                    # Check if neighbor is already in the prefix (would create immediate loop)
+                    prefix_nodes = set(path[:node_idx])  # Nodes before current_node (not including it)
+                    if neighbor in prefix_nodes:
+                        continue  # Skip - neighbor already visited earlier in path
+                    
+                    # Try to find multiple paths from neighbor to destination
+                    # We'll try several paths in case the shortest creates a loop
+                    try:
+                        # Create a modified graph that encourages exploration away from existing OD paths
+                        modified_graph = self.graph.copy()
+                        
+                        # Collect ALL edges used in ANY existing path for this OD pair
+                        # and calculate their distance to destination for dynamic penalties
+                        all_od_edges = {}  # {(u, v): distance_to_dest}
+                        for p in self.od_paths[od_pair]:
+                            for i in range(len(p) - 1):
+                                edge = (p[i], p[i+1])
+                                if edge not in all_od_edges:
+                                    # Calculate remaining distance from the end of this edge to destination
+                                    try:
+                                        dist_to_dest = nx.shortest_path_length(
+                                            self.graph, p[i+1], dest, weight='weight'
+                                        )
+                                        all_od_edges[edge] = dist_to_dest
+                                    except nx.NetworkXNoPath:
+                                        all_od_edges[edge] = 0  # Edge already at destination
+                        
+                        if self.detour_exploration_mode == 'remove':
+                            # Remove already-used edges entirely - forces completely different routes
+                            edges_to_remove = []
+                            for (u, v) in all_od_edges.keys():
+                                if modified_graph.has_edge(u, v):
+                                    edges_to_remove.append((u, v))
+                            modified_graph.remove_edges_from(edges_to_remove)
+                        else:
+                            # Penalize already-used edges with distance-based dynamic factor
+                            # Edges farther from destination get higher penalty (more exploration early)
+                            # Edges closer to destination get lower penalty (less exploration near end)
+                            if all_od_edges:
+                                max_dist = max(all_od_edges.values()) if all_od_edges.values() else 1
+                                
+                                for (u, v), dist_to_dest in all_od_edges.items():
+                                    if modified_graph.has_edge(u, v):
+                                        # Dynamic penalty: scales from base_penalty to base_penalty * detour_penalty_factor
+                                        # based on normalized distance to destination
+                                        if max_dist > 0:
+                                            normalized_dist = dist_to_dest / max_dist
+                                            # Penalty ranges from 1.0 (at dest) to detour_penalty_factor (far from dest)
+                                            dynamic_penalty = 1.0 + (self.detour_penalty_factor - 1.0) * normalized_dist
+                                        else:
+                                            dynamic_penalty = self.detour_penalty_factor
+                                        
+                                        original_weight = modified_graph[u][v].get('weight', 1)
+                                        modified_graph[u][v]['weight'] = original_weight * dynamic_penalty
+                        
+                        # Get multiple simple paths from neighbor to destination using modified graph
+                        # This encourages finding truly alternative routes
+                        detour_paths = enumerate_shortest_simple_paths(
+                            modified_graph, neighbor, dest, max_paths=self.max_detour_paths
+                        )
+                        
+                        if not detour_paths:
+                            continue  # No path from neighbor to destination
+                        
+                        prefix_and_current = set(path[:node_idx + 1])  # All nodes up to and including current
+                        
+                        # Try each detour path and add those that don't create loops
+                        for detour_suffix in detour_paths:
+                            # Check if detour would revisit any nodes from the prefix (creating a loop)
+                            # detour_suffix = [neighbor, ..., dest]
+                            # We need to check if any node in [..., dest] part is already in prefix + current_node
+                            detour_nodes_after_neighbor = set(detour_suffix[1:])  # All nodes after neighbor
+                            
+                            if detour_nodes_after_neighbor & prefix_and_current:  # Any shared nodes?
+                                continue  # Skip this detour path - would create a loop
+                            
+                            # Build concatenated path: prefix + [current_node] + detour_suffix
+                            # (detour_suffix includes neighbor, so we don't add it separately)
+                            new_path = path[:node_idx + 1] + detour_suffix
+                            
+                            # Check for duplicates (convert to tuple for hashing)
+                            new_path_tuple = tuple(new_path)
+                            existing_paths_tuples = set(tuple(p) for p in self.od_paths[od_pair])
+                            
+                            if new_path_tuple not in existing_paths_tuples:
+                                new_paths.append(new_path)
+                            
+                    except Exception:
+                        # Neighbor cannot reach destination or other error, skip
+                        continue
+                        
+            except ValueError:
+                # Current node not in this path
+                continue
+        
+        # Add new paths to od_paths and update bookkeeping
+        if new_paths:
+            self.od_paths[od_pair].extend(new_paths)
+            
+            # Update nodes_in_paths and node_to_od_pairs for all nodes in new paths
+            for new_path in new_paths:
+                for node in new_path:
+                    self.nodes_in_paths.add(node)
+                    if node not in self.node_to_od_pairs:
+                        self.node_to_od_pairs[node] = set()
+                    self.node_to_od_pairs[node].add(od_pair)
+        
+        return new_paths
+
     def calculate_turn_probabilities(self, current_node):
         """Calculate turn probabilities including special cases for origin/destination nodes"""
         # node = self.graph.nodes[current_node]
@@ -411,7 +632,7 @@ class PathFinder:
                         link = self.links[(node.node_id, down_node)]
                         # num_pedestrians.append(self.links[(node.node_id, down_node)].num_pedestrians[time_step-1]) # use the previous time step, current time step is not available is not updated yet
                         densities.append(link.get_density(time_step-1))
-                        capacity = link.receiving_flow[time_step-2] # -2 steps otherwise it will be -1
+                        capacity = link.receiving_flow[time_step-2] # -2 steps is the most recent, the capacity of -1 step is -1 by default
                         capacities.append(capacity if capacity >= 0 else link.back_gate_width * link.free_flow_speed * link.k_critical * link.unit_time)
                     except KeyError:
                         densities.append(0)

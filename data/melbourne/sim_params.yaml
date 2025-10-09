@@ -22,6 +22,14 @@ simulation:
     beta: 0.5
     omega: 0.8
 
+# Controller Configuration (for dynamic rerouting at specific nodes)
+controllers:
+  enabled: false  # Set to true to enable controller-based path expansion
+  nodes: []  # Example: [50, 100, 150] - nodes that can create detour paths
+  # Optional: time-based activation
+  # schedule:
+  #   50: [[0, 200]]  # Node 50 active during steps 0-200
+  #   100: [[100, 300]]  # Node 100 active during steps 100-300
 
 # Default Link Parameters
 default_link:

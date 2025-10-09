@@ -17,11 +17,21 @@ simulation:
   unit_time: 10
   assign_flows_type: "classic"
   path_finder:
-    k_paths: 4
+    k_paths: 1
     theta: 10
     alpha: 1
     beta: 0.5
     omega: 0.8
+
+# Controller Configuration (for dynamic rerouting at specific nodes)
+# Example: Node 2 and 3 are potential rerouting points in this 6-node network
+controllers:
+  enabled: true  # Set to true to enable controller-based path expansion
+  nodes: [3]  # Example: [2, 3] - intersection nodes that can create alternative routes
+  # Optional: time-based activation
+  # schedule:
+  #   2: [[0, 500]]  # Node 2 active during entire simulation
+  #   3: [[100, 400]]  # Node 3 active only during steps 100-400
 
 # Default Link Parameters
 default_link:

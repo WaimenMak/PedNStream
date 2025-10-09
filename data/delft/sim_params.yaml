@@ -13,11 +13,19 @@ simulation:
   unit_time: 10
   assign_flows_type: "classic"
   path_finder:
-    k_paths: 50
+    k_paths: 5
     theta: 10 # temperature parameter for softmax
     alpha: 1 # congestion weight
     beta: 0.5 # congestion weight
     omega: 0.8 # capacity weight
+
+# Controller Configuration (for dynamic rerouting)
+controllers:
+  enabled: true  # Set to true to enable controller-based path expansion
+  nodes: [6, 4]  # List of node IDs that act as controllers, e.g., [3, 4, 5]
+  # Optional fields for future use:
+  # links: []  # List of link IDs for link-based control, e.g., ["2_3", "4_5"]
+  # schedule: {}  # Time-based activation, e.g., {3: [[0, 100], [200, 300]]}
 
 # Default Link Parameters
 default_link:

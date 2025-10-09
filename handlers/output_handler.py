@@ -68,6 +68,8 @@ class OutputHandler:
             'destination_nodes': network.destination_nodes,
             'origin_nodes': network.origin_nodes,
             # Add other relevant network parameters
+            # save the od paths
+            'od_paths': {f"{k[0]}-{k[1]}": v for k, v in network.path_finder.od_paths.items()}
         }
         
         # Save to files

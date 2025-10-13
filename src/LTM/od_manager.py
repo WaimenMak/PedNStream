@@ -63,6 +63,7 @@ class DemandGenerator:
         self.simulation_steps = simulation_steps
         self.params = params
         self.time = np.arange(simulation_steps)
+        self.seed = params["seed"] # the seed from the simulation params, can be None
 
         # Dictionary to store built-in and custom demand patterns
         self.demand_patterns: Dict[str, Callable] = {
@@ -90,7 +91,7 @@ class DemandGenerator:
             return DemandConfig(
                 peak_lambda=origin_config.get('peak_lambda', 10.0),
                 base_lambda=origin_config.get('base_lambda', 5.0),
-                seed=origin_config.get('seed', 42),
+                seed=self.seed,  # use the seed from the simulation params
                 pattern=origin_config.get('pattern', 'gaussian_peaks')
             )
         except KeyError:
@@ -148,5 +149,5 @@ class DemandGenerator:
         evening_peak = config.peak_lambda * np.exp(-(self.time - 3*t/4)**2 / (2 * (t/20)**2))
         lambda_t = config.base_lambda + morning_peak + evening_peak
         
-        np.random.seed(config.seed)
+        np.random.seed(self.seed)  # use the seed from the simulation params
         return np.random.poisson(lam=lambda_t)

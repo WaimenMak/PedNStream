@@ -39,6 +39,7 @@ def load_config(config_path: str) -> dict:
         'simulation_steps': config['simulation']['simulation_steps'],
         'unit_time': config['simulation']['unit_time'],
         'assign_flows_type': config['simulation'].get('assign_flows_type', 'classic'),
+        'seed': config['simulation'].get('seed', None),
         'path_finder': path_finder_params,
         'default_link': config['default_link'],
         'links': config.get('links', {}),

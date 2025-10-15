@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# @Time    : 26/01/2025 15:30
+# @Time    : 14/10/2025 15:30
 # @Author  : mmai
 # @FileName: discovery
 # @Software: PyCharm
@@ -44,7 +44,7 @@ class AgentDiscovery:
         # Agent mappings
         self.separator_agents = {}  # agent_id -> {"forward": link, "reverse": link, "total_width": float}
         self.gater_agents = {}      # agent_id -> {"node": node, "out_links": [link1, link2, ...]}
-        self.agent_to_type = {}     # agent_id -> "sep" or "gat"
+        self.agent_to_type = {}     # agent_id -> "sep" or "gate"
         
         # Create agents from predefined configuration
         self._create_predefined_separators()
@@ -110,7 +110,7 @@ class AgentDiscovery:
                 "node": node,
                 "out_links": real_out_links
             }
-            self.agent_to_type[agent_id] = "gat"
+            self.agent_to_type[agent_id] = "gate"
     
     def _compute_max_outdegree(self) -> int:
         """Compute maximum outdegree across all gater agents for action padding."""
@@ -131,7 +131,7 @@ class AgentDiscovery:
         return self.gater_agents.copy()
     
     def get_agent_type(self, agent_id: str) -> str:
-        """Return agent type ('sep' or 'gat') for given agent ID."""
+        """Return agent type ('sep' or 'gate') for given agent ID."""
         if agent_id not in self.agent_to_type:
             raise ValueError(f"Unknown agent ID: {agent_id}")
         return self.agent_to_type[agent_id]

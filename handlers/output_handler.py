@@ -69,7 +69,10 @@ class OutputHandler:
             'origin_nodes': network.origin_nodes,
             # Add other relevant network parameters
             # save the od paths
-            'od_paths': {f"{k[0]}-{k[1]}": v for k, v in network.path_finder.od_paths.items()}
+            'od_paths': (
+                {f"{k[0]}-{k[1]}": v for k, v in network.path_finder.od_paths.items()}
+                if getattr(network, 'path_finder', None) is not None else {}
+            )
         }
         
         # Save to files

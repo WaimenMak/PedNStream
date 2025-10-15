@@ -72,6 +72,7 @@ class Network:
         self.unit_time = params['unit_time']
         self.destination_nodes = destination_nodes
         self.origin_nodes = origin_nodes
+        self.path_finder = None
         self.pos = pos
         self.assign_flows_type = params.get('assign_flows_type', 'classic')
         self.logger.info(f"Network initialization started, assign flows type: {self.assign_flows_type}")

@@ -20,7 +20,7 @@ class ObservationBuilder:
     Builds observations for separator and gater agents from network state.
     """
     
-    def __init__(self, network, agent_discovery: AgentDiscovery, normalize: bool = True):
+    def __init__(self, network, agent_discovery: AgentDiscovery, normalize: bool = True, with_density_obs: bool = False):
         """
         Initialize observation builder.
         
@@ -28,10 +28,12 @@ class ObservationBuilder:
             network: Network instance from LTM simulation
             agent_discovery: AgentDiscovery instance with agent mappings
             normalize: Whether to normalize observations
+            with_density_obs: Whether to include density observations
         """
         self.network = network
         self.agent_discovery = agent_discovery
         self.normalize = normalize
+        self.with_density_obs = with_density_obs
         
         # Normalization constants (will be refined based on actual features)
         self.density_norm = 10.0    # Typical jam density
@@ -54,7 +56,7 @@ class ObservationBuilder:
         
         if agent_type == "sep":
             return self._build_separator_observation(agent_id, time_step)
-        elif agent_type == "gat":
+        elif agent_type == "gate":
             return self._build_gater_observation(agent_id, time_step)
         else:
             raise ValueError(f"Unknown agent type: {agent_type}")
@@ -69,22 +71,16 @@ class ObservationBuilder:
         
         # Forward direction features
         features.extend([
-            forward_link.density[time_step] if time_step < len(forward_link.density) else 0.0,
-            forward_link.speed[time_step] if time_step < len(forward_link.speed) else 0.0,
-            forward_link.avg_travel_time[time_step] if time_step < len(forward_link.avg_travel_time) else 0.0,
-            forward_link.num_pedestrians[time_step] if time_step < len(forward_link.num_pedestrians) else 0.0,
-            forward_link.sending_flow[time_step-1] if time_step > 0 and time_step-1 < len(forward_link.sending_flow) else 0.0,
-            forward_link.receiving_flow[time_step-1] if time_step > 0 and time_step-1 < len(forward_link.receiving_flow) else 0.0
+            forward_link.density[time_step] if time_step < len(forward_link.density) else 0.0 if self.with_density_obs else 0.0, # bidirectional density
+            forward_link.inflow[time_step] if time_step < len(forward_link.inflow) else 0.0,
+            forward_link.outflow[time_step] if time_step < len(forward_link.outflow) else 0.0,
         ])
         
         # Reverse direction features
         features.extend([
-            reverse_link.density[time_step] if time_step < len(reverse_link.density) else 0.0,
-            reverse_link.speed[time_step] if time_step < len(reverse_link.speed) else 0.0,
-            reverse_link.avg_travel_time[time_step] if time_step < len(reverse_link.avg_travel_time) else 0.0,
-            reverse_link.num_pedestrians[time_step] if time_step < len(reverse_link.num_pedestrians) else 0.0,
-            reverse_link.sending_flow[time_step-1] if time_step > 0 and time_step-1 < len(reverse_link.sending_flow) else 0.0,
-            reverse_link.receiving_flow[time_step-1] if time_step > 0 and time_step-1 < len(reverse_link.receiving_flow) else 0.0
+            reverse_link.density[time_step] if time_step < len(reverse_link.density) else 0.0 if self.with_density_obs else 0.0,
+            reverse_link.inflow[time_step] if time_step < len(reverse_link.inflow) else 0.0,
+            reverse_link.outflow[time_step] if time_step < len(reverse_link.outflow) else 0.0,
         ])
         
         obs = np.array(features, dtype=np.float32)
@@ -103,7 +99,7 @@ class ObservationBuilder:
         
         # TODO: Extract per-outgoing-link features
         # Placeholder: 8 features per link, padded to max_outdegree
-        features_per_link = 8
+        features_per_link = 3 if self.with_density_obs else 2 # density, inflow of outgoing link, outflow of incoming link
         obs = np.zeros(max_outdegree * features_per_link, dtype=np.float32)
         
         for i, link in enumerate(out_links):
@@ -111,14 +107,9 @@ class ObservationBuilder:
             
             # Extract link features
             link_features = [
-                link.density[time_step] if time_step < len(link.density) else 0.0,
-                link.speed[time_step] if time_step < len(link.speed) else 0.0,
-                link.avg_travel_time[time_step] if time_step < len(link.avg_travel_time) else 0.0,
-                link.num_pedestrians[time_step] if time_step < len(link.num_pedestrians) else 0.0,
-                link.receiving_flow[time_step-1] if time_step > 0 and time_step-1 < len(link.receiving_flow) else 0.0,
-                link.front_gate_width / link.width if link.width > 0 else 1.0,  # Current gate width ratio
-                link.capacity,  # Link capacity
-                0.0  # Placeholder for additional feature
+                link.get_density(time_step) if self.with_density_obs else 0.0, # shared density
+                link.inflow[time_step] if time_step < len(link.inflow) else 0.0, # inflow of outgoing link
+                link.reverse_link.outflow[time_step] if time_step < len(link.reverse_link.outflow) else 0.0, # outflow of incoming link
             ]
             
             obs[start_idx:start_idx + features_per_link] = link_features
@@ -209,7 +200,7 @@ class ActionApplier:
             
             if agent_type == "sep":
                 self._apply_separator_action(agent_id, action)
-            elif agent_type == "gat":
+            elif agent_type == "gate":
                 self._apply_gater_action(agent_id, action)
             else:
                 raise ValueError(f"Unknown agent type: {agent_type}")

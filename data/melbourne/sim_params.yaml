@@ -10,6 +10,7 @@ network:
 # Simulation Parameters
 simulation:
 #  simulation_steps: 1692
+  seed: 42
   simulation_steps: 500
   unit_time: 10
 #  path_finder:
@@ -67,37 +68,31 @@ demand:
 #    value: 8
 #  origin_265:
 #    pattern: "node_demand_from_data"
-#    seed: 42
 #
   origin_8172:
     pattern: "gaussian_peaks"
     peak_lambda: 30
     base_lambda: 10
-    seed: 42
 #
   origin_188:
     pattern: "sudden_demand"
     peak_lambda: 30
     base_lambda: 10
-    seed: 42
 
   origin_88:
     pattern: "gaussian_peaks"
     peak_lambda: 30
     base_lambda: 10
-    seed: 42
 
   origin_31:
     pattern: "gaussian_peaks"
     peak_lambda: 30
     base_lambda: 10
-    seed: 42
 
   origin_203:
     pattern: "gaussian_peaks"
     peak_lambda: 30
     base_lambda: 5
-    seed: 42
 
 #OD Flow Configuration
 #od_flows:

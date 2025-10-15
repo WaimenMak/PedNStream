@@ -63,7 +63,7 @@ class DemandGenerator:
         self.simulation_steps = simulation_steps
         self.params = params
         self.time = np.arange(simulation_steps)
-        self.seed = params["seed"] # the seed from the simulation params, can be None
+        self.seed = params.get('seed', None) # the seed from the simulation params, can be None
 
         # Dictionary to store built-in and custom demand patterns
         self.demand_patterns: Dict[str, Callable] = {

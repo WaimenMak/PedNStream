@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# @Time    : 26/01/2025 15:30
+# @Time    : 13/10/2025 12:30
 # @Author  : mmai
 # @FileName: pz_pednet_env
 # @Software: PyCharm
@@ -35,56 +35,27 @@ class PedNetParallelEnv(ParallelEnv):
     
     metadata = {"render_modes": ["human"], "name": "pednet_v0"}
     
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, dataset: str):
         """
         Initialize the PedNet environment.
         
         Args:
-            config: Configuration dictionary containing:
-                - dataset: str, network dataset name (e.g., "delft", "melbourne")
-                - simulation_steps: int, number of simulation time steps
-                - controllers: dict, predefined controller configuration:
-                    {
-                        "separators": [(node1, node2), (node3, node4), ...],
-                        "gaters": [node1, node2, node3, ...]
-                    }
-                - min_sep_frac: float, minimum separator width fraction [0, 0.5)
-                - min_gate_frac: float, minimum gate width fraction [0, 1)
-                - normalize_obs: bool, whether to normalize observations
-                - early_stop_on_jam: bool, early termination on traffic jam
-                - log_level: str, logging level for network simulation
-                - seed: Optional[int], random seed
+            - dataset: str, network dataset name (e.g., "delft", "melbourne")
         """
         super().__init__()
         
-        # Store configuration
-        self.config = config
-        self.dataset = config.get("dataset", "delft")
-        self.simulation_steps = config.get("simulation_steps", 500)
-        self.controller_config = config.get("controllers", {"separators": [], "gaters": []})
-        self.min_sep_frac = config.get("min_sep_frac", 0.1)
-        self.min_gate_frac = config.get("min_gate_frac", 0.1)
-        self.normalize_obs = config.get("normalize_obs", True)
-        self.early_stop_on_jam = config.get("early_stop_on_jam", False)
-        self.log_level = config.get("log_level", "WARNING")
-        
         # Initialize components (will be set in reset)
         self.env_generator = NetworkEnvGenerator()
-        self.network = None
-        self.agent_discovery = None
-        self.space_builder = None
-        self.obs_builder = None
-        self.action_applier = None
         
-        # Environment state
-        self.current_step = 0
+        self.network = self.env_generator.create_network(dataset)
+        self.timestep = None
+        self.sim_step = self.timestep + 1 # the simulation step starts from 1
+        self.simulation_steps = self.network.params['simulation_steps']
         self.agents_list = []
-        self._agent_selector = None
-        self._cumulative_rewards = {}
-        
-        # Spaces (will be built after agent discovery)
-        self._action_spaces = {}
-        self._observation_spaces = {}
+
+        # initialize the observation builder and action applier
+        self.obs_builder = ObservationBuilder(self.network, self.agent_discovery, self.normalize_obs)
+        self.action_applier = ActionApplier(self.network, self.agent_discovery, self.min_sep_frac, self.min_gate_frac)
 
     @property
     def agents(self) -> List[str]:
@@ -117,42 +88,19 @@ class PedNetParallelEnv(ParallelEnv):
         # Set random seed
         if seed is not None:
             np.random.seed(seed)
+            self.network.demand_generator.seed = seed
         
         # Create fresh network environment
-        self.network = self.env_generator.create_network(self.dataset)
+        self.network = self.env_generator.randomize_network(self.network, self.randomize_params)
+        self.timestep = 0
         
         # TODO: Set network logging level to reduce training overhead
         # self.network.logger.setLevel(getattr(logging, self.log_level.upper()))
         
-        # Create agents from predefined configuration
-        self.agent_discovery = AgentDiscovery(self.network, self.controller_config)
-        self.agents_list = self.agent_discovery.get_all_agent_ids()
-        
-        # Build action and observation spaces
-        self.space_builder = SpaceBuilder(
-            agent_discovery=self.agent_discovery,
-            min_sep_frac=self.min_sep_frac,
-            min_gate_frac=self.min_gate_frac
-        )
-        self._action_spaces = self.space_builder.build_action_spaces()
-        self._observation_spaces = self.space_builder.build_observation_spaces()
-        
-        # Initialize observation builder and action applier
-        self.obs_builder = ObservationBuilder(
-            network=self.network,
-            agent_discovery=self.agent_discovery,
-            normalize=self.normalize_obs
-        )
-        self.action_applier = ActionApplier(
-            network=self.network,
-            agent_discovery=self.agent_discovery,
-            min_sep_frac=self.min_sep_frac,
-            min_gate_frac=self.min_gate_frac
-        )
         
         # Reset environment state
-        self.current_step = 1  # Network simulation starts at t=1
-        self._cumulative_rewards = {agent: 0.0 for agent in self.agents_list}
+        # self.current_step = 1  # Network simulation starts at t=1
+        # self._cumulative_rewards = {agent: 0.0 for agent in self.agents_list}
         
         # Build initial observations
         observations = self._get_observations()
@@ -179,7 +127,7 @@ class PedNetParallelEnv(ParallelEnv):
         self.action_applier.apply_all_actions(actions)
         
         # Advance the simulation by one step
-        self.network.network_loading(self.current_step)
+        self.network.network_loading(self.sim_step)
         
         # Build new observations
         observations = self._get_observations()
@@ -195,7 +143,7 @@ class PedNetParallelEnv(ParallelEnv):
         infos = self._get_infos()
         
         # Update environment state
-        self.current_step += 1
+        self.sim_step += 1
         for agent_id, reward in rewards.items():
             self._cumulative_rewards[agent_id] += reward
         
@@ -205,7 +153,7 @@ class PedNetParallelEnv(ParallelEnv):
         """Build observations for all agents."""
         observations = {}
         for agent_id in self.agents_list:
-            observations[agent_id] = self.obs_builder.build_observation(agent_id, self.current_step)
+            observations[agent_id] = self.obs_builder.build_observation(agent_id, self.sim_step)
         return observations
 
     def _compute_rewards(self) -> Dict[str, float]:
@@ -220,7 +168,7 @@ class PedNetParallelEnv(ParallelEnv):
     def _check_terminations(self) -> Dict[str, bool]:
         """Check if any agents should terminate."""
         # Standard termination: reached simulation end
-        terminated = self.current_step >= self.simulation_steps - 1
+        terminated = self.sim_step >= self.simulation_steps - 1
         
         # TODO: Optional early termination on severe congestion
         if self.early_stop_on_jam:
@@ -239,7 +187,7 @@ class PedNetParallelEnv(ParallelEnv):
         infos = {}
         for agent_id in self.agents_list:
             info = {
-                "step": self.current_step,
+                "step": self.sim_step,
                 "cumulative_reward": self._cumulative_rewards.get(agent_id, 0.0)
             }
             

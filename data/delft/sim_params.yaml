@@ -9,6 +9,7 @@ network:
 
 # Simulation Parameters
 simulation:
+  seed: 42
   simulation_steps: 500
   unit_time: 10
   assign_flows_type: "classic"
@@ -65,19 +66,16 @@ demand:
     pattern: "sudden_demand"
     peak_lambda: 20
     base_lambda: 5
-    seed: 42
 
   origin_80:
     pattern: "gaussian_peaks"
     peak_lambda: 15
     base_lambda: 6
-    seed: 42
 
   origin_13:
     pattern: "sudden_demand"
     peak_lambda: 25
     base_lambda: 5
-    seed: 42
 
 #OD Flow Configuration
 #od_flows:

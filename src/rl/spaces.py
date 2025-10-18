@@ -22,18 +22,14 @@ class SpaceBuilder:
     Builds action and observation spaces for discovered agents.
     """
     
-    def __init__(self, agent_discovery: AgentDiscovery, min_sep_frac: float = 0.1, min_gate_frac: float = 0.1):
+    def __init__(self, agent_discovery: AgentDiscovery):
         """
         Initialize space builder.
         
         Args:
             agent_discovery: AgentDiscovery instance with network mappings
-            min_sep_frac: Minimum separator width fraction [0, 0.5)
-            min_gate_frac: Minimum gate width fraction [0, 1)
         """
         self.agent_discovery = agent_discovery
-        self.min_sep_frac = min_sep_frac
-        self.min_gate_frac = min_gate_frac
         
         # Observation space dimensions (placeholders - will be refined)
         self.sep_obs_dim = 12  # TODO: Define based on actual features
@@ -52,13 +48,13 @@ class SpaceBuilder:
                 dtype=np.float32
             )
         
-        # Gater agents: continuous vector of size max_outdegree
-        max_outdegree = self.agent_discovery.get_max_outdegree()
+        # Gater agents: continuous vector sized to actual number of outgoing links
         for agent_id in self.agent_discovery.get_gater_agents():
+            num_outgoing = len(self.agent_discovery.get_gater_outgoing_links(agent_id))
             action_spaces[agent_id] = spaces.Box(
                 low=0.0,
                 high=1.0,
-                shape=(max_outdegree,),
+                shape=(num_outgoing,),
                 dtype=np.float32
             )
         
@@ -105,8 +101,8 @@ class SpaceBuilder:
     
     def validate_gater_action(self, action: np.ndarray, agent_id: str) -> bool:
         """Validate gater agent action."""
-        max_outdegree = self.agent_discovery.get_max_outdegree()
+        num_outgoing = len(self.agent_discovery.get_gater_outgoing_links(agent_id))
         return (isinstance(action, np.ndarray) and 
-                action.shape == (max_outdegree,) and 
+                action.shape == (num_outgoing,) and 
                 np.all((0.0 <= action) & (action <= 1.0)))
 

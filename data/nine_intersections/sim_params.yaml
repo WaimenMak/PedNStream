@@ -1,0 +1,50 @@
+# Netwrok
+network:
+  adjacency_matrix: [
+    [0, 1, 0, 1, 0, 0, 0, 0, 0],  # Node 0
+    [1, 0, 1, 0, 1, 0, 0, 0, 0],  # Node 1
+    [0, 1, 0, 0, 0, 1, 0, 0, 0],  # Node 2
+    [1, 0, 0, 0, 1, 0, 1, 0, 0],  # Node 3
+    [0, 1, 0, 1, 0, 1, 0, 1, 0],  # Node 4
+    [0, 0, 1, 0, 1, 0, 0, 0, 1],  # Node 5
+    [0, 0, 0, 1, 0, 0, 0, 1, 0],  # Node 6
+    [0, 0, 0, 0, 1, 0, 1, 0, 1],  # Node 7
+    [0, 0, 0, 0, 0, 1, 0, 1, 0]   # Node 8
+  ]
+
+# Simulation Parameters
+simulation:
+  simulation_steps: 1000
+  unit_time: 10
+  assign_flows_type: "classic"
+  path_finder:
+    k_paths: 5
+    theta: 10 # temperature parameter for softmax
+    alpha: 1 # congestion weight
+    beta: 0.5 # congestion weight
+    omega: 0.8 # capacity weight
+
+# Default Link Parameters
+default_link:
+  length: 50
+  width: 4
+  free_flow_speed: 1.1
+  k_critical: 2
+  k_jam: 6
+  gamma: 0.01
+  speed_noise_std: 0.05
+  fd_type: "yperman"
+  activity_probability: 0
+  bi_factor: 1
+
+# Demand Configuration
+demand:
+  origin_0:
+    pattern: "gaussian_peaks"
+    peak_lambda: 15
+    base_lambda: 5
+
+  origin_4:
+    pattern: "gaussian_peaks"
+    peak_lambda: 15
+    base_lambda: 5

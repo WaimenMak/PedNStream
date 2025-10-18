@@ -13,6 +13,7 @@ Handles conversion between agent actions/observations and network state.
 import numpy as np
 from typing import Dict, Any, List
 from .discovery import AgentDiscovery
+from LTM.link import Link
 
 
 class ObservationBuilder:
@@ -70,18 +71,22 @@ class ObservationBuilder:
         features = []
         
         # Forward direction features
-        features.extend([
-            forward_link.density[time_step] if time_step < len(forward_link.density) else 0.0 if self.with_density_obs else 0.0, # bidirectional density
-            forward_link.inflow[time_step] if time_step < len(forward_link.inflow) else 0.0,
-            forward_link.outflow[time_step] if time_step < len(forward_link.outflow) else 0.0,
-        ])
-        
-        # Reverse direction features
-        features.extend([
-            reverse_link.density[time_step] if time_step < len(reverse_link.density) else 0.0 if self.with_density_obs else 0.0,
-            reverse_link.inflow[time_step] if time_step < len(reverse_link.inflow) else 0.0,
-            reverse_link.outflow[time_step] if time_step < len(reverse_link.outflow) else 0.0,
-        ])
+        if self.with_density_obs:
+            features.extend([
+                forward_link.density[time_step] if time_step < len(forward_link.density) else 0.0,
+                forward_link.inflow[time_step] if time_step < len(forward_link.inflow) else 0.0,
+                forward_link.outflow[time_step] if time_step < len(forward_link.outflow) else 0.0,
+                reverse_link.density[time_step] if time_step < len(reverse_link.density) else 0.0,
+                reverse_link.inflow[time_step] if time_step < len(reverse_link.inflow) else 0.0,
+                reverse_link.outflow[time_step] if time_step < len(reverse_link.outflow) else 0.0,
+            ])
+        else:
+            features.extend([
+                forward_link.inflow[time_step] if time_step < len(forward_link.inflow) else 0.0,
+                forward_link.outflow[time_step] if time_step < len(forward_link.outflow) else 0.0,
+                reverse_link.inflow[time_step] if time_step < len(reverse_link.inflow) else 0.0,
+                reverse_link.outflow[time_step] if time_step < len(reverse_link.outflow) else 0.0,
+            ])
         
         obs = np.array(features, dtype=np.float32)
         
@@ -106,11 +111,17 @@ class ObservationBuilder:
             start_idx = i * features_per_link
             
             # Extract link features
-            link_features = [
-                link.get_density(time_step) if self.with_density_obs else 0.0, # shared density
-                link.inflow[time_step] if time_step < len(link.inflow) else 0.0, # inflow of outgoing link
-                link.reverse_link.outflow[time_step] if time_step < len(link.reverse_link.outflow) else 0.0, # outflow of incoming link
-            ]
+            if self.with_density_obs:
+                link_features = [
+                    link.get_density(time_step), # shared density
+                    link.inflow[time_step] if time_step < len(link.inflow) else 0.0, # inflow of outgoing link
+                    link.reverse_link.outflow[time_step] if time_step < len(link.reverse_link.outflow) else 0.0, # outflow of incoming link
+                ]
+            else:
+                link_features = [
+                    link.inflow[time_step] if time_step < len(link.inflow) else 0.0, # inflow of outgoing link
+                    link.reverse_link.outflow[time_step] if time_step < len(link.reverse_link.outflow) else 0.0, # outflow of incoming link
+                ]
             
             obs[start_idx:start_idx + features_per_link] = link_features
         
@@ -173,20 +184,22 @@ class ActionApplier:
     """
     
     def __init__(self, network, agent_discovery: AgentDiscovery, 
-                 min_sep_frac: float = 0.1, min_gate_frac: float = 0.1):
+                 max_delta_sep_width: float = 0.1, max_delta_gate_width: float = 0.1, min_sep_width: float = 1.0):
         """
-        Initialize action applier.
+        Initialize action applier. for all kinds of algorithms, not just RL.
         
         Args:
             network: Network instance from LTM simulation
             agent_discovery: AgentDiscovery instance with agent mappings
-            min_sep_frac: Minimum separator width fraction
-            min_gate_frac: Minimum gate width fraction
+            max_delta_sep_width: Maximum delta separator width
+            max_delta_gate_width: Maximum delta gate width
+            min_sep_width: Minimum separator width
         """
         self.network = network
         self.agent_discovery = agent_discovery
-        self.min_sep_frac = min_sep_frac
-        self.min_gate_frac = min_gate_frac
+        self.max_delta_sep_width = max_delta_sep_width
+        self.max_delta_gate_width = max_delta_gate_width
+        self.min_sep_width = min_sep_width
     
     def apply_all_actions(self, actions: Dict[str, Any]):
         """
@@ -205,26 +218,47 @@ class ActionApplier:
             else:
                 raise ValueError(f"Unknown agent type: {agent_type}")
     
+    def clip_separator_action_value(self, action_value: float, forward_link: Link):
+        """
+        Validate separator agent action value. if the action value is >=1 meter and <= max link width.
+        If the change of the width is too large, clip the action value to the maximum or minimum value.
+        """
+        if action_value < self.min_sep_width or action_value > forward_link.width - self.min_sep_width:
+            return self.min_sep_width if action_value < self.min_sep_width else forward_link.width - self.min_sep_width
+        if abs(action_value - forward_link.separator_width) > self.max_delta_sep_width:
+            return forward_link.separator_width + self.max_delta_sep_width if action_value - forward_link.separator_width > self.max_delta_sep_width else forward_link.separator_width - self.max_delta_sep_width
+        return action_value
+
+    def clip_gater_action_value(self, action_value: float, link: Link):
+        """
+        Validate gater agent action value. if the action value is >=0 and <= max link width.
+        If the change of the width is too large, clip the action value to the maximum or minimum value.
+        """
+        if action_value < 0 or action_value > link.width:
+            return 0.0 if action_value < 0 else link.width
+        return action_value
+    
     def _apply_separator_action(self, agent_id: str, action: np.ndarray):
         """
         Apply separator agent action to control lane allocation.
         
         Args:
             agent_id: Separator agent identifier
-            action: Action array of shape (1,) with value in [0, 1]
+            action: Action array of shape (1,) is the processed action value: the actual width
         """
         # Get separator links
         forward_link, reverse_link = self.agent_discovery.get_separator_links(agent_id)
-        total_width = self.agent_discovery.get_separator_total_width(agent_id)
+        # total_width = self.agent_discovery.get_separator_total_width(agent_id)
         
         # Convert action to width fraction, ensuring minimum width
-        action_value = float(action[0])
-        max_frac = 1.0 - self.min_sep_frac
-        width_frac = self.min_sep_frac + action_value * (max_frac - self.min_sep_frac)
+        action_value = float(action[0]) # should be the actual width of the forward link
+        action_value = self.clip_separator_action_value(action_value, forward_link)
+        # max_frac = 1.0 - self.min_sep_frac
+        # width_frac = self.min_sep_frac + action_value * (max_frac - self.min_sep_frac)
         
         # Set separator width (reverse width is automatically adjusted)
-        new_width = width_frac * total_width
-        forward_link.separator_width = new_width
+        # new_width = width_frac * total_width
+        forward_link.separator_width(action_value)
     
     def _apply_gater_action(self, agent_id: str, action: np.ndarray):
         """
@@ -232,21 +266,15 @@ class ActionApplier:
         
         Args:
             agent_id: Gater agent identifier
-            action: Action array of shape (max_outdegree,) with values in [0, 1]
+            action: Action array of shape (num_outgoing_links,) with values in [0, 1]
         """
         # Get gater outgoing links
         out_links = self.agent_discovery.get_gater_outgoing_links(agent_id)
-        action_mask = self.agent_discovery.get_gater_action_mask(agent_id)
         
-        # Apply actions only to valid outgoing links
+        # Apply actions to all outgoing links (no padding, direct mapping)
         for i, link in enumerate(out_links):
-            if action_mask[i] > 0:  # Valid action slot
-                # Convert action to gate width fraction
-                action_value = float(action[i])
-                max_frac = 1.0 - self.min_gate_frac
-                gate_frac = self.min_gate_frac + action_value * (max_frac - self.min_gate_frac)
-                
-                # Set front gate width
-                new_gate_width = gate_frac * link.width
-                link.front_gate_width = new_gate_width
+            # Action value is the actual width of the gate
+            action_value = float(action[i])
+            action_value = self.clip_gater_action_value(action_value, link)
+            link.back_gate_width = action_value
 

@@ -191,10 +191,6 @@ class PedNetParallelEnv(ParallelEnv):
                 "cumulative_reward": self._cumulative_rewards.get(agent_id, 0.0)
             }
             
-            # Add action mask for gater agents
-            if agent_id.startswith("gat:"):
-                info["action_mask"] = self.agent_discovery.get_gater_action_mask(agent_id)
-            
             infos[agent_id] = info
         
         return infos

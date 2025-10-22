@@ -94,6 +94,9 @@ class AgentDiscovery:
             # Find real (non-virtual) outgoing links
             real_out_links = []
             for link in node.outgoing_links:
+                # Skip separator links
+                if isinstance(link, Separator):
+                    continue
                 # Skip virtual links (origin/destination nodes)
                 if hasattr(node, 'virtual_outgoing_link') and link == node.virtual_outgoing_link:
                     continue

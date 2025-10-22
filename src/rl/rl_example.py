@@ -42,7 +42,10 @@ def test_environment():
             actions = {}
             for agent_id in env.agents:
                 action_space = env.action_space(agent_id)
-                actions[agent_id] = action_space.sample()
+                if action_space.shape == (1,):
+                    actions[agent_id] = action_space.low
+                else:
+                    actions[agent_id] = action_space.sample()
                 
             
             # Step environment

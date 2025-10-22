@@ -448,7 +448,8 @@ class Separator(Link):
             self._travel_time_running_sum -= self.travel_time[time_step - self.avg_travel_time_window]
             self.avg_travel_time[time_step] = self._travel_time_running_sum / self.avg_travel_time_window
 
-        self.separator_width_data[time_step] = self._separator_width
+        self.separator_width_data[time_step] = self._separator_width # for visualization of the separator width
+        self.back_gate_width_data[time_step] = self._separator_width # for visualization of the back gate width
 
     @property
     def area(self):

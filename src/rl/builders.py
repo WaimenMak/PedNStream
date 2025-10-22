@@ -98,7 +98,7 @@ class ObservationBuilder:
     
     def _build_gater_observation(self, agent_id: str, time_step: int) -> np.ndarray:
         """Build observation for gater agent."""
-        node = self.agent_discovery.get_gater_node(agent_id)
+        # node = self.agent_discovery.get_gater_node(agent_id)
         out_links = self.agent_discovery.get_gater_outgoing_links(agent_id)
         max_outdegree = self.agent_discovery.get_max_outdegree()
         
@@ -191,8 +191,8 @@ class ActionApplier:
         Args:
             network: Network instance from LTM simulation
             agent_discovery: AgentDiscovery instance with agent mappings
-            max_delta_sep_width: Maximum delta separator width
-            max_delta_gate_width: Maximum delta gate width
+            max_delta_sep_width: Maximum delta separator width within one time step
+            max_delta_gate_width: Maximum delta gate width within one time step
             min_sep_width: Minimum separator width
         """
         self.network = network
@@ -236,6 +236,8 @@ class ActionApplier:
         """
         if action_value < 0 or action_value > link.width:
             return 0.0 if action_value < 0 else link.width
+        if abs(action_value - link.back_gate_width) > self.max_delta_gate_width:
+            return link.back_gate_width + self.max_delta_gate_width if action_value - link.back_gate_width > self.max_delta_gate_width else link.back_gate_width - self.max_delta_gate_width
         return action_value
     
     def _apply_separator_action(self, agent_id: str, action: np.ndarray):

@@ -2,8 +2,8 @@
 network:
 #  origin_nodes: [0, 8, 80, 13]
 #  destination_nodes: [0, 8, 74, 136]
-  origin_nodes: [0]
-  destination_nodes: [8]
+  origin_nodes: [0, 80]
+  destination_nodes: [8, 74]
 #  origin_nodes: [0, 8, 80, 13, 247, 266, 143, 249, 97, 146, 142, 294]
 #  destination_nodes: [0, 8, 74, 136, 10, 13, 182, 35, 216, 219, 80, 274]
 
@@ -25,7 +25,7 @@ controllers:
   enabled: true  # Set to true to enable controller-based path expansion
   nodes: [6, 4]  # List of node IDs that act as controllers, e.g., [3, 4, 5]
   # Optional fields for future use:
-  # links: []  # List of link IDs for link-based control, e.g., ["2_3", "4_5"]
+  # links: []  # List of link IDs for link-based control, e.g., [(2,3), (4,5)]
   # schedule: {}  # Time-based activation, e.g., {3: [[0, 100], [200, 300]]}
 
 # Default Link Parameters

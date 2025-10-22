@@ -86,6 +86,18 @@ class Network:
                 self.demand_generator.register_pattern(func.__name__, func)
                 self.logger.info(f"Custom demand pattern registered: {func.__name__}")
         
+# Controller configuration
+        controller_config = params.get('controllers', {})
+        self.controller_enabled = controller_config.get('enabled', False)
+        self.controller_nodes = controller_config.get('nodes', set())  # all nodes related to controllers
+        self.controller_gaters = self.controller_nodes.copy() # only the intersection nodes with gater control
+        self.controller_links = controller_config.get('links', [])
+        for link in self.controller_links:
+            if isinstance(link, (tuple, list)) and len(link) == 2:
+                self.controller_nodes.add(link[0])
+                self.controller_nodes.add(link[1])
+        self.logger.info(f"Controller configuration: enabled: {self.controller_enabled}, nodes: {self.controller_nodes}, links: {self.controller_links}")
+
         # Initialize network structure
         self.init_nodes_and_links()
         self.logger.info(f"Network initialized with {len(self.nodes)} nodes and {len(self.links)} links")
@@ -95,7 +107,7 @@ class Network:
             self.od_manager = ODManager(self.simulation_steps, logger=self.logger)
             self.od_manager.init_od_flows(origin_nodes, destination_nodes, od_flows)
         
-            self.path_finder = PathFinder(self.links, params=self.params)  # Pass params here
+            self.path_finder = PathFinder(self.links, params=self.params, controller_nodes=self.controller_nodes, controller_links=self.controller_links)  # Pass params here
             self.path_finder.find_od_paths(od_pairs=self.od_manager.od_flows.keys(), 
                                          nodes=self.nodes)
 
@@ -192,7 +204,10 @@ class Network:
                     
                     # Get shared parameters for both directions
                     link_params = self._get_link_params(i, j)
-                    link_type = link_params.get('controller_type', 'gate')
+                    if (i, j) in self.controller_links or (j, i) in self.controller_links:
+                        link_type = 'separator'
+                    else:
+                        link_type = link_params.get('controller_type', 'gate')
                     
                     # Create both links with identical parameters
                     if link_type == 'separator':

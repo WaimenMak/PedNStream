@@ -26,20 +26,16 @@ class AgentDiscovery:
     - Gaters: control node-level gate widths via front_gate_width
     """
     
-    def __init__(self, network, controller_config: Dict[str, Any]):
+    def __init__(self, network):
         """
         Initialize agent mapping from predefined controller configuration.
         
         Args:
             network: Network instance from LTM simulation
-            controller_config: Dictionary specifying controller placement:
-                {
-                    "separators": [(node1, node2), (node3, node4), ...],  # Bidirectional links to control
-                    "gaters": [node1, node2, node3, ...]  # Nodes with gate control
-                }
         """
         self.network = network
-        self.controller_config = controller_config
+        self.controller_gaters = network.controller_gaters # a list of node ids with gater control
+        self.controller_separators = network.controller_links # a list of tuple (node1, node2) with separator control
         
         # Agent mappings
         self.separator_agents = {}  # agent_id -> {"forward": link, "reverse": link, "total_width": float}
@@ -55,7 +51,7 @@ class AgentDiscovery:
     
     def _create_predefined_separators(self):
         """Create separator agents from predefined configuration."""
-        separator_pairs = self.controller_config.get("separators", [])
+        separator_pairs = self.controller_separators
         
         for node_pair in separator_pairs:
             if len(node_pair) != 2:
@@ -86,7 +82,7 @@ class AgentDiscovery:
     
     def _create_predefined_gaters(self):
         """Create gater agents from predefined node configuration."""
-        gater_nodes = self.controller_config.get("gaters", [])
+        gater_nodes = self.controller_gaters
         
         for node_id in gater_nodes:
             if node_id not in self.network.nodes:
@@ -105,7 +101,7 @@ class AgentDiscovery:
             if not real_out_links:
                 raise ValueError(f"Gater node {node_id} has no real outgoing links to control")
             
-            agent_id = f"gat:{node_id}"
+            agent_id = f"gate:{node_id}"
             self.gater_agents[agent_id] = {
                 "node": node,
                 "out_links": real_out_links

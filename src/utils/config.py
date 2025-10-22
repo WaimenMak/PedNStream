@@ -18,23 +18,6 @@ def load_config(config_path: str) -> dict:
     # 1. Assemble the 'params' dictionary required by the Network class
     path_finder_params = config['simulation'].get('path_finder', {})
     
-    # Add controllers configuration to path_finder params if present
-    if 'controllers' in config:
-        path_finder_params['controllers'] = {
-            'enabled': config['controllers'].get('enabled', True),
-            'nodes': config['controllers'].get('nodes', []),
-            'links': config['controllers'].get('links', []),
-            'schedule': config['controllers'].get('schedule', {})
-        }
-    else:
-        # Default: no controllers
-        path_finder_params['controllers'] = {
-            'enabled': False,
-            'nodes': [],
-            'links': [],
-            'schedule': {}
-        }
-    
     params = {
         'simulation_steps': config['simulation']['simulation_steps'],
         'unit_time': config['simulation']['unit_time'],
@@ -43,7 +26,8 @@ def load_config(config_path: str) -> dict:
         'path_finder': path_finder_params,
         'default_link': config['default_link'],
         'links': config.get('links', {}),
-        'demand': config.get('demand', {})
+        'demand': config.get('demand', {}),
+        'controllers': config.get('controllers', {}),
     }
 
     # 2. Assemble the final result dictionary

@@ -19,14 +19,16 @@ sys.path.append(str(project_root))
 
 import numpy as np
 from src.rl import PedNetParallelEnv
+from handlers.output_handler import OutputHandler
+from src.utils.visualizer import NetworkVisualizer, progress_callback
 
 
 def test_environment():
     """Test the PedNet environment with predefined controllers."""
-    dataset = "nine_node"
+    dataset = "nine_intersections"
     try:
         # Initialize environment
-        env = PedNetParallelEnv(dataset)
+        env = PedNetParallelEnv(dataset, simulation_dir="../../outputs/rl_example")
         print(f"Created PedNet environment with dataset: {dataset}")
         
         # Reset environment
@@ -35,18 +37,13 @@ def test_environment():
         
         # Run a few simulation steps with random actions
         print("\nRunning simulation steps...")
-        for step in range(5):
+        for step in range(499):
             # Generate random actions for all agents
             actions = {}
             for agent_id in env.agents:
                 action_space = env.action_space(agent_id)
                 actions[agent_id] = action_space.sample()
                 
-                # For gater agents, apply action mask
-                if agent_id.startswith("gate:"):
-                    action_mask = infos[agent_id].get("action_mask")
-                    if action_mask is not None:
-                        actions[agent_id] = actions[agent_id] * action_mask
             
             # Step environment
             observations, rewards, terminations, truncations, infos = env.step(actions)
@@ -61,6 +58,7 @@ def test_environment():
                 break
         
         print("Environment test completed successfully!")
+        env.save(simulation_dir="rl_example")
         
     except Exception as e:
         print(f"Error testing environment: {e}")
@@ -68,6 +66,19 @@ def test_environment():
         print("Check the controller configuration matches your network topology.")
         raise
 
+    return env
+
 
 if __name__ == "__main__":
-    test_environment()
+    import matplotlib.pyplot as plt
+    import matplotlib
+    env = test_environment()
+    # visualize the simulation results
+    # output_handler = OutputHandler(base_dir="../../outputs", simulation_dir="rl_example")
+    # output_handler.save_network_state(env.network)
+    # visualizer = NetworkVisualizer(simulation_dir=output_handler.simulation_dir)
+    # matplotlib.use('macosx')
+    # ani = visualizer.animate_network(start_time=0, end_time=env.network.params['simulation_steps'], interval=100, edge_property='density')
+    # plt.show()
+    env.render(mode="animate")
+    # env.render(mode="human") # some bugs with snapshot visualization

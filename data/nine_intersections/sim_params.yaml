@@ -11,10 +11,13 @@ network:
     [0, 0, 0, 0, 1, 0, 1, 0, 1],  # Node 7
     [0, 0, 0, 0, 0, 1, 0, 1, 0]   # Node 8
   ]
+  origin_nodes: [0]
+  destination_nodes: [8]
+
 
 # Simulation Parameters
 simulation:
-  simulation_steps: 1000
+  simulation_steps: 500
   unit_time: 10
   assign_flows_type: "classic"
   path_finder:
@@ -37,14 +40,18 @@ default_link:
   activity_probability: 0
   bi_factor: 1
 
+controllers:
+  enabled: true  # Set to true to enable controller-based path expansion
+  nodes: [1, 3, 5, 7]  # List of node IDs that act as controllers
+
 # Demand Configuration
 demand:
   origin_0:
     pattern: "gaussian_peaks"
-    peak_lambda: 15
-    base_lambda: 5
+    peak_lambda: 50
+    base_lambda: 10
 
-  origin_4:
-    pattern: "gaussian_peaks"
-    peak_lambda: 15
-    base_lambda: 5
+#  origin_4:
+#    pattern: "gaussian_peaks"
+#    peak_lambda: 15
+#    base_lambda: 5

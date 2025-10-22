@@ -19,9 +19,14 @@ import gymnasium as gym
 from gymnasium import spaces
 
 from src.utils.env_loader import NetworkEnvGenerator
+from src.utils.visualizer import NetworkVisualizer, progress_callback
 from .discovery import AgentDiscovery
 from .spaces import SpaceBuilder
 from .builders import ObservationBuilder, ActionApplier
+
+import matplotlib.pyplot as plt
+import matplotlib
+from handlers.output_handler import OutputHandler
 
 
 class PedNetParallelEnv(ParallelEnv):
@@ -35,7 +40,7 @@ class PedNetParallelEnv(ParallelEnv):
     
     metadata = {"render_modes": ["human"], "name": "pednet_v0"}
     
-    def __init__(self, dataset: str):
+    def __init__(self, dataset: str, simulation_dir: str = None):
         """
         Initialize the PedNet environment.
         
@@ -49,13 +54,34 @@ class PedNetParallelEnv(ParallelEnv):
         
         self.network = self.env_generator.create_network(dataset)
         self.timestep = None
-        self.sim_step = self.timestep + 1 # the simulation step starts from 1
         self.simulation_steps = self.network.params['simulation_steps']
-        self.agents_list = []
+        self._max_delta_sep_width = 0.25 * self.network.params['unit_time'] # 0.25 meters per sec
+        self._max_delta_gate_width = 0.25 * self.network.params['unit_time'] # 0.25 meters per sec
+        self._min_sep_width = 1.0  # Minimum width for each direction in bidirectional corridors (meters)
+        
+        # Discover agents from network configuration
+        self.agent_discovery = AgentDiscovery(self.network)
+        self.agents_list = self.agent_discovery.get_all_agent_ids()
+        
+        # Build action and observation spaces
+        self.normalize_obs = False
+        self.with_density_obs = False
+        self.space_builder = SpaceBuilder(self.agent_discovery, self.with_density_obs, self._min_sep_width)
+        self._action_spaces = self.space_builder.build_action_spaces()
+        self._observation_spaces = self.space_builder.build_observation_spaces()
+        
+        # Initialize observation builder and action applier
+        self.obs_builder = ObservationBuilder(self.network, self.agent_discovery, self.normalize_obs, self.with_density_obs)
+        self.action_applier = ActionApplier(self.network, self.agent_discovery, self._max_delta_sep_width, self._max_delta_gate_width, self._min_sep_width)
+        
+        # Initialize cumulative rewards
+        self._cumulative_rewards = {agent: 0.0 for agent in self.agents_list}
 
-        # initialize the observation builder and action applier
-        self.obs_builder = ObservationBuilder(self.network, self.agent_discovery, self.normalize_obs)
-        self.action_applier = ActionApplier(self.network, self.agent_discovery, self.min_sep_frac, self.min_gate_frac)
+        # Initialize visualizer
+        if simulation_dir is not None:  
+            self.visualizer = NetworkVisualizer(simulation_dir=simulation_dir)
+        else:
+            self.visualizer = NetworkVisualizer(network=self.network)
 
     @property
     def agents(self) -> List[str]:
@@ -88,19 +114,17 @@ class PedNetParallelEnv(ParallelEnv):
         # Set random seed
         if seed is not None:
             np.random.seed(seed)
-            self.network.demand_generator.seed = seed
-        
-        # Create fresh network environment
-        self.network = self.env_generator.randomize_network(self.network, self.randomize_params)
-        self.timestep = 0
-        
-        # TODO: Set network logging level to reduce training overhead
-        # self.network.logger.setLevel(getattr(logging, self.log_level.upper()))
-        
+            if hasattr(self.network, 'demand_generator'):
+                self.network.demand_generator.seed = seed
         
         # Reset environment state
-        # self.current_step = 1  # Network simulation starts at t=1
-        # self._cumulative_rewards = {agent: 0.0 for agent in self.agents_list}
+        self.timestep = 0
+        self.sim_step = 1  # Network simulation starts at t=1
+        self._cumulative_rewards = {agent: 0.0 for agent in self.agents_list}
+        
+        # TODO: Reset network state if needed
+        # TODO: Set network logging level to reduce training overhead
+        # self.network.logger.setLevel(getattr(logging, self.log_level.upper()))
         
         # Build initial observations
         observations = self._get_observations()
@@ -113,7 +137,7 @@ class PedNetParallelEnv(ParallelEnv):
         Execute one environment step with all agent actions.
         
         Args:
-            actions: Dictionary mapping agent_id to action
+            actions: Dictionary mapping agent_id to action, the value is the width of the separator or gate
             
         Returns:
             Tuple of (observations, rewards, terminations, truncations, infos)
@@ -124,7 +148,10 @@ class PedNetParallelEnv(ParallelEnv):
                 raise ValueError(f"Unknown agent: {agent_id}")
         
         # Apply all agent actions to the network
-        self.action_applier.apply_all_actions(actions)
+        if len(actions) > 0:    
+            self.action_applier.apply_all_actions(actions)
+        else:
+            print("No actions provided, skipping action application.")
         
         # Advance the simulation by one step
         self.network.network_loading(self.sim_step)
@@ -168,12 +195,12 @@ class PedNetParallelEnv(ParallelEnv):
     def _check_terminations(self) -> Dict[str, bool]:
         """Check if any agents should terminate."""
         # Standard termination: reached simulation end
-        terminated = self.sim_step >= self.simulation_steps - 1
+        terminated = self.sim_step >= self.simulation_steps
         
         # TODO: Optional early termination on severe congestion
-        if self.early_stop_on_jam:
-            # Check if any link is severely jammed
-            pass
+        # if self.early_stop_on_jam:
+        #     # Check if any link is severely jammed
+        #     pass
         
         return {agent_id: terminated for agent_id in self.agents_list}
 
@@ -196,9 +223,34 @@ class PedNetParallelEnv(ParallelEnv):
         return infos
 
     def render(self, mode="human"):
-        """Render the environment (placeholder)."""
-        # TODO: Optional visualization integration
-        pass
+        """Render the environment based on mode."""
+        if mode == "human":
+            # Static blocking display of current state
+            self.visualizer.visualize_network_state(
+                time_step=self.sim_step,
+                edge_property='density',  # Customize as needed (e.g., 'flow', 'speed')
+                with_colorbar=True,
+                set_title=True,
+                figsize=(10, 8)
+            )
+        elif mode == "animate":
+            # Full animation from start to current step (blocking)
+            matplotlib.use('macosx')
+            ani = self.visualizer.animate_network(
+                start_time=0,
+                end_time=self.sim_step,  # Up to current step
+                interval=100,  # Adjust speed as needed
+                edge_property='density',  # Customize as needed
+                tag=False  # Optional labels
+            )
+            plt.show()  # Blocks until animation is closed
+        else:
+            raise ValueError(f"Unsupported render mode: {mode}")
+
+    def save(self, simulation_dir: str):
+        """Save the current network state."""
+        output_handler = OutputHandler(base_dir="../../outputs", simulation_dir=simulation_dir)
+        output_handler.save_network_state(self.network)
 
     def close(self):
         """Clean up environment resources."""

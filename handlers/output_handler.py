@@ -31,7 +31,7 @@ class OutputHandler:
         # Save link data
         link_data = {}
         for (u, v), link in network.links.items():
-            link_data[f"{u}-{v}"] = {
+            link_entry = {
                 'density': link.density.tolist(),
                 'link_flow': link.link_flow.tolist(),
                 'speed': link.speed.tolist(),
@@ -51,6 +51,12 @@ class OutputHandler:
                     'k_jam': link.k_jam
                 }
             }
+            
+            # Save front_gate_width only for outgoing links from gater nodes (to avoid redundancy)
+            if hasattr(network, 'controller_gaters') and u in network.controller_gaters:
+                link_entry['back_gate_width'] = link.back_gate_width_data.tolist()
+            
+            link_data[f"{u}-{v}"] = link_entry
         
         # Save node data
         node_data = {}

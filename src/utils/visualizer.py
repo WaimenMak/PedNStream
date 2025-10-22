@@ -145,9 +145,14 @@ class NetworkVisualizer:
         # Draw nodes
         node_sizes = [G.nodes[node]['size'] * 50 + 1000 for node in G.nodes()]
         # Color nodes: red for origins, pink for destinations, lightblue for others
-        node_colors = ['red' if int(node) in self.network_params['origin_nodes'] 
-                      else 'pink' if int(node) in self.network_params['destination_nodes'] 
-                      else 'lightblue' for node in G.nodes()]
+        if self.from_saved:
+            node_colors = ['red' if int(node) in self.network_params['origin_nodes'] 
+                          else 'pink' if int(node) in self.network_params['destination_nodes'] 
+                          else 'lightblue' for node in G.nodes()]
+        else:
+            node_colors = ['red' if int(node) in self.network.origin_nodes 
+                          else 'pink' if int(node) in self.network.destination_nodes
+                          else 'lightblue' for node in G.nodes()]
         nx.draw_networkx_nodes(G, self.pos, node_size=node_sizes,
                              node_color=node_colors,
                              ax=ax)
@@ -216,6 +221,10 @@ class NetworkVisualizer:
         ax.set_ylim(y_min, y_max)
         # Adjust layout to prevent cutting off
         plt.tight_layout()
+        
+        # Draw gate apertures
+        self._draw_gate_apertures(ax, time_step=time_step)
+        
         plt.show()
         
         return fig, ax
@@ -482,9 +491,14 @@ class NetworkVisualizer:
             
             # Draw nodes
             node_sizes = [self.G.nodes[node]['size'] * 100 + 100 for node in self.G.nodes()]
-            node_colors = ['red' if int(node) in self.network_params['origin_nodes'] 
-                          else 'pink' if int(node) in self.network_params['destination_nodes'] 
-                          else 'lightblue' for node in self.G.nodes()]
+            if self.from_saved:
+                node_colors = ['red' if int(node) in self.network_params['origin_nodes'] 
+                else 'pink' if int(node) in self.network_params['destination_nodes'] 
+                else 'lightblue' for node in self.G.nodes()]
+            else:
+                node_colors = ['red' if int(node) in self.network.origin_nodes 
+                else 'pink' if int(node) in self.network.destination_nodes
+                else 'lightblue' for node in self.G.nodes()]
             # print(self.pos)
             # self.pos = nx.spring_layout(G, k=1, iterations=50, seed=42)
             nx.draw_networkx_nodes(self.G, pos=self.pos,
@@ -582,6 +596,9 @@ class NetworkVisualizer:
             
             # Draw node labels
             nx.draw_networkx_labels(self.G, self.pos,font_size=20, ax=ax)
+            
+            # Draw gate apertures
+            self._draw_gate_apertures(ax, time_step=frame)
             
             # Update colorbar
             sm = plt.cm.ScalarMappable(cmap=plt.cm.RdYlGn_r,
@@ -688,7 +705,7 @@ class NetworkVisualizer:
         # Draw base edges in light gray
         all_edges = list(graph.edges())
         bidirectional = [(u, v) for (u, v) in all_edges if (v, u) in graph.edges()]
-        unidirectional = [(u, v) for (u, v) in all_edges if (v, u) not in graph.edges()]
+        # unidirectional = [(u, v) for (u, v) in all_edges if (v, u) not in graph.edges()]
         if bidirectional:
             nx.draw_networkx_edges(
                 graph, pos,
@@ -701,17 +718,17 @@ class NetworkVisualizer:
                 ax=ax,
                 connectionstyle="arc3,rad=0.2"
             )
-        if unidirectional:
-            nx.draw_networkx_edges(
-                graph, pos,
-                edgelist=unidirectional,
-                arrows=True,
-                arrowsize=8,
-                edge_color='lightgray',
-                width=1.5,
-                alpha=0.7,
-                ax=ax
-            )
+        # if unidirectional:
+        #     nx.draw_networkx_edges(
+        #         graph, pos,
+        #         edgelist=unidirectional,
+        #         arrows=True,
+        #         arrowsize=8,
+        #         edge_color='lightgray',
+        #         width=1.5,
+        #         alpha=0.7,
+        #         ax=ax
+        #     )
 
         # Prepare colors for OD pairs (one color per OD)
         cmap = plt.get_cmap('tab20')
@@ -826,6 +843,69 @@ class NetworkVisualizer:
         
         plt.tight_layout()
         plt.show()
+
+    def _draw_gate_apertures(self, ax, time_step=None):
+        """
+        Draw gate apertures (lines at node-edge junctions representing gate width)
+        Works with both live network objects and saved simulation data
+        :param ax: Matplotlib axis to draw on
+        :param time_step: Current time step (for reference, not used in aperture calculation)
+        """
+        # Determine which edges have gate width data
+        edges_with_gates = {}
+        
+        if self.from_saved:
+            # For saved data: collect edges that have back_gate_width
+            for link_id, link_info in self.link_data.items():
+                if 'back_gate_width' in link_info:
+                    u, v = link_id.split('-')
+                    edges_with_gates[(u, v)] = np.array(link_info['back_gate_width'])[time_step]
+        else:
+            # For live network: collect edges from gater nodes
+            if self.network is None:
+                return
+            
+            for (u, v), link in self.network.links.items():
+                # Get gate width from back_gate_width property
+                edges_with_gates[(str(u), str(v))] = link.back_gate_width_data[time_step]
+        
+        # Draw apertures for all edges with gate width data
+        for (u, v), gate_width in edges_with_gates.items():
+            # Get node positions
+            u_pos = np.array(self.pos[u])
+            v_pos = np.array(self.pos[v])
+            
+            # Calculate direction vector (from u to v)
+            direction = v_pos - u_pos
+            direction_length = np.linalg.norm(direction)
+            if direction_length == 0:
+                continue
+            
+            # Normalize direction and get perpendicular vector
+            direction_norm = direction / direction_length
+            perpendicular = np.array([-direction_norm[1], direction_norm[0]])
+            
+            # Connection point: slightly away from the node (about 3% of edge distance)
+            connection_point = u_pos + 0.03 * direction
+            
+            # Scale factor for gate width visualization (adjust for readability)
+            scale_factor = 0.05  # Adjust this to make apertures more/less visible
+            
+            # Calculate aperture endpoints: perpendicular line through connection point
+            half_width = gate_width * scale_factor / 2
+            aperture_start = connection_point - perpendicular * half_width
+            aperture_end = connection_point + perpendicular * half_width
+            
+            # Draw aperture line as a dashed line
+            ax.plot(
+                [aperture_start[0], aperture_end[0]],
+                [aperture_start[1], aperture_end[1]],
+                color='darkblue',
+                linewidth=2.5,
+                alpha=0.7,
+                zorder=2,  # Draw on top of edges
+                linestyle='--'  # Dashed line
+            )
 
 
 def progress_callback(current_frame, total_frames):

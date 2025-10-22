@@ -53,6 +53,7 @@ class Link(BaseLink):
         self._width = kwargs['width']  # width of the link
         self._front_gate_width = self.width  # width of the gate, for gate control in the head
         self._back_gate_width = self.width  # width of the gate, for gate control in the tail
+        self.back_gate_width_data = self.width * np.ones(simulation_steps)
         self.free_flow_speed = kwargs['free_flow_speed']
         self.capacity = self.free_flow_speed * kwargs['k_critical']
         self.k_jam = kwargs['k_jam']
@@ -183,6 +184,8 @@ class Link(BaseLink):
         if time_step >= self.avg_travel_time_window:
             self._travel_time_running_sum -= self.travel_time[time_step - self.avg_travel_time_window]
             self.avg_travel_time[time_step] = self._travel_time_running_sum / self.avg_travel_time_window
+        # update the back_gate_width_data
+        self.back_gate_width_data[time_step] = self.back_gate_width
 
     def get_density(self, time_step: int):
         """

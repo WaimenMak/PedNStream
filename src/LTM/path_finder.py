@@ -144,7 +144,7 @@ def enumerate_shortest_simple_paths(graph, origin, dest, max_paths=None):
 
 class PathFinder:
     """Handles path finding and path-related operations"""
-    def __init__(self, links, params=None):
+    def __init__(self, links, params=None, controller_nodes=None, controller_links=None):
         self.od_paths = {}  # {(origin, dest): [path1, path2, ...]}
         self.graph = self._create_graph(links)
         self.links = links
@@ -162,10 +162,9 @@ class PathFinder:
         self.k_paths = path_params.get('k_paths', 3)
         
         # Controller configuration
-        controller_config = path_params.get('controllers', {})
-        self.controllers_enabled = controller_config.get('enabled', False)
-        self.controller_nodes = set(controller_config.get('nodes', []))
-        self.controller_links = set(controller_config.get('links', []))
+        self.controller_nodes = controller_nodes
+        self.controller_links = controller_links
+        self.controllers_enabled = True if controller_nodes or controller_links else False
         
         # Detour exploration settings (hardcoded for now)
         self.detour_exploration_mode = 'penalize'  # 'penalize' or 'remove' - penalize makes prefix edges expensive
@@ -484,14 +483,14 @@ class PathFinder:
                             # We need to check if any node in [..., dest] part is already in prefix + current_node
                             detour_nodes_after_neighbor = set(detour_suffix[1:])  # All nodes after neighbor
                             
-                            if detour_nodes_after_neighbor & prefix_and_current:  # Any shared nodes?
+                            if detour_nodes_after_neighbor & prefix_and_current:  # Use the set operation to check if there are any shared nodes
                                 continue  # Skip this detour path - would create a loop
                             
                             # Build concatenated path: prefix + [current_node] + detour_suffix
                             # (detour_suffix includes neighbor, so we don't add it separately)
                             new_path = path[:node_idx + 1] + detour_suffix
                             
-                            # Check for duplicates (convert to tuple for hashing)
+                            # Check for duplicates, if the new path is already in the od_paths (convert to tuple for hashing)
                             new_path_tuple = tuple(new_path)
                             existing_paths_tuples = set(tuple(p) for p in self.od_paths[od_pair])
                             

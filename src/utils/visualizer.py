@@ -6,6 +6,7 @@ import pandas as pd
 import os
 from tqdm import tqdm
 import numpy as np
+from src.LTM.link import Separator
 
 class NetworkVisualizer:
     def __init__(self, network=None, simulation_dir=None, pos=None):
@@ -179,27 +180,47 @@ class NetworkVisualizer:
             elif edge_property == 'num_pedestrians':
                 vmin, vmax = 0, 100  # adjust these values based on your pedestrians range
             
-            if (v, u) in edges:
-                nx.draw_networkx_edges(G, self.pos, 
-                                    edgelist=[(u, v)],
-                                    edge_color=[G[u][v]['value']],
-                                    edge_cmap=plt.cm.RdYlGn_r,
-                                    width=width,
-                                    edge_vmin=vmin,
-                                    edge_vmax=vmax,
-                                    arrowsize=arrowsize,
-                                    ax=ax,
-                                    connectionstyle=f"arc3,rad=0.2")
-            else:
-                nx.draw_networkx_edges(G, self.pos, 
-                                     edgelist=[(u, v)],
-                                     edge_color=[G[u][v]['value']],
-                                     edge_cmap=plt.cm.RdYlGn_r,
-                                     width=width,
-                                     edge_vmin=vmin,
-                                     edge_vmax=vmax,
-                                     arrowsize=arrowsize,
-                                     ax=ax)
+            # Determine connection style for drawing arcs
+            rad = 0
+            is_separator = False
+            if self.from_saved:
+                link_key = f"{u}-{v}"
+                if self.link_data.get(link_key, {}).get('is_separator'):
+                    is_separator = True
+            elif self.network:
+                # Need to handle potential key errors if u,v are strings
+                try:
+                    is_separator = isinstance(self.network.links[(int(u), int(v))], Separator)
+                except (KeyError, ValueError):
+                    pass # Not a separator or key format issue
+
+            if is_separator:
+                if self.from_saved:
+                    link_info = self.link_data[f"{u}-{v}"]
+                    sep_width = np.array(link_info['separator_width'])[time_step]
+                    total_width = link_info['parameters']['width']
+                else: # live network
+                    link = self.network.links[(int(u), int(v))]
+                    sep_width = link.separator_width_data[time_step]
+                    total_width = link.width
+                
+                ratio = sep_width / total_width
+                rad = ratio * 0.8  # Scale factor for curvature
+            elif (v, u) in edges: # Default arc for bidirectional non-separator links
+                rad = 0.2
+            
+            connectionstyle = f"arc3,rad={rad}"
+
+            nx.draw_networkx_edges(G, self.pos, 
+                                 edgelist=[(u, v)],
+                                 edge_color=[G[u][v]['value']],
+                                 edge_cmap=plt.cm.RdYlGn_r,
+                                 width=width,
+                                 edge_vmin=vmin,
+                                 edge_vmax=vmax,
+                                 arrowsize=arrowsize,
+                                 ax=ax,
+                                 connectionstyle=connectionstyle)
         
         # Add title
         if set_title:
@@ -408,11 +429,12 @@ class NetworkVisualizer:
         m.save(filename)
 
     def animate_network(self, start_time=0, end_time=None, interval=50, figsize=(10, 8), 
-                       edge_property='density', tag=False):
+                       edge_property='density', tag=False, vis_actions=False):
         """
         Create an animation of the network evolution
         :param edge_property: Property to visualize ('density', 'flow', or 'speed')
         :param tag: Boolean to control whether to show value labels on links
+        :param vis_actions: Boolean to control whether to visualize separators and gaters
         """
         if end_time is None:
             if self.from_saved:
@@ -520,17 +542,65 @@ class NetworkVisualizer:
             elif edge_property == 'speed':
                 vmin, vmax = 0, 3  # adjust these values based on your speed range
             
-            nx.draw_networkx_edges(self.G, self.pos, 
-                                 edgelist=edges,
-                                 edge_color=edge_values.tolist(),
-                                 edge_cmap=plt.cm.RdYlGn_r,
-                                 width=edges_widths.tolist(),
-                                 edge_vmin=vmin,
-                                 edge_vmax=vmax,
-                                 arrowsize=edges_arrowsizes.tolist(),
-                                 ax=ax,
-                                 connectionstyle="arc3,rad=0.2")
-            
+            # Draw edges individually to customize arc curvature for separators
+            for u, v in self.G.edges():
+                edge_value = self.G[u][v].get('value', 0)
+                edge_width = edge_value * 5
+                arrow_size = edge_value * 20
+
+                # Determine connection style for drawing arcs
+                rad = 0
+                is_separator = False
+                if self.from_saved:
+                    link_key = f"{u}-{v}"
+                    if self.link_data.get(link_key, {}).get('is_separator'):
+                        is_separator = True
+                elif self.network:
+                    try:
+                        is_separator = isinstance(self.network.links[(int(u), int(v))], Separator)
+                    except (KeyError, ValueError):
+                        pass
+
+                # Only apply special visualization if vis_actions is True
+                if is_separator and vis_actions:
+                    if self.from_saved:
+                        link_info = self.link_data[f"{u}-{v}"]
+                        sep_width = np.array(link_info['separator_width'])[frame]
+                        total_width = link_info['parameters']['width']
+                    else: # live network
+                        link = self.network.links[(int(u), int(v))]
+                        sep_width = link.separator_width_data[frame]
+                        total_width = link.width
+                    
+                    rad = sep_width * 0.8 / total_width
+                elif (v, u) in self.G.edges() and not vis_actions:
+                    # Standard bidirectional curve only when not visualizing actions
+                    rad = 0.2
+                elif (v, u) in self.G.edges() and vis_actions and not is_separator:
+                    # Slight curve for regular bidirectional edges when visualizing actions
+                    rad = 0.2
+
+                connectionstyle = f"arc3,rad={rad}"
+
+                nx.draw_networkx_edges(self.G, self.pos,
+                                     edgelist=[(u, v)],
+                                     edge_color=[edge_value],
+                                     edge_cmap=plt.cm.RdYlGn_r,
+                                     width=edge_width,
+                                     edge_vmin=vmin,
+                                     edge_vmax=vmax,
+                                     arrowsize=arrow_size,
+                                     ax=ax,
+                                     connectionstyle=connectionstyle)
+                
+                # Draw separator indicator line only when visualizing actions
+                if is_separator and vis_actions:
+                    u_pos = np.array(self.pos[u])
+                    v_pos = np.array(self.pos[v])
+                    ax.plot([u_pos[0], v_pos[0]], [u_pos[1], v_pos[1]],
+                            color='black', linewidth=1.5, alpha=0.6, 
+                            linestyle='-', zorder=1)  # Draw behind the curved edge
+
             # Only draw edge labels if tag is True
             if tag:
                 # Separate edge labels for forward and reverse directions
@@ -597,8 +667,9 @@ class NetworkVisualizer:
             # Draw node labels
             nx.draw_networkx_labels(self.G, self.pos,font_size=20, ax=ax)
             
-            # Draw gate apertures
-            self._draw_gate_apertures(ax, time_step=frame)
+            # Draw gate apertures only when visualizing actions
+            if vis_actions:
+                self._draw_gate_apertures(ax, time_step=frame)
             
             # Update colorbar
             sm = plt.cm.ScalarMappable(cmap=plt.cm.RdYlGn_r,
@@ -886,7 +957,7 @@ class NetworkVisualizer:
             perpendicular = np.array([-direction_norm[1], direction_norm[0]])
             
             # Connection point: slightly away from the node (about 3% of edge distance)
-            connection_point = u_pos + 0.03 * direction
+            connection_point = u_pos + 0.08 * direction
             
             # Scale factor for gate width visualization (adjust for readability)
             scale_factor = 0.05  # Adjust this to make apertures more/less visible

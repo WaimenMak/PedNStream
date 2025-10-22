@@ -11,8 +11,8 @@ network:
     [0, 0, 0, 0, 1, 0, 1, 0, 1],  # Node 7
     [0, 0, 0, 0, 0, 1, 0, 1, 0]   # Node 8
   ]
-  origin_nodes: [0]
-  destination_nodes: [8]
+  origin_nodes: [0, 8]
+  destination_nodes: [8, 0]
 
 
 # Simulation Parameters
@@ -42,16 +42,17 @@ default_link:
 
 controllers:
   enabled: true  # Set to true to enable controller-based path expansion
-  nodes: [1, 3, 5, 7]  # List of node IDs that act as controllers
+#  nodes: [1, 3, 5, 7]  # List of node IDs that act as controllers
+  links: ["1-4"]
 
 # Demand Configuration
 demand:
   origin_0:
     pattern: "gaussian_peaks"
-    peak_lambda: 50
+    peak_lambda: 25
     base_lambda: 10
 
-#  origin_4:
-#    pattern: "gaussian_peaks"
-#    peak_lambda: 15
-#    base_lambda: 5
+  origin_8:
+    pattern: "gaussian_peaks"
+    peak_lambda: 25
+    base_lambda: 10

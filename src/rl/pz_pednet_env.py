@@ -40,7 +40,7 @@ class PedNetParallelEnv(ParallelEnv):
     
     metadata = {"render_modes": ["human"], "name": "pednet_v0"}
     
-    def __init__(self, dataset: str, simulation_dir: str = None):
+    def __init__(self, dataset: str):
         """
         Initialize the PedNet environment.
         
@@ -78,10 +78,7 @@ class PedNetParallelEnv(ParallelEnv):
         self._cumulative_rewards = {agent: 0.0 for agent in self.agents_list}
 
         # Initialize visualizer
-        if simulation_dir is not None:  
-            self.visualizer = NetworkVisualizer(simulation_dir=simulation_dir)
-        else:
-            self.visualizer = NetworkVisualizer(network=self.network)
+        self.visualizer = None
 
     @property
     def agents(self) -> List[str]:
@@ -222,8 +219,12 @@ class PedNetParallelEnv(ParallelEnv):
         
         return infos
 
-    def render(self, mode="human"):
+    def render(self, mode="human", simulation_dir: str = None, vis_actions: bool = False):
         """Render the environment based on mode."""
+        if simulation_dir is not None:  
+            self.visualizer = NetworkVisualizer(simulation_dir=simulation_dir)
+        else:
+            self.visualizer = NetworkVisualizer(network=self.network)
         if mode == "human":
             # Static blocking display of current state
             self.visualizer.visualize_network_state(
@@ -241,7 +242,8 @@ class PedNetParallelEnv(ParallelEnv):
                 end_time=self.sim_step,  # Up to current step
                 interval=100,  # Adjust speed as needed
                 edge_property='density',  # Customize as needed
-                tag=False  # Optional labels
+                tag=False,  # Optional labels
+                vis_actions=vis_actions
             )
             plt.show()  # Blocks until animation is closed
         else:

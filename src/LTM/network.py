@@ -90,12 +90,13 @@ class Network:
         controller_config = params.get('controllers', {})
         self.controller_enabled = controller_config.get('enabled', False)
         self.controller_nodes = controller_config.get('nodes', set())  # all nodes related to controllers
+        self.controller_nodes = set(map(int, self.controller_nodes))
         self.controller_gaters = self.controller_nodes.copy() # only the intersection nodes with gater control
-        self.controller_links = controller_config.get('links', [])
-        for link in self.controller_links:
-            if isinstance(link, (tuple, list)) and len(link) == 2:
-                self.controller_nodes.add(link[0])
-                self.controller_nodes.add(link[1])
+        self.controller_links = controller_config.get('links', []) # link is a string like '1-2'
+        for link in self.controller_links: # expand the nodes related to controllers
+            start_node, end_node = link.split('-')
+            self.controller_nodes.add(int(start_node))
+            self.controller_nodes.add(int(end_node))
         self.logger.info(f"Controller configuration: enabled: {self.controller_enabled}, nodes: {self.controller_nodes}, links: {self.controller_links}")
 
         # Initialize network structure
@@ -204,7 +205,7 @@ class Network:
                     
                     # Get shared parameters for both directions
                     link_params = self._get_link_params(i, j)
-                    if (i, j) in self.controller_links or (j, i) in self.controller_links:
+                    if f"{i}-{j}" in self.controller_links or f"{j}-{i}" in self.controller_links:
                         link_type = 'separator'
                     else:
                         link_type = link_params.get('controller_type', 'gate')

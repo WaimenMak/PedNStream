@@ -28,7 +28,7 @@ def test_environment():
     dataset = "nine_intersections"
     try:
         # Initialize environment
-        env = PedNetParallelEnv(dataset, simulation_dir="../../outputs/rl_example")
+        env = PedNetParallelEnv(dataset)
         print(f"Created PedNet environment with dataset: {dataset}")
         
         # Reset environment
@@ -80,5 +80,5 @@ if __name__ == "__main__":
     # matplotlib.use('macosx')
     # ani = visualizer.animate_network(start_time=0, end_time=env.network.params['simulation_steps'], interval=100, edge_property='density')
     # plt.show()
-    env.render(mode="animate")
+    env.render(mode="animate", simulation_dir="../../outputs/rl_example", vis_actions=True)
     # env.render(mode="human") # some bugs with snapshot visualization

@@ -13,7 +13,7 @@ Handles conversion between agent actions/observations and network state.
 import numpy as np
 from typing import Dict, Any, List
 from .discovery import AgentDiscovery
-from LTM.link import Link
+from LTM.link import Link, Separator
 
 
 class ObservationBuilder:
@@ -260,7 +260,8 @@ class ActionApplier:
         
         # Set separator width (reverse width is automatically adjusted)
         # new_width = width_frac * total_width
-        forward_link.separator_width(action_value)
+        # forward_link.separator_width(action_value)
+        forward_link.separator_width = action_value
     
     def _apply_gater_action(self, agent_id: str, action: np.ndarray):
         """

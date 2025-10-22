@@ -422,6 +422,7 @@ class Separator(Link):
         self._separator_width = self._width / 2
         self._front_gate_width = self._width / 2
         self._back_gate_width = self._width / 2
+        self.separator_width_data = self._width / 2 * np.ones(simulation_steps)
 
     def get_density(self, time_step: int):
         return self.density[time_step]
@@ -446,6 +447,8 @@ class Separator(Link):
         if time_step >= self.avg_travel_time_window:
             self._travel_time_running_sum -= self.travel_time[time_step - self.avg_travel_time_window]
             self.avg_travel_time[time_step] = self._travel_time_running_sum / self.avg_travel_time_window
+
+        self.separator_width_data[time_step] = self._separator_width
 
     @property
     def area(self):

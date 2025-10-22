@@ -54,6 +54,7 @@ class AgentDiscovery:
         separator_pairs = self.controller_separators
         
         for node_pair in separator_pairs:
+            node_pair = tuple(map(int, node_pair.split('-')))
             if len(node_pair) != 2:
                 raise ValueError(f"Separator pair must have exactly 2 nodes: {node_pair}")
             

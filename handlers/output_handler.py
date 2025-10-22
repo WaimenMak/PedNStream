@@ -6,6 +6,7 @@ import pandas as pd
 from datetime import datetime
 from pathlib import Path
 from src.LTM.network import Network
+from src.LTM.link import Separator
 
 class OutputHandler:
     def __init__(self, base_dir="outputs", simulation_dir=None):
@@ -55,6 +56,11 @@ class OutputHandler:
             # Save front_gate_width only for outgoing links from gater nodes (to avoid redundancy)
             if hasattr(network, 'controller_gaters') and u in network.controller_gaters:
                 link_entry['back_gate_width'] = link.back_gate_width_data.tolist()
+
+            # If the link is a separator, save its width data for visualization
+            if isinstance(link, Separator) and hasattr(link, 'separator_width_data'):
+                link_entry['is_separator'] = True
+                link_entry['separator_width'] = link.separator_width_data.tolist()
             
             link_data[f"{u}-{v}"] = link_entry
         

@@ -17,7 +17,7 @@ class ODManager:
         self.logger = logger or logging.getLogger(__name__)
         self.od_flows = {}  # {(o,d): array of flows}
         self.simulation_steps = simulation_steps
-        self._default_zero_flow = np.zeros(self.simulation_steps)
+        self._default_zero_flow = np.zeros(self.simulation_steps + 1)
 
     def init_od_flows(self, origin_nodes: list, destination_nodes: list, od_flows: dict = None):
         """
@@ -37,15 +37,15 @@ class ODManager:
             for o in origin_nodes:
                 for d in destination_nodes:
                     if o != d:
-                        self.od_flows[(o, d)] = np.ones(self.simulation_steps)
+                        self.od_flows[(o, d)] = np.ones(self.simulation_steps + 1)
 
     def _set_predefined_flows(self, od_flows: dict):
         """Set predefined OD flows"""
         for (o, d), flow in od_flows.items():
             if isinstance(flow, (int, float)):  # if the element in od_flows is a single value
-                self.od_flows[(o, d)] = np.full(self.simulation_steps, flow)
+                self.od_flows[(o, d)] = np.full(self.simulation_steps + 1, flow)
             else:
-                if len(flow) != self.simulation_steps: # if the element in od_flows is a list or array
+                if len(flow) != self.simulation_steps + 1: # if the element in od_flows is a list or array
                     raise ValueError(f"Flow array length for OD pair ({o},{d}) must match simulation_steps")
                 self.od_flows[(o, d)] = np.array(flow)
 
@@ -106,7 +106,7 @@ class DemandGenerator:
     def generate_constant(self, origin_id: int, params=None) -> np.ndarray:
         """Built-in constant demand pattern"""
         config = self._get_demand_config(origin_id)
-        return np.full(self.simulation_steps, config.base_lambda)
+        return np.full(self.simulation_steps + 1, config.base_lambda)
     
     def generate_sudden_demand(self, origin_id: int, params=None) -> np.ndarray:
         """Built-in sudden demand pattern with configurable parameters"""

@@ -8,13 +8,13 @@ class BaseLink:
         self.start_node = start_node
         self.end_node = end_node
         
-        # Common dynamic attributes
-        self.inflow = np.zeros(simulation_steps)
-        self.outflow = np.zeros(simulation_steps)
-        self.cumulative_inflow = np.zeros(simulation_steps)
-        self.cumulative_outflow = np.zeros(simulation_steps)
-        self.sending_flow = -1 * np.ones(simulation_steps)
-        self.receiving_flow = -1 * np.ones(simulation_steps)
+        # Common dynamic attributes - extend by 1 to accommodate steps 1 to simulation_steps
+        self.inflow = np.zeros(simulation_steps + 1)
+        self.outflow = np.zeros(simulation_steps + 1)
+        self.cumulative_inflow = np.zeros(simulation_steps + 1)
+        self.cumulative_outflow = np.zeros(simulation_steps + 1)
+        self.sending_flow = -1 * np.ones(simulation_steps + 1)
+        self.receiving_flow = -1 * np.ones(simulation_steps + 1)
 
     def update_cum_outflow(self, q_j: float, time_step: int):
         self.outflow[time_step] = q_j
@@ -53,7 +53,7 @@ class Link(BaseLink):
         self._width = kwargs['width']  # width of the link
         self._front_gate_width = self.width  # width of the gate, for gate control in the head
         self._back_gate_width = self.width  # width of the gate, for gate control in the tail
-        self.back_gate_width_data = self.width * np.ones(simulation_steps)
+        self.back_gate_width_data = self.width * np.ones(simulation_steps + 1)
         self.free_flow_speed = kwargs['free_flow_speed']
         self.capacity = self.free_flow_speed * kwargs['k_critical']
         self.k_jam = kwargs['k_jam']
@@ -79,7 +79,7 @@ class Link(BaseLink):
 
         self.exponent = 0.8 # private attribute for the releasing factor exponent, default is 1
 
-        self.travel_time = np.zeros(simulation_steps, dtype=np.float32)
+        self.travel_time = np.zeros(simulation_steps + 1, dtype=np.float32)
         self.travel_time[0] = min(self.length / self.free_flow_speed, self.max_travel_time)
         self._travel_time_running_sum = self.travel_time[0]
         self.unit_time = unit_time
@@ -87,14 +87,14 @@ class Link(BaseLink):
 
         # For efficient moving average calculation
         self.avg_travel_time_window = round(100 / self.unit_time)
-        self.avg_travel_time = np.zeros(simulation_steps, dtype=np.float32)
+        self.avg_travel_time = np.zeros(simulation_steps + 1, dtype=np.float32)
         self.avg_travel_time[:self.avg_travel_time_window] = self.travel_time[0] # initialize the first window
 
         # Additional dynamic attributes
-        self.num_pedestrians = np.zeros(simulation_steps, dtype=np.float32)
-        self.density = np.zeros(simulation_steps, dtype=np.float32) 
-        self.speed = np.zeros(simulation_steps, dtype=np.float32)
-        self.link_flow = np.zeros(simulation_steps, dtype=np.float32)
+        self.num_pedestrians = np.zeros(simulation_steps + 1, dtype=np.float32)
+        self.density = np.zeros(simulation_steps + 1, dtype=np.float32) 
+        self.speed = np.zeros(simulation_steps + 1, dtype=np.float32)
+        self.link_flow = np.zeros(simulation_steps + 1, dtype=np.float32)
         self.gamma = kwargs.get('gamma', 2e-3)  # Default value if not provided, diffusion coefficient
         self.reverse_link = None
         self.activity_probability = kwargs.get('activity_probability', 0.0)
@@ -422,7 +422,7 @@ class Separator(Link):
         self._separator_width = self._width / 2
         self._front_gate_width = self._width / 2
         self._back_gate_width = self._width / 2
-        self.separator_width_data = self._width / 2 * np.ones(simulation_steps)
+        self.separator_width_data = self._width / 2 * np.ones(simulation_steps + 1)
 
     def get_density(self, time_step: int):
         return self.density[time_step]

@@ -222,7 +222,7 @@ class PathFinder:
                 for od_pair in self.node_to_od_pairs[node]:
                     self.expand_controller_paths(nodes[node], od_pair)
                     print(f"Controller node {node}: Added {len(self.od_paths[od_pair])} detour path(s) for OD {od_pair}")
-        # self.check_if_paths_are_different(self.od_paths)
+        self.check_if_paths_are_different(self.od_paths)
         # Calculate and store turn probabilities for all nodes in paths
         self.calculate_all_turn_probs(nodes=nodes)
     
@@ -241,6 +241,8 @@ class PathFinder:
             if len(unique) != len(normalized):
                 dup_count = len(normalized) - len(unique)
                 print(f"Warning: duplicate paths detected for OD {od_pair}: {dup_count} duplicate(s)")
+                od_paths[od_pair] = [list(p) for p in unique]
+                print(f"Unique paths for OD {od_pair}: {od_paths[od_pair]}")
 
     def calculate_all_turn_probs(self, nodes):
         """Calculate and store turn probabilities for all nodes in paths"""
@@ -266,33 +268,7 @@ class PathFinder:
             
         return {'length': length, 'free_flow_time': free_flow_time} 
     
-    # def get_od_pairs_for_turn(self, upstream_node: int, current_node: int, downstream_node: int):
-    #     """
-    #     Find all OD pairs whose paths use the specified turn.
-        
-    #     Args:
-    #         upstream_node: ID of the upstream node
-    #         current_node: ID of the current node
-    #         downstream_node: ID of the downstream node
-            
-    #     Returns:
-    #         list of (origin, destination) tuples that use this turn
-    #     """
-    #     od_pairs_using_turn = []
-        
-    #     # Check each OD pair
-    #     for (origin, dest), paths in self.od_paths.items():
-    #         # Check each path for this OD pair
-    #         for path in paths:
-    #             # Look for the turn sequence in the path
-    #             for i in range(len(path)-2):
-    #                 if (path[i] == upstream_node and 
-    #                     path[i+1] == current_node and 
-    #                     path[i+2] == downstream_node):
-    #                     od_pairs_using_turn.append((origin, dest))
-    #                     break  # Found turn in this path, move to next OD pair
-                        
-    #     return od_pairs_using_turn
+
 
     def calculate_path_distance(self, path, start_idx=0):
         """
@@ -312,58 +288,7 @@ class PathFinder:
                 distance += link["weight"]
         return distance
 
-    # def calculate_path_probabilities(self, current_node: int):
-    #     """
-    #     Calculate route choice probability for paths from current node to destinations.
-    #     For each OD pair passing through current_node, calculate probabilities of 
-    #     choosing different downstream paths.
-    #     """
-    #     node_path_probs = {}  # {(o,d): {downstream_path: probability}}
-        
-    #     for od_pair, paths in self.od_paths.items():
-    #         downstream_paths = []
-    #         distances = []
-            
-    #         # Find paths containing current node and get downstream portions
-    #         for path in paths:
-    #             try:
-    #                 node_idx = path.index(current_node)
-    #                 if node_idx < len(path) - 1:  # Ensure there's a downstream path
-    #                     downstream_path = tuple(path[node_idx:])  # From current node to destination
-    #                     downstream_paths.append(downstream_path)
-    #                     distances.append(self.calculate_path_distance(path, start_idx=node_idx))
-    #             except ValueError:
-    #                 # Current node not in this path
-    #                 continue
-            
-    #         if downstream_paths:
-    #             # Convert to probabilities using logit model
-    #             theta = 0.1  # sensitivity parameter
-    #             exp_utilities = np.exp(-theta * np.array(distances))
-    #             probs = exp_utilities / np.sum(exp_utilities)
-                
-    #             # Store probabilities for downstream paths
-    #             node_path_probs[od_pair] = dict(zip(downstream_paths, probs))
-                
-    #     return node_path_probs
 
-    # def build_turn_to_paths_map(self):
-    #     """Build mapping from turns to paths that use them"""
-    #     self.turn_to_paths = {}
-        
-    #     for od_pair, paths in self.od_paths.items():
-    #         for path in paths:
-    #             # Look for turns in path
-    #             for i in range(len(path)-2):
-    #                 turn = (path[i], path[i+1], path[i+2])
-                    
-    #                 if turn not in self.turn_to_paths:
-    #                     self.turn_to_paths[turn] = {}
-                    
-    #                 if od_pair not in self.turn_to_paths[turn]:
-    #                     self.turn_to_paths[turn][od_pair] = []
-                        
-    #                 self.turn_to_paths[turn][od_pair].append(tuple(path))
 
     def expand_controller_paths(self, current_node: Node, od_pair):
         """

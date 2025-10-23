@@ -37,7 +37,7 @@ def test_environment():
         
         # Run a few simulation steps with random actions
         print("\nRunning simulation steps...")
-        for step in range(499):
+        for step in range(env.simulation_steps):
             # Generate random actions for all agents
             actions = {}
             for agent_id in env.agents:
@@ -50,6 +50,7 @@ def test_environment():
             
             # Step environment
             observations, rewards, terminations, truncations, infos = env.step(actions)
+            # print(observations[env.agents[0]])
             
             # Print step results
             total_reward = sum(rewards.values())

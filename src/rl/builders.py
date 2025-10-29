@@ -12,8 +12,8 @@ Handles conversion between agent actions/observations and network state.
 
 import numpy as np
 from typing import Dict, Any, List
-from .discovery import AgentDiscovery
-from LTM.link import Link, Separator
+from .discovery import AgentManager
+from src.LTM.link import Link, Separator
 
 
 class ObservationBuilder:
@@ -21,18 +21,18 @@ class ObservationBuilder:
     Builds observations for separator and gater agents from network state.
     """
     
-    def __init__(self, network, agent_discovery: AgentDiscovery, normalize: bool = True, with_density_obs: bool = False):
+    def __init__(self, network, agent_manager: AgentManager, normalize: bool = True, with_density_obs: bool = False):
         """
         Initialize observation builder.
         
         Args:
             network: Network instance from LTM simulation
-            agent_discovery: AgentDiscovery instance with agent mappings
+            agent_manager: AgentManager instance with agent mappings
             normalize: Whether to normalize observations
             with_density_obs: Whether to include density observations
         """
         self.network = network
-        self.agent_discovery = agent_discovery
+        self.agent_manager = agent_manager
         self.normalize = normalize
         self.with_density_obs = with_density_obs
         
@@ -53,7 +53,7 @@ class ObservationBuilder:
         Returns:
             Observation array for the agent
         """
-        agent_type = self.agent_discovery.get_agent_type(agent_id)
+        agent_type = self.agent_manager.get_agent_type(agent_id)
         
         if agent_type == "sep":
             return self._build_separator_observation(agent_id, time_step)
@@ -64,7 +64,7 @@ class ObservationBuilder:
     
     def _build_separator_observation(self, agent_id: str, time_step: int) -> np.ndarray:
         """Build observation for separator agent."""
-        forward_link, reverse_link = self.agent_discovery.get_separator_links(agent_id)
+        forward_link, reverse_link = self.agent_manager.get_separator_links(agent_id)
         
         # TODO: Extract meaningful features from both directions
         # Placeholder features:
@@ -73,12 +73,12 @@ class ObservationBuilder:
         # Forward direction features
         if self.with_density_obs:
             features.extend([
-                forward_link.density[time_step] if time_step < len(forward_link.density) else 0.0,
+                forward_link.density[time_step] if time_step < len(forward_link.density) else 0.0, # density of the forward link
                 forward_link.inflow[time_step] if time_step < len(forward_link.inflow) else 0.0,
-                forward_link.outflow[time_step] if time_step < len(forward_link.outflow) else 0.0,
-                reverse_link.density[time_step] if time_step < len(reverse_link.density) else 0.0,
-                reverse_link.inflow[time_step] if time_step < len(reverse_link.inflow) else 0.0,
-                reverse_link.outflow[time_step] if time_step < len(reverse_link.outflow) else 0.0,
+                forward_link.outflow[time_step] if time_step < len(forward_link.outflow) else 0.0, # outflow of the forward link
+                reverse_link.density[time_step] if time_step < len(reverse_link.density) else 0.0, # density of the reverse link
+                reverse_link.inflow[time_step] if time_step < len(reverse_link.inflow) else 0.0, # inflow of the reverse link
+                reverse_link.outflow[time_step] if time_step < len(reverse_link.outflow) else 0.0, # outflow of the reverse link
             ])
         else:
             features.extend([
@@ -99,12 +99,12 @@ class ObservationBuilder:
     def _build_gater_observation(self, agent_id: str, time_step: int) -> np.ndarray:
         """Build observation for gater agent."""
         # node = self.agent_discovery.get_gater_node(agent_id)
-        out_links = self.agent_discovery.get_gater_outgoing_links(agent_id)
-        max_outdegree = self.agent_discovery.get_max_outdegree()
+        out_links = self.agent_manager.get_gater_outgoing_links(agent_id)
+        max_outdegree = self.agent_manager.get_max_outdegree()
         
         # TODO: Extract per-outgoing-link features
         # Placeholder: 8 features per link, padded to max_outdegree
-        features_per_link = 3 if self.with_density_obs else 2 # density, inflow of outgoing link, outflow of incoming link
+        features_per_link = 4 if self.with_density_obs else 3 # density, inflow of outgoing link, outflow of incoming link, current gate width
         obs = np.zeros(max_outdegree * features_per_link, dtype=np.float32)
         
         for i, link in enumerate(out_links):
@@ -116,11 +116,13 @@ class ObservationBuilder:
                     link.get_density(time_step), # shared density
                     link.inflow[time_step] if time_step < len(link.inflow) else 0.0, # inflow of outgoing link
                     link.reverse_link.outflow[time_step] if time_step < len(link.reverse_link.outflow) else 0.0, # outflow of incoming link
+                    link.back_gate_width,
                 ]
             else:
                 link_features = [
                     link.inflow[time_step] if time_step < len(link.inflow) else 0.0, # inflow of outgoing link
                     link.reverse_link.outflow[time_step] if time_step < len(link.reverse_link.outflow) else 0.0, # outflow of incoming link
+                    link.back_gate_width,
                 ]
             
             obs[start_idx:start_idx + features_per_link] = link_features
@@ -157,23 +159,31 @@ class ObservationBuilder:
         # Placeholder normalization
         normalized = obs.copy()
         
-        features_per_link = 8
+        if self.with_density_obs:
+            features_per_link = 4
+        else:
+            features_per_link = 3
+        
+        if features_per_link == 0:
+            return normalized
+
         max_outdegree = len(obs) // features_per_link
         
         for i in range(max_outdegree):
             start_idx = i * features_per_link
             
-            # Normalize density (index 0)
-            normalized[start_idx] /= self.density_norm
-            
-            # Normalize speed (index 1)
-            normalized[start_idx + 1] /= self.speed_norm
-            
-            # Normalize travel time (index 2)
-            normalized[start_idx + 2] /= self.time_norm
-            
-            # Normalize receiving flow (index 4)
-            normalized[start_idx + 4] /= self.flow_norm
+            if self.with_density_obs:
+                # Normalize density (index 0)
+                normalized[start_idx] /= self.density_norm
+                # Normalize flow (indices 1, 2)
+                normalized[start_idx + 1] /= self.flow_norm
+                normalized[start_idx + 2] /= self.flow_norm
+                # Note: gate width (index 3) is not normalized
+            else:
+                # Normalize flow (indices 0, 1)
+                normalized[start_idx] /= self.flow_norm
+                normalized[start_idx + 1] /= self.flow_norm
+                # Note: gate width (index 2) is not normalized
         
         return normalized
 
@@ -183,20 +193,20 @@ class ActionApplier:
     Applies agent actions to network components.
     """
     
-    def __init__(self, network, agent_discovery: AgentDiscovery, 
+    def __init__(self, network, agent_manager: AgentManager, 
                  max_delta_sep_width: float = 0.1, max_delta_gate_width: float = 0.1, min_sep_width: float = 1.0):
         """
         Initialize action applier. for all kinds of algorithms, not just RL.
         
         Args:
             network: Network instance from LTM simulation
-            agent_discovery: AgentDiscovery instance with agent mappings
+            agent_manager: AgentManager instance with agent mappings
             max_delta_sep_width: Maximum delta separator width within one time step
             max_delta_gate_width: Maximum delta gate width within one time step
             min_sep_width: Minimum separator width
         """
         self.network = network
-        self.agent_discovery = agent_discovery
+        self.agent_manager = agent_manager
         self.max_delta_sep_width = max_delta_sep_width
         self.max_delta_gate_width = max_delta_gate_width
         self.min_sep_width = min_sep_width
@@ -209,7 +219,7 @@ class ActionApplier:
             actions: Dictionary mapping agent_id to action
         """
         for agent_id, action in actions.items():
-            agent_type = self.agent_discovery.get_agent_type(agent_id)
+            agent_type = self.agent_manager.get_agent_type(agent_id)
             
             if agent_type == "sep":
                 self._apply_separator_action(agent_id, action)
@@ -223,22 +233,32 @@ class ActionApplier:
         Validate separator agent action value. if the action value is >=1 meter and <= max link width.
         If the change of the width is too large, clip the action value to the maximum or minimum value.
         """
-        if action_value < self.min_sep_width or action_value > forward_link.width - self.min_sep_width:
-            return self.min_sep_width if action_value < self.min_sep_width else forward_link.width - self.min_sep_width
+        # if action_value < self.min_sep_width or action_value > forward_link.width - self.min_sep_width:
+        #     return np.clip(action_value, self.min_sep_width, forward_link.width - self.min_sep_width)
         if abs(action_value - forward_link.separator_width) > self.max_delta_sep_width:
-            return forward_link.separator_width + self.max_delta_sep_width if action_value - forward_link.separator_width > self.max_delta_sep_width else forward_link.separator_width - self.max_delta_sep_width
-        return action_value
+            delta = np.clip(
+                action_value - forward_link.separator_width,
+                -self.max_delta_sep_width,
+                self.max_delta_sep_width
+            )
+            action_value = forward_link.separator_width + delta
+        return np.clip(action_value, self.min_sep_width, forward_link.width - self.min_sep_width)
 
     def clip_gater_action_value(self, action_value: float, link: Link):
         """
         Validate gater agent action value. if the action value is >=0 and <= max link width.
         If the change of the width is too large, clip the action value to the maximum or minimum value.
         """
-        if action_value < 0 or action_value > link.width:
-            return 0.0 if action_value < 0 else link.width
+        # if action_value < 0 or action_value > link.width:
+        #     return 0.0 if action_value < 0 else link.width
         if abs(action_value - link.back_gate_width) > self.max_delta_gate_width:
-            return link.back_gate_width + self.max_delta_gate_width if action_value - link.back_gate_width > self.max_delta_gate_width else link.back_gate_width - self.max_delta_gate_width
-        return action_value
+            delta = np.clip(
+                action_value - link.back_gate_width,
+                -self.max_delta_gate_width,
+                self.max_delta_gate_width
+            )
+            action_value = link.back_gate_width + delta
+        return np.clip(action_value, 0.0, link.width)
     
     def _apply_separator_action(self, agent_id: str, action: np.ndarray):
         """
@@ -249,7 +269,7 @@ class ActionApplier:
             action: Action array of shape (1,) is the processed action value: the actual width
         """
         # Get separator links
-        forward_link, reverse_link = self.agent_discovery.get_separator_links(agent_id)
+        forward_link, reverse_link = self.agent_manager.get_separator_links(agent_id)
         # total_width = self.agent_discovery.get_separator_total_width(agent_id)
         
         # Convert action to width fraction, ensuring minimum width
@@ -272,7 +292,7 @@ class ActionApplier:
             action: Action array of shape (num_outgoing_links,) with values in [0, 1]
         """
         # Get gater outgoing links
-        out_links = self.agent_discovery.get_gater_outgoing_links(agent_id)
+        out_links = self.agent_manager.get_gater_outgoing_links(agent_id)
         
         # Apply actions to all outgoing links (no padding, direct mapping)
         for i, link in enumerate(out_links):

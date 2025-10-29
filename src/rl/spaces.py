@@ -14,7 +14,7 @@ and dimensionality.
 import numpy as np
 from typing import Dict
 from gymnasium import spaces
-from .discovery import AgentDiscovery
+from .discovery import AgentManager
 
 
 class SpaceBuilder:
@@ -22,22 +22,22 @@ class SpaceBuilder:
     Builds action and observation spaces for discovered agents.
     """
     
-    def __init__(self, agent_discovery: AgentDiscovery, with_density_obs: bool = False, min_sep_width: float = 1.0):
+    def __init__(self, agent_manager: AgentManager, with_density_obs: bool = False, min_sep_width: float = 1.0):
         """
         Initialize space builder.
         
         Args:
-            agent_discovery: AgentDiscovery instance with network mappings
+            agent_manager: AgentManager instance with network mappings
             with_density_obs: Whether density observations are included
             min_sep_width: Minimum width for each direction in bidirectional separators
         """
-        self.agent_discovery = agent_discovery
+        self.agent_manager = agent_manager
         self.with_density_obs = with_density_obs
         self.min_sep_width = min_sep_width
         
         # Observation space dimensions based on actual features
         self.sep_obs_dim = 6 if with_density_obs else 4  # Forward + reverse link features
-        self.gat_obs_dim_per_link = 3 if with_density_obs else 2  # Features per outgoing link
+        self.gat_obs_dim_per_link = 4 if with_density_obs else 3  # Features per outgoing link, including current gate width
     
     def build_action_spaces(self) -> Dict[str, spaces.Space]:
         """Build action spaces for all agents with physical width constraints."""
@@ -45,8 +45,8 @@ class SpaceBuilder:
         
         # Separator agents: control forward lane width in bidirectional corridor
         # Action value is actual width in meters: [min_sep_width, total_width - min_sep_width]
-        for agent_id in self.agent_discovery.get_separator_agents():
-            forward_link, reverse_link = self.agent_discovery.get_separator_links(agent_id)
+        for agent_id in self.agent_manager.get_separator_agents():
+            forward_link, reverse_link = self.agent_manager.get_separator_links(agent_id)
             total_width = forward_link.width  # Total corridor width
             
             action_spaces[agent_id] = spaces.Box(
@@ -58,8 +58,8 @@ class SpaceBuilder:
         
         # Gater agents: control gate widths for each outgoing link
         # Action value is actual gate width in meters: [0, link.width]
-        for agent_id in self.agent_discovery.get_gater_agents():
-            out_links = self.agent_discovery.get_gater_outgoing_links(agent_id)
+        for agent_id in self.agent_manager.get_gater_agents():
+            out_links = self.agent_manager.get_gater_outgoing_links(agent_id)
             
             # Build bounds per outgoing link
             low_bounds = np.zeros(len(out_links), dtype=np.float32)
@@ -79,7 +79,7 @@ class SpaceBuilder:
         observation_spaces = {}
         
         # Separator agents: fixed-size feature vector
-        for agent_id in self.agent_discovery.get_separator_agents():
+        for agent_id in self.agent_manager.get_separator_agents():
             observation_spaces[agent_id] = spaces.Box(
                 low=-np.inf,
                 high=np.inf,
@@ -89,8 +89,8 @@ class SpaceBuilder:
         
         # Gater agents: per-outgoing-link features, padded to max_outdegree
         # Note: Currently using max_outdegree padding for observations (unlike actions)
-        max_outdegree = self.agent_discovery.get_max_outdegree()
-        for agent_id in self.agent_discovery.get_gater_agents():
+        max_outdegree = self.agent_manager.get_max_outdegree()
+        for agent_id in self.agent_manager.get_gater_agents():
             observation_spaces[agent_id] = spaces.Box(
                 low=-np.inf,
                 high=np.inf,
@@ -113,14 +113,14 @@ class SpaceBuilder:
         if not isinstance(action, np.ndarray) or action.shape != (1,):
             return False
         
-        forward_link, _ = self.agent_discovery.get_separator_links(agent_id)
+        forward_link, _ = self.agent_manager.get_separator_links(agent_id)
         total_width = forward_link.width
         
         return self.min_sep_width <= action[0] <= (total_width - self.min_sep_width)
     
     def validate_gater_action(self, action: np.ndarray, agent_id: str) -> bool:
         """Validate gater agent action against physical bounds."""
-        out_links = self.agent_discovery.get_gater_outgoing_links(agent_id)
+        out_links = self.agent_manager.get_gater_outgoing_links(agent_id)
         
         if not isinstance(action, np.ndarray) or action.shape != (len(out_links),):
             return False

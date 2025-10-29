@@ -960,7 +960,7 @@ class NetworkVisualizer:
             connection_point = u_pos + 0.08 * direction
             
             # Scale factor for gate width visualization (adjust for readability)
-            scale_factor = 0.05  # Adjust this to make apertures more/less visible
+            scale_factor = 0.07  # Adjust this to make apertures more/less visible
             
             # Calculate aperture endpoints: perpendicular line through connection point
             half_width = gate_width * scale_factor / 2

@@ -1,0 +1,55 @@
+# Netwrok
+network:
+  adjacency_matrix: [[0, 1, 0, 0, 0, 0],
+                    [1, 0, 1, 0, 0, 0],
+                    [0, 1, 0, 1, 0, 0],
+                    [0, 0, 1, 0, 1, 0],
+                    [0, 0, 0, 1, 0, 1],
+                    [0, 0, 0, 0, 1, 0]]
+
+  origin_nodes: [5, 0]
+  destination_nodes: [0, 5]
+
+
+  # Simulation Parameters
+simulation:
+  simulation_steps: 600
+  unit_time: 10
+  assign_flows_type: "classic"
+  path_finder:
+    k_paths: 1
+    theta: 10 # temperature parameter for softmax
+    alpha: 1 # congestion weight
+    beta: 0.5 # congestion weight
+    omega: 0.8 # capacity weight
+
+# Default Link Parameters
+default_link:
+  length: 100
+  width: 5
+  free_flow_speed: 1.1
+  k_critical: 2
+  k_jam: 6
+  gamma: 0.01
+  speed_noise_std: 0.05
+  fd_type: "yperman"
+  activity_probability: 0
+  bi_factor: 1
+
+controllers:
+  enabled: true  # Set to true to enable controller-based path expansion
+  # nodes: [4]  # List of node IDs that act as controllers
+  links: ["2-3"]
+
+# Demand Configuration
+demand:
+  origin_0:
+    pattern: "gaussian_peaks"
+    peak_lambda: 25
+    base_lambda: 10
+
+  origin_5:
+    pattern: "sudden_demand"
+    peak_lambda: 25
+    base_lambda: 20
+

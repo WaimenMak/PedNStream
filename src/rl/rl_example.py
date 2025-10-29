@@ -62,7 +62,7 @@ def test_environment():
                 break
         
         print("Environment test completed successfully!")
-        env.save(simulation_dir="rl_example")
+        env.save(simulation_dir="rl_example") # have to save before rendering
         
     except Exception as e:
         print(f"Error testing environment: {e}")
@@ -86,3 +86,7 @@ if __name__ == "__main__":
     # plt.show()
     env.render(mode="animate", simulation_dir="../../outputs/rl_example", vis_actions=True)
     # env.render(mode="human") # some bugs with snapshot visualization
+
+    # from pettingzoo.test import parallel_api_test
+    # env = PedNetParallelEnv(dataset="nine_intersections")
+    # parallel_api_test(env, num_cycles=1_000_000)

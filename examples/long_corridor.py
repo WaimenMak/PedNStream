@@ -42,8 +42,12 @@ if __name__ == "__main__":
             'k_jam': 6,
             'fd_type': 'yperman',  # type of fundamental diagram
             'bi_factor': 1,  # factor for bi-directional FD
-            'controller_type': 'separator',  # type of controller
+            'controller_type': 'gate',  # type of controller
         },
+        # 'controllers': {
+        #     'enabled': True,
+        #     'links': ["0-1","1-2","2-3","3-4","4-5"],
+        # },
         'demand': {
             "origin_0": {
                 "peak_lambda": 25,
@@ -163,15 +167,15 @@ if __name__ == "__main__":
     # Create the visualization
     visualizer = NetworkVisualizer(simulation_dir=os.path.join(output_dir, f"{sim_name}"))
     anim = visualizer.animate_network(start_time=0, end_time=params["simulation_steps"],
-                                    interval=100, edge_property='density', tag=False)
+                                    interval=100, edge_property='density', tag=False, vis_actions=True)
 
     # GIf
-    # writer = PillowWriter(fps=8, metadata=dict(artist='Me'))
+    writer = PillowWriter(fps=8, metadata=dict(artist='Me'))
 
     # Save the animation with progress tracking
-    # anim.save(os.path.join(output_dir, f"{sim_name}", "network_animation.gif"),
-    #           writer=writer,
-    #           progress_callback=progress_callback)
+    anim.save(os.path.join(output_dir, f"{sim_name}", "network_animation.gif"),
+              writer=writer,
+              progress_callback=progress_callback)
 
     # plt.show()
     

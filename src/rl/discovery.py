@@ -17,7 +17,7 @@ from src.LTM.link import Separator, Link
 from src.LTM.node import Node
 
 
-class AgentDiscovery:
+class AgentManager:
     """
     Maps predefined controllers to network components.
     

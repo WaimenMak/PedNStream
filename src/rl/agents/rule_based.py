@@ -81,23 +81,77 @@ class RuleBasedGaterAgent(BaseAgent):
 class RuleBasedSeparatorAgent(BaseAgent):
     """
     A rule-based agent for controlling separators based on in/outflow balance.
+    
+    Optionally uses a moving average buffer to smooth instantaneous inflow measurements,
+    reducing sensitivity to fluctuations.
     """
-    def __init__(self, width: float):
+    def __init__(self, width: float, use_smoothing: bool = False, buffer_size: int = 5):
         """
         Initializes the RuleBasedSeparatorAgent.
+        
         Args:
-            width: The width of the road
+            width (float): The width of the road
+            use_smoothing (bool): If True, uses moving average smoothing on inflows. Default: False
+            buffer_size (int): Window size for the moving average buffer. Only used if use_smoothing=True. Default: 5
         """
         self.road_width = width
+        self.use_smoothing = use_smoothing
+        self.buffer_size = buffer_size
+        
+        # Initialize inflow buffers for each direction (only if smoothing is enabled)
+        if self.use_smoothing:
+            self._link_inflow_buffer = []
+            self._reversed_link_inflow_buffer = []
+        else:
+            self._link_inflow_buffer = None
+            self._reversed_link_inflow_buffer = None
+
+    def _update_and_smooth_inflow(self, buffer: list, current_inflow: float) -> float:
+        """
+        Update the inflow buffer and return the smoothed (moving average) inflow.
+        
+        Args:
+            buffer (list): The inflow history buffer
+            current_inflow (float): Current instantaneous inflow value
+            
+        Returns:
+            float: Smoothed inflow value (moving average)
+        """
+        if not self.use_smoothing:
+            return current_inflow
+        
+        buffer.append(current_inflow)
+        
+        # Keep buffer size fixed
+        if len(buffer) > self.buffer_size:
+            buffer.pop(0)
+        
+        # Return moving average
+        return float(np.mean(buffer))
 
     def act(self, obs: np.ndarray) -> np.ndarray:
         """
-        Calculates actions based on the inflows of the link and revsersed link.
+        Calculates actions based on the inflows of the link and reversed link.
+        
+        If smoothing is enabled, uses moving average of historical inflows.
+        Otherwise, uses instantaneous inflow values.
         """
-        link_inflow = obs[1]
-        reversed_link_inflow = obs[4]
+        # Extract raw inflows
+        # Observation structure: [inflow, outflow, reverse_inflow, reverse_outflow] (or with density if enabled)
+        link_inflow_raw = obs[1] if len(obs) > 1 else 0.0
+        reversed_link_inflow_raw = obs[4] if len(obs) > 4 else 0.0
+        
+        # Apply smoothing if enabled
+        if self.use_smoothing:
+            link_inflow = self._update_and_smooth_inflow(self._link_inflow_buffer, link_inflow_raw)
+            reversed_link_inflow = self._update_and_smooth_inflow(self._reversed_link_inflow_buffer, reversed_link_inflow_raw)
+        else:
+            link_inflow = link_inflow_raw
+            reversed_link_inflow = reversed_link_inflow_raw
+        
+        # Allocate width proportionally to inflows
         if link_inflow + reversed_link_inflow == 0:
-            actions = self.road_width / 2 # if the inflow is 0, set the action to the middle of the road
+            actions = self.road_width / 2  # if the inflow is 0, set the action to the middle of the road
         else:
             actions = self.road_width * link_inflow / (link_inflow + reversed_link_inflow)
         return np.array([actions], dtype=np.float32)
@@ -113,22 +167,22 @@ if __name__ == "__main__":
     for agent_id in env.agent_manager.get_gater_agents():
         rule_based_gater_agents[agent_id] = RuleBasedGaterAgent(env.agent_manager.get_gater_outgoing_links(agent_id), env.with_density_obs)
     for agent_id in env.agent_manager.get_separator_agents():
-        rule_based_separator_agents[agent_id] = RuleBasedSeparatorAgent(env.agent_manager.get_separator_links(agent_id)[0].width)
+        rule_based_separator_agents[agent_id] = RuleBasedSeparatorAgent(env.agent_manager.get_separator_links(agent_id)[0].width, use_smoothing=True, buffer_size=5)
     observations, infos = env.reset()
     for step in range(env.simulation_steps):
         actions = {}
-        for agent_id in env.agents:
-            if agent_id in rule_based_gater_agents:
-                actions[agent_id] = rule_based_gater_agents[agent_id].act(observations[agent_id])
-            elif agent_id in rule_based_separator_agents:
-                actions[agent_id] = rule_based_separator_agents[agent_id].act(observations[agent_id])
-            print(actions[agent_id])
+        # for agent_id in env.agents:
+        #     if agent_id in rule_based_gater_agents:
+        #         actions[agent_id] = rule_based_gater_agents[agent_id].act(observations[agent_id])
+        #     elif agent_id in rule_based_separator_agents:
+        #         actions[agent_id] = rule_based_separator_agents[agent_id].act(observations[agent_id])
+        #     print(actions[agent_id])
         #     if actions[agent_id] == 0:
         #         pass
         observations, rewards, terminations, truncations, infos = env.step(actions)
         # print(rewards)
 
     env.save(simulation_dir="rule_based_agents")
-    env.render(mode="animate", simulation_dir="../../outputs/rule_based_agents", variable='density', vis_actions=True)
+    env.render(mode="animate", simulation_dir="../../outputs/rule_based_agents", variable='flow', vis_actions=True)
 
 

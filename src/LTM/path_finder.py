@@ -155,10 +155,12 @@ class PathFinder:
 
         # Get parameters from config or use defaults
         path_params = params.get('path_finder', {}) if params else {}
-        self.theta = path_params.get('theta', 0.1)  # like the temperature in the logit model
+        self.temp = path_params.get('temp', 0.1)  # like the temperature in the logit model
         self.alpha = path_params.get('alpha', 1.0)  # distance weight
         self.beta = path_params.get('beta', 0.05)   # congestion weight
         self.omega = path_params.get('omega', 0.05)   # capacity weight
+        self.std_dev = path_params.get('std_dev', 0)   # standard deviation of the normal distribution
+        self.epsilon = np.random.normal(0, self.std_dev)   # random variable in the utility function follow the normal distribution
         self.k_paths = path_params.get('k_paths', 3)
         
         # Controller configuration
@@ -565,8 +567,8 @@ class PathFinder:
                 norm_densities = np.maximum(np.array(densities) - 2, 0) / (10 - 2) # 2: k_critical, 10: max density
                 utilities = (self.alpha * np.array(distances)/(np.sum(distances)+1e-6)
                              + self.beta * norm_densities
-                             - self.omega * np.array(capacities)/(np.sum(capacities)+1e-6))
-                exp_utilities = np.exp(-self.theta * utilities)
+                             - self.omega * np.array(capacities)/(np.sum(capacities)+1e-6)) + self.epsilon
+                exp_utilities = np.exp(-self.temp * utilities)
                 probs = exp_utilities / np.sum(exp_utilities)
                 node.node_turn_probs[od_pair].update(dict(zip(turns, probs)))
         

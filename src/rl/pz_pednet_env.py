@@ -57,7 +57,7 @@ class PedNetParallelEnv(ParallelEnv):
         self.simulation_steps = self.network.params['simulation_steps']
         self._max_delta_sep_width = 0.25 * self.network.params['unit_time'] # 0.25 meters per sec
         self._max_delta_gate_width = 0.25 * self.network.params['unit_time'] # 0.25 meters per sec
-        self._min_sep_width = 2  # Minimum width for each direction in bidirectional corridors (meters)
+        self._min_sep_width = 1.5  # Minimum width for each direction in bidirectional corridors (meters)
         
         # Discover agents from network configuration
         self.agent_manager = AgentManager(self.network)
@@ -119,7 +119,7 @@ class PedNetParallelEnv(ParallelEnv):
         self.sim_step = 1  # Network simulation starts at t=1
         self._cumulative_rewards = {agent: 0.0 for agent in self.possible_agents}
         
-        # TODO: Reset network state if needed
+        # TODO: Reset network state if needed using self.env_generator.randomize_network()
         # TODO: Set network logging level to reduce training overhead
         # self.network.logger.setLevel(getattr(logging, self.log_level.upper()))
         

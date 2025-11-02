@@ -19,10 +19,11 @@ simulation:
   assign_flows_type: "classic"
   path_finder:
     k_paths: 1
-    theta: 10
+    temp: 10
     alpha: 1
     beta: 0.5
     omega: 0.8
+    std_dev: 0
 
 # Controller Configuration (for dynamic rerouting at specific nodes)
 # Example: Node 2 and 3 are potential rerouting points in this 6-node network

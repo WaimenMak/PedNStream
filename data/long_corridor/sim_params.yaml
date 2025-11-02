@@ -18,7 +18,7 @@ simulation:
   assign_flows_type: "classic"
   path_finder:
     k_paths: 1
-    theta: 10 # temperature parameter for softmax
+    temp: 10 # temperature parameter for softmax
     alpha: 1 # congestion weight
     beta: 0.5 # congestion weight
     omega: 0.8 # capacity weight
@@ -26,12 +26,12 @@ simulation:
 # Default Link Parameters
 default_link:
   length: 100
-  width: 5
+  width: 4
   free_flow_speed: 1.1
   k_critical: 2
   k_jam: 6
   gamma: 0.01
-  speed_noise_std: 0.05
+  speed_noise_std: 0
   fd_type: "yperman"
   activity_probability: 0
   bi_factor: 1

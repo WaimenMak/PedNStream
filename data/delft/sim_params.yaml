@@ -15,10 +15,11 @@ simulation:
   assign_flows_type: "classic"
   path_finder:
     k_paths: 5
-    theta: 10 # temperature parameter for softmax
+    temp: 10 # temperature parameter for softmax
     alpha: 1 # congestion weight
     beta: 0.5 # congestion weight
     omega: 0.8 # capacity weight
+    std_dev: 0 # standard deviation for stochastic path choice
 
 # Controller Configuration (for dynamic rerouting)
 controllers:

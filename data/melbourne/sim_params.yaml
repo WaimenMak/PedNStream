@@ -4,8 +4,8 @@
 #  destination_nodes: [286]
 
 network:
-  origin_nodes: [172, 188, 88, 31, 203]
-  destination_nodes: [297, 4, 286]
+  origin_nodes: [289]
+  destination_nodes: [300]
 
 # Simulation Parameters
 simulation:
@@ -17,7 +17,7 @@ simulation:
 #    k_paths: 1
   assign_flows_type: "classic"
   path_finder:
-    k_paths: 3
+    k_paths: 1
     theta: 10
     alpha: 1
     beta: 0.5

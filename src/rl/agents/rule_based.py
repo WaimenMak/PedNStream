@@ -171,11 +171,11 @@ if __name__ == "__main__":
     observations, infos = env.reset()
     for step in range(env.simulation_steps):
         actions = {}
-        # for agent_id in env.agents:
-        #     if agent_id in rule_based_gater_agents:
-        #         actions[agent_id] = rule_based_gater_agents[agent_id].act(observations[agent_id])
-        #     elif agent_id in rule_based_separator_agents:
-        #         actions[agent_id] = rule_based_separator_agents[agent_id].act(observations[agent_id])
+        for agent_id in env.agents:
+            if agent_id in rule_based_gater_agents:
+                actions[agent_id] = rule_based_gater_agents[agent_id].act(observations[agent_id])
+            elif agent_id in rule_based_separator_agents:
+                actions[agent_id] = rule_based_separator_agents[agent_id].act(observations[agent_id])
         #     print(actions[agent_id])
         #     if actions[agent_id] == 0:
         #         pass
@@ -183,6 +183,6 @@ if __name__ == "__main__":
         # print(rewards)
 
     env.save(simulation_dir="rule_based_agents")
-    env.render(mode="animate", simulation_dir="../../outputs/rule_based_agents", variable='flow', vis_actions=True)
+    env.render(mode="animate", simulation_dir="../../outputs/rule_based_agents", variable='density', vis_actions=True, save_dir='../../outputs')
 
 

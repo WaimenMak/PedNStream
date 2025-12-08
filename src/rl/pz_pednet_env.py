@@ -27,6 +27,8 @@ from .builders import ObservationBuilder, ActionApplier
 import matplotlib.pyplot as plt
 import matplotlib
 from handlers.output_handler import OutputHandler
+from matplotlib.animation import PillowWriter
+import os
 
 
 class PedNetParallelEnv(ParallelEnv):
@@ -51,6 +53,7 @@ class PedNetParallelEnv(ParallelEnv):
         
         # Initialize components (will be set in reset)
         self.env_generator = NetworkEnvGenerator()
+        self.dataset = dataset
         
         self.network = self.env_generator.create_network(dataset)
         self.timestep = None
@@ -97,14 +100,13 @@ class PedNetParallelEnv(ParallelEnv):
             raise ValueError(f"Agent {agent} not found in action spaces")
         return self._action_spaces[agent]
 
-    def reset(self, seed: Optional[int] = None, options: Optional[Dict] = None) -> Tuple[Dict, Dict]:
+    def reset(self, seed: Optional[int] = None, randomize: bool = False) -> Tuple[Dict, Dict]:
         """
         Reset the environment and return initial observations.
         
         Args:
             seed: Random seed for reproducibility
-            options: Additional reset options
-            
+            randomize: Whether to randomize the network at reset
         Returns:
             Tuple of (observations, infos) dictionaries
         """
@@ -114,14 +116,30 @@ class PedNetParallelEnv(ParallelEnv):
             if hasattr(self.network, 'demand_generator'):
                 self.network.demand_generator.seed = seed
         
+        # Determine reset mode
+        # Always re-create network to clear state
+        if randomize:
+            self.network = self.env_generator.randomize_network(self.dataset, seed)
+        else:
+            # Deterministic reset using default configuration
+            self.network = self.env_generator.create_network(self.dataset)
+            
+        # Re-initialize components with the new network instance
+        self.agent_manager = AgentManager(self.network)
+        
+        # Verify agents haven't changed (topology should be constant)
+        # new_agents = set(self.agent_manager.get_all_agent_ids())
+        # if new_agents != set(self.possible_agents):
+        #     self.possible_agents = list(new_agents)
+            
+        # Update builders/appliers with new references
+        self.obs_builder = ObservationBuilder(self.network, self.agent_manager, self.normalize_obs, self.with_density_obs)
+        self.action_applier = ActionApplier(self.network, self.agent_manager, self._max_delta_sep_width, self._max_delta_gate_width, self._min_sep_width)
+        
         # Reset environment state
         self.timestep = 0
         self.sim_step = 1  # Network simulation starts at t=1
         self._cumulative_rewards = {agent: 0.0 for agent in self.possible_agents}
-        
-        # TODO: Reset network state if needed using self.env_generator.randomize_network()
-        # TODO: Set network logging level to reduce training overhead
-        # self.network.logger.setLevel(getattr(logging, self.log_level.upper()))
         
         # Build initial observations
         observations = self._get_observations()
@@ -219,7 +237,7 @@ class PedNetParallelEnv(ParallelEnv):
         
         return infos
 
-    def render(self, mode="human", simulation_dir: str = None, variable = 'density', vis_actions: bool = False):
+    def render(self, mode="human", simulation_dir: str = None, variable = 'density', vis_actions: bool = False, save_dir: str = None):
         """Render the environment based on mode."""
         if simulation_dir is not None:  
             self.visualizer = NetworkVisualizer(simulation_dir=simulation_dir)
@@ -246,6 +264,11 @@ class PedNetParallelEnv(ParallelEnv):
                 vis_actions=vis_actions
             )
             plt.show()  # Blocks until animation is closed
+            if save_dir is not None:
+                writer = PillowWriter(fps=10, metadata=dict(artist='Me'))
+                ani.save(os.path.join(save_dir, f"{self.dataset}_{self.sim_step}.gif"),
+                         writer=writer,
+                         progress_callback=progress_callback)
         else:
             raise ValueError(f"Unsupported render mode: {mode}")
 

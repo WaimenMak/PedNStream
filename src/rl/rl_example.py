@@ -32,7 +32,7 @@ def test_environment():
         print(f"Created PedNet environment with dataset: {dataset}")
         
         # Reset environment
-        observations, infos = env.reset(seed=42)
+        observations, infos = env.reset(seed=42, randomize=True)
         print(f"Environment reset. Found {len(env.agents)} agents:")
         
         # Run a few simulation steps with random actions
@@ -84,7 +84,7 @@ if __name__ == "__main__":
     # matplotlib.use('macosx')
     # ani = visualizer.animate_network(start_time=0, end_time=env.network.params['simulation_steps'], interval=100, edge_property='density')
     # plt.show()
-    env.render(mode="animate", simulation_dir="../../outputs/rl_example", vis_actions=True)
+    env.render(mode="animate", simulation_dir="../../outputs/rl_example", vis_actions=True, save_dir='../outputs')
     # env.render(mode="human") # some bugs with snapshot visualization
 
     # from pettingzoo.test import parallel_api_test

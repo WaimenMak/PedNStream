@@ -93,7 +93,7 @@ class Network:
         self.controller_nodes = set(map(int, self.controller_nodes))
         self.controller_gaters = self.controller_nodes.copy() # only the intersection nodes with gater control
         self.controller_links = controller_config.get('links', []) # link is a string like '1-2'
-        for link in self.controller_links: # expand the nodes related to controllers
+        for link in self.controller_links: # expand the nodes related to controllers, so controller nodes are all nodes related to the controllers
             start_node, end_node = link.split('-')
             self.controller_nodes.add(int(start_node))
             self.controller_nodes.add(int(end_node))

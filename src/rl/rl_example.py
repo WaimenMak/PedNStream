@@ -32,37 +32,41 @@ def test_environment():
         print(f"Created PedNet environment with dataset: {dataset}")
         
         # Reset environment
-        observations, infos = env.reset(seed=42, randomize=True)
+        # observations, infos = env.reset(seed=42, randomize=True)
         print(f"Environment reset. Found {len(env.agents)} agents:")
         
         # Run a few simulation steps with random actions
         print("\nRunning simulation steps...")
-        for step in range(env.simulation_steps):
-            # Generate random actions for all agents
-            actions = {}
-            for agent_id in env.agents:
-                action_space = env.action_space(agent_id)
-                if action_space.shape == (1,):
-                    actions[agent_id] = action_space.low
-                else:
-                    actions[agent_id] = action_space.sample()
+        for episode in range(2):
+            print(f"Episode {episode + 1}...")
+            if episode > 0:
+                env.reset(seed=42, randomize=True)
+            for step in range(env.simulation_steps):
+                # Generate random actions for all agents
+                actions = {}
+                for agent_id in env.agents:
+                    action_space = env.action_space(agent_id)
+                    if action_space.shape == (1,):
+                        actions[agent_id] = action_space.low
+                    else:
+                        actions[agent_id] = action_space.sample()
+                    
                 
-            
-            # Step environment
-            observations, rewards, terminations, truncations, infos = env.step(actions)
-            # print(observations[env.agents[0]])
-            
-            # Print step results
-            total_reward = sum(rewards.values())
-            any_done = any(terminations.values()) or any(truncations.values())
-            print(f"  Step {step + 1}: total_reward={total_reward:.3f}, done={any_done}")
-            
-            if any_done:
-                print("  Episode terminated.")
-                break
+                # Step environment
+                observations, rewards, terminations, truncations, infos = env.step(actions)
+                # print(observations[env.agents[0]])
+                
+                # Print step results
+                total_reward = sum(rewards.values())
+                any_done = any(terminations.values()) or any(truncations.values())
+                print(f"  Step {step + 1}: total_reward={total_reward:.3f}, done={any_done}")
+                
+                if any_done:
+                    print("  Episode terminated.")
+                    break
         
-        print("Environment test completed successfully!")
-        env.save(simulation_dir="rl_example") # have to save before rendering
+            print("Environment test completed successfully!")
+            env.save(simulation_dir="rl_example") # have to save before rendering
         
     except Exception as e:
         print(f"Error testing environment: {e}")

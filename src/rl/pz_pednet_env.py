@@ -56,7 +56,8 @@ class PedNetParallelEnv(ParallelEnv):
         self.dataset = dataset
         
         self.network = self.env_generator.create_network(dataset)
-        self.timestep = None
+        # self.timestep = 0
+        self.sim_step = 1  # Network simulation starts at t=1
         self.simulation_steps = self.network.params['simulation_steps']
         self._max_delta_sep_width = 0.25 * self.network.params['unit_time'] # 0.25 meters per sec
         self._max_delta_gate_width = 0.25 * self.network.params['unit_time'] # 0.25 meters per sec
@@ -137,7 +138,7 @@ class PedNetParallelEnv(ParallelEnv):
         self.action_applier = ActionApplier(self.network, self.agent_manager, self._max_delta_sep_width, self._max_delta_gate_width, self._min_sep_width)
         
         # Reset environment state
-        self.timestep = 0
+        # self.timestep = 0
         self.sim_step = 1  # Network simulation starts at t=1
         self._cumulative_rewards = {agent: 0.0 for agent in self.possible_agents}
         

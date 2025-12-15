@@ -17,6 +17,7 @@ from typing import Dict, Any, Optional, List, Tuple
 from pettingzoo import ParallelEnv
 import gymnasium as gym
 from gymnasium import spaces
+import functools
 
 from src.utils.env_loader import NetworkEnvGenerator
 from src.utils.visualizer import NetworkVisualizer, progress_callback
@@ -42,7 +43,7 @@ class PedNetParallelEnv(ParallelEnv):
     
     metadata = {"render_modes": ["human"], "name": "pednet_v0"}
     
-    def __init__(self, dataset: str, with_density_obs: bool = False):
+    def __init__(self, dataset: str, normalize_obs: bool = False, with_density_obs: bool = False):
         """
         Initialize the PedNet environment.
         
@@ -68,7 +69,7 @@ class PedNetParallelEnv(ParallelEnv):
         self.possible_agents = self.agent_manager.get_all_agent_ids()
         
         # Build action and observation spaces
-        self.normalize_obs = False
+        self.normalize_obs = normalize_obs
         self.with_density_obs = with_density_obs
         self.space_builder = SpaceBuilder(self.agent_manager, self.with_density_obs, self._min_sep_width)
         self._action_spaces = self.space_builder.build_action_spaces()
@@ -89,28 +90,34 @@ class PedNetParallelEnv(ParallelEnv):
         """Return list of all agent IDs."""
         return self.possible_agents.copy()
 
+    @functools.lru_cache(maxsize=None)
     def observation_space(self, agent: str) -> spaces.Space:
         """Return observation space for given agent."""
         if agent not in self._observation_spaces:
             raise ValueError(f"Agent {agent} not found in observation spaces")
         return self._observation_spaces[agent]
 
+    @functools.lru_cache(maxsize=None)
     def action_space(self, agent: str) -> spaces.Space:
         """Return action space for given agent."""
         if agent not in self._action_spaces:
             raise ValueError(f"Agent {agent} not found in action spaces")
         return self._action_spaces[agent]
 
-    def reset(self, seed: Optional[int] = None, randomize: bool = False) -> Tuple[Dict, Dict]:
+    def reset(self, seed: Optional[int] = None, options: Optional[dict] = None) -> Tuple[Dict, Dict]:
         """
         Reset the environment and return initial observations.
         
         Args:
             seed: Random seed for reproducibility
-            randomize: Whether to randomize the network at reset
+            options: Optional dictionary with reset options. Supported keys:
+                - 'randomize' (bool): Whether to randomize the network at reset (default: False)
         Returns:
             Tuple of (observations, infos) dictionaries
         """
+        # Extract options
+        randomize = options.get('randomize', False) if options else False
+        
         # Set random seed
         if seed is not None:
             np.random.seed(seed)
@@ -200,12 +207,59 @@ class PedNetParallelEnv(ParallelEnv):
         return observations
 
     def _compute_rewards(self) -> Dict[str, float]:
-        """Compute rewards for all agents (placeholder)."""
-        # TODO: Implement reward computation
-        # Options: throughput, delay penalty, congestion avoidance, etc.
+        """
+        Compute rewards for all agents based on intersection density minimization.
+        
+        Reward Function:
+        R_t = - sum_{l in L_in U L_out} (density_l / k_jam_l)^2
+        
+        This encourages the agent to balance density across the intersection,
+        preventing both upstream queuing and downstream congestion.
+        """
         rewards = {}
+        
         for agent_id in self.possible_agents:
-            rewards[agent_id] = 0.0  # Placeholder
+            agent_type = self.agent_manager.get_agent_type(agent_id)
+            penalty = 0.0
+            
+            if agent_type == 'gate':
+                # Get node and its connected links
+                node = self.agent_manager.get_gater_node(agent_id)
+                
+                # Collect all real (non-virtual) incoming links
+                for link in node.incoming_links:
+                    if hasattr(link, 'virtual_incoming_link') and link == link.virtual_incoming_link:
+                        continue
+                    # For regular bidirectional Links, get_density() returns combined density
+                    # For Separators or unidirectional links, use directional density
+                    from src.LTM.link import Separator
+                    if isinstance(link, Separator):
+                        # Separator: use directional density (independent lanes)
+                        norm_reverse_link_density = link.reverse_link.density[self.sim_step] / (link.reverse_link.k_jam + 1e-6)
+                        norm_forward_link_density = link.density[self.sim_step] / (link.k_jam + 1e-6)
+                        normalized_density = (norm_reverse_link_density + norm_forward_link_density) / 2
+                    else:
+                        # Regular Link: use get_density() to get combined bidirectional density once
+                        normalized_density = link.get_density(self.sim_step) / (link.k_jam + 1e-6)
+                    
+                    penalty += normalized_density
+                # average the penalty of all incoming links
+                penalty /= len(node.incoming_links)
+                    
+            
+            elif agent_type == 'sep':
+                # For separator, consider both directions of the bidirectional corridor
+                forward_link, reverse_link = self.agent_manager.get_separator_links(agent_id)
+                
+                for link in [forward_link, reverse_link]:
+                    normalized_density = link.density[self.sim_step] / (link.k_jam + 1e-6)
+                    penalty += normalized_density
+                # average the penalty of all links
+                penalty /= 2
+            
+            # Reward is negative penalty (minimize congestion)
+            rewards[agent_id] = -penalty
+        
         return rewards
 
     def _check_terminations(self) -> Dict[str, bool]:
@@ -275,7 +329,7 @@ class PedNetParallelEnv(ParallelEnv):
 
     def save(self, simulation_dir: str):
         """Save the current network state."""
-        output_handler = OutputHandler(base_dir="../../outputs", simulation_dir=simulation_dir)
+        output_handler = OutputHandler(base_dir="../outputs", simulation_dir=simulation_dir)
         output_handler.save_network_state(self.network)
 
     def close(self):

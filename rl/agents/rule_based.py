@@ -157,7 +157,7 @@ class RuleBasedSeparatorAgent(BaseAgent):
         return np.array([actions], dtype=np.float32)
 
 if __name__ == "__main__":
-    from src.rl.pz_pednet_env import PedNetParallelEnv
+    from rl.pz_pednet_env import PedNetParallelEnv
     dataset = "long_corridor"
     env = PedNetParallelEnv(dataset, with_density_obs=True)
 
@@ -183,6 +183,6 @@ if __name__ == "__main__":
         # print(rewards)
 
     env.save(simulation_dir="rule_based_agents")
-    env.render(mode="animate", simulation_dir="../../outputs/rule_based_agents", variable='density', vis_actions=True, save_dir='../../outputs')
+    env.render(mode="animate", simulation_dir="../../src/outputs/rule_based_agents", variable='density', vis_actions=True, save_dir='../../src/outputs')
 
 

@@ -37,10 +37,10 @@ class ObservationBuilder:
         self.with_density_obs = with_density_obs
         
         # Normalization constants (will be refined based on actual features)
-        self.density_norm = 10.0    # Typical jam density
-        self.speed_norm = 2.0       # Typical free-flow speed
-        self.time_norm = 100.0      # Typical travel time
-        self.flow_norm = 50.0       # Typical flow rate
+        self.density_norm = 6.0    # Typical jam density
+        self.speed_norm = 1.5       # Typical free-flow speed
+        # self.time_norm = 100.0      # Typical travel time
+        self.flow_norm = 20.0       # Typical flow rate
     
     def build_observation(self, agent_id: str, time_step: int) -> np.ndarray:
         """
@@ -139,17 +139,14 @@ class ObservationBuilder:
         # Placeholder normalization
         normalized = obs.copy()
         
-        # Normalize density features (indices 0, 6)
-        normalized[[0, 6]] /= self.density_norm
-        
-        # Normalize speed features (indices 1, 7)
-        normalized[[1, 7]] /= self.speed_norm
-        
-        # Normalize travel time features (indices 2, 8)
-        normalized[[2, 8]] /= self.time_norm
-        
-        # Normalize flow features (indices 4, 5, 10, 11)
-        normalized[[4, 5, 10, 11]] /= self.flow_norm
+        if self.with_density_obs:
+            # normalize density features (indices 0, 4)
+            normalized[[0, 3]] /= self.density_norm
+            # normalize flow features (indices 1, 5)
+            normalized[[1, 2, 4, 5]] /= self.flow_norm
+        else:
+            # normalize flow features (indices 0, 2)
+            normalized[[0, 1, 2, 3]] /= self.flow_norm
         
         return normalized
     

@@ -11,16 +11,12 @@ Shows how to configure and run the multi-agent environment with
 specific separator and gater controller placements.
 """
 
-import os
 import sys
 from pathlib import Path
 project_root = Path(__file__).resolve().parent.parent
 sys.path.append(str(project_root))
 
-import numpy as np
-from src.rl import PedNetParallelEnv
-from handlers.output_handler import OutputHandler
-from src.utils.visualizer import NetworkVisualizer, progress_callback
+from rl import PedNetParallelEnv
 
 
 def test_environment():
@@ -32,7 +28,7 @@ def test_environment():
         print(f"Created PedNet environment with dataset: {dataset}")
         
         # Reset environment
-        # observations, infos = env.reset(seed=42, randomize=True)
+        # observations, infos = env.reset(seed=42, options={'randomize': True})
         print(f"Environment reset. Found {len(env.agents)} agents:")
         
         # Run a few simulation steps with random actions
@@ -40,7 +36,7 @@ def test_environment():
         for episode in range(2):
             print(f"Episode {episode + 1}...")
             if episode > 0:
-                env.reset(seed=42, randomize=True)
+                env.reset(seed=42, options={'randomize': True})
             for step in range(env.simulation_steps):
                 # Generate random actions for all agents
                 actions = {}
@@ -78,8 +74,6 @@ def test_environment():
 
 
 if __name__ == "__main__":
-    import matplotlib.pyplot as plt
-    import matplotlib
     env = test_environment()
     # visualize the simulation results
     # output_handler = OutputHandler(base_dir="../../outputs", simulation_dir="rl_example")
@@ -89,7 +83,7 @@ if __name__ == "__main__":
     # ani = visualizer.animate_network(start_time=0, end_time=env.network.params['simulation_steps'], interval=100, edge_property='density')
     # plt.show()
     # env.render(mode="animate", simulation_dir="../../outputs/rl_example", vis_actions=True, save_dir='../outputs') # save the output animation
-    env.render(mode="animate", simulation_dir="../../outputs/rl_example", vis_actions=True)  # visualize without saving
+    env.render(mode="animate", simulation_dir="../outputs/rl_example", vis_actions=True)  # visualize without saving
     # env.render(mode="human") # some bugs with snapshot visualization
 
     # from pettingzoo.test import parallel_api_test

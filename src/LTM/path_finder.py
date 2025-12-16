@@ -113,7 +113,7 @@ def k_shortest_paths(graph, origin, dest, k):
 
 def enumerate_shortest_simple_paths(graph, origin, dest, max_paths=None):
     """
-    Enumerate all simple paths from origin to dest.
+    Enumerate all simple paths from origin to dest. This method is used when generating the paths between O-D pairs, and expanding paths at controller nodes.
 
     Args:
         graph (nx.DiGraph): Directed graph.
@@ -131,20 +131,19 @@ def enumerate_shortest_simple_paths(graph, origin, dest, max_paths=None):
     try:
         paths_iter = nx.shortest_simple_paths(graph, origin, dest, weight='weight')
     except Exception:
-        print(f"No path found between {origin} and {dest}")
         return []
 
     paths = []
     for path in paths_iter:
         paths.append(path)
         if max_paths is not None and len(paths) >= max_paths:
-            print(f"Early stopping: Found {len(paths)} paths")
+            # print(f"Early stopping: Found {len(paths)} paths")
             break
     return paths
 
 class PathFinder:
     """Handles path finding and path-related operations"""
-    def __init__(self, links, params=None, controller_nodes=None, controller_links=None):
+    def __init__(self, links, params=None, controller_nodes=None, controller_links=None, logger=None):
         self.od_paths = {}  # {(origin, dest): [path1, path2, ...]}
         self.graph = self._create_graph(links)
         self.links = links
@@ -152,6 +151,7 @@ class PathFinder:
         self.node_turn_probs = {}  # {node_id: {(o,d): {(up_node, down_node): probability}}}
         self.node_to_od_pairs = {}  # {node_id: set((o1,d1), (o2,d2), ...)}, to get the relevant od pairs for the node
         self._initialized = False  # Add initialization flag
+        self.logger = logger
 
         # Get parameters from config or use defaults
         path_params = params.get('path_finder', {}) if params else {}
@@ -162,6 +162,7 @@ class PathFinder:
         self.std_dev = path_params.get('std_dev', 0)   # standard deviation of the normal distribution
         self.epsilon = np.random.normal(0, self.std_dev)   # random variable in the utility function follow the normal distribution
         self.k_paths = path_params.get('k_paths', 3)
+        self.verbose = path_params.get('verbose', False)  # Control path finding logging
         
         # Controller configuration
         self.controller_nodes = controller_nodes
@@ -215,21 +216,25 @@ class PathFinder:
                         self.node_to_od_pairs[node].add((origin, dest))
                     
             except nx.NetworkXNoPath:
-                print(f"No path found between {origin} and {dest}")
+                if self.logger and self.verbose:
+                    self.logger.info(f"No path found between {origin} and {dest}")
                 self.od_paths[(origin, dest)] = []
 
         # expand the paths at controller nodes
         if not self._initialized and self.controllers_enabled:
             for node in self.controller_nodes:
                 for od_pair in self.node_to_od_pairs[node]:
+                    num_paths_before = len(self.od_paths[od_pair])
                     self.expand_controller_paths(nodes[node], od_pair)
-                    print(f"Controller node {node}: Added {len(self.od_paths[od_pair])} detour path(s) for OD {od_pair}")
-        self.check_if_paths_are_different(self.od_paths)
+                    num_paths_after = len(self.od_paths[od_pair])
+                    if self.logger and self.verbose:
+                        self.logger.info(f"Controller node {node}: Added {num_paths_after - num_paths_before} detour path(s) for OD {od_pair}")
+        self.check_if_paths_are_different(self.od_paths, self.logger, self.verbose)
         # Calculate and store turn probabilities for all nodes in paths
         self.calculate_all_turn_probs(nodes=nodes)
     
     @staticmethod
-    def check_if_paths_are_different(od_paths):
+    def check_if_paths_are_different(od_paths, logger=None, verbose=False):
         """Check if the paths of a od pair are all different"""
         # check if the paths of a od pair are all different
         for od_pair, paths in od_paths.items():
@@ -242,9 +247,11 @@ class PathFinder:
             unique = set(normalized)
             if len(unique) != len(normalized):
                 dup_count = len(normalized) - len(unique)
-                print(f"Warning: duplicate paths detected for OD {od_pair}: {dup_count} duplicate(s)")
+                if logger and verbose:
+                    logger.info(f"Warning: duplicate paths detected for OD {od_pair}: {dup_count} duplicate(s)")
                 od_paths[od_pair] = [list(p) for p in unique]
-                print(f"Unique paths for OD {od_pair}: {od_paths[od_pair]}")
+                if logger and verbose:
+                    logger.info(f"Unique paths for OD {od_pair}: {od_paths[od_pair]}")
 
     def calculate_all_turn_probs(self, nodes):
         """Calculate and store turn probabilities for all nodes in paths"""

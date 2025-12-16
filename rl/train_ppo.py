@@ -92,6 +92,8 @@ class PPOAgent:
                 action = mean
             else:
                 std = torch.exp(log_std)
+                if std.any() < 0:
+                    raise ValueError(f"Negative standard deviation: {std.item()}")
                 action = torch.normal(mean, std)
             
             # Clip to action bounds
@@ -316,8 +318,8 @@ def train_ppo(dataset="long_corridor", total_episodes=100, steps_per_episode=Non
 
 if __name__ == "__main__":
     agents, rewards = train_ppo(
-        dataset="long_corridor",
-        total_episodes=50,
-        update_freq=200
+        dataset="nine_intersections",
+        total_episodes=5,
+        update_freq=10
     )
 

@@ -108,7 +108,7 @@ class Network:
             self.od_manager = ODManager(self.simulation_steps, logger=self.logger)
             self.od_manager.init_od_flows(origin_nodes, destination_nodes, od_flows)
         
-            self.path_finder = PathFinder(self.links, params=self.params, controller_nodes=self.controller_nodes, controller_links=self.controller_links)  # Pass params here
+            self.path_finder = PathFinder(self.links, params=self.params, controller_nodes=self.controller_nodes, controller_links=self.controller_links, logger=self.logger)  # Pass params and logger here
             self.path_finder.find_od_paths(od_pairs=self.od_manager.od_flows.keys(), 
                                          nodes=self.nodes)
 

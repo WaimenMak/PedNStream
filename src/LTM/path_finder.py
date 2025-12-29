@@ -162,7 +162,7 @@ class PathFinder:
         self.std_dev = path_params.get('std_dev', 0)   # standard deviation of the normal distribution
         self.epsilon = np.random.normal(0, self.std_dev)   # random variable in the utility function follow the normal distribution
         self.k_paths = path_params.get('k_paths', 3)
-        self.verbose = path_params.get('verbose', False)  # Control path finding logging
+        self.verbose = path_params.get('verbose', True)  # Control path finding logging
         
         # Controller configuration
         self.controller_nodes = controller_nodes
@@ -258,6 +258,8 @@ class PathFinder:
         # self.node_turn_probs = {}
         for node_id in self.nodes_in_paths:
             if nodes[node_id].source_num > 2: # only process intersection nodes
+                # if node_id == 30:
+                #     pass
                 self.calculate_turn_probabilities(nodes[node_id])
             # self.calculate_turn_probabilities(nodes[node_id])
             # nodes[node_id].turns = list(turns)
@@ -301,7 +303,8 @@ class PathFinder:
 
     def expand_controller_paths(self, current_node: Node, od_pair):
         """
-        Expand paths at controller nodes by adding detours through non-path neighbors.
+        Expand paths at controller nodes by adding detours through non-path neighbors. If path
+        already exist in original routes skip it.
         
         Args:
             current_node: The controller node
@@ -321,6 +324,54 @@ class PathFinder:
             if link.end_node is not None:
                 all_outgoing_neighbors.add(link.end_node.node_id)
         
+        # Create a modified graph that encourages exploration away from existing OD paths
+        # This is computed once per OD pair as it depends only on existing OD paths
+        modified_graph = self.graph.copy()
+        
+        # Collect ALL edges used in ANY existing path for this OD pair
+        # and calculate their distance to destination for dynamic penalties
+        all_od_edges = {}  # {(u, v): distance_to_dest}
+        for p in paths:
+            for i in range(len(p) - 1):
+                edge = (p[i], p[i+1])
+                if edge not in all_od_edges:
+                    # Calculate remaining distance from the end of this edge to destination
+                    try:
+                        dist_to_dest = nx.shortest_path_length(
+                            self.graph, p[i+1], dest, weight='weight'
+                        )
+                        all_od_edges[edge] = dist_to_dest
+                    except nx.NetworkXNoPath:
+                        all_od_edges[edge] = 0  # Edge already at destination
+        
+        if self.detour_exploration_mode == 'remove':
+            # Remove already-used edges entirely - forces completely different routes
+            edges_to_remove = []
+            for (u, v) in all_od_edges.keys():
+                if modified_graph.has_edge(u, v):
+                    edges_to_remove.append((u, v))
+            modified_graph.remove_edges_from(edges_to_remove)
+        else:
+            # Penalize already-used edges with distance-based dynamic factor
+            # Edges farther from destination get higher penalty (more exploration early)
+            # Edges closer to destination get lower penalty (less exploration near end)
+            if all_od_edges:
+                max_dist = max(all_od_edges.values()) if all_od_edges.values() else 1
+                
+                for (u, v), dist_to_dest in all_od_edges.items():
+                    if modified_graph.has_edge(u, v):
+                        # Dynamic penalty: scales from base_penalty to base_penalty * detour_penalty_factor
+                        # based on normalized distance to destination
+                        if max_dist > 0:
+                            normalized_dist = dist_to_dest / max_dist
+                            # Penalty ranges from 1.0 (at dest) to detour_penalty_factor (far from dest)
+                            dynamic_penalty = 1.0 + (self.detour_penalty_factor - 1.0) * normalized_dist
+                        else:
+                            dynamic_penalty = self.detour_penalty_factor
+                        
+                        original_weight = modified_graph[u][v].get('weight', 1)
+                        modified_graph[u][v]['weight'] = original_weight * dynamic_penalty
+
         # Process each existing path that contains current node
         for path in paths:
             try:
@@ -352,53 +403,6 @@ class PathFinder:
                     # Try to find multiple paths from neighbor to destination
                     # We'll try several paths in case the shortest creates a loop
                     try:
-                        # Create a modified graph that encourages exploration away from existing OD paths
-                        modified_graph = self.graph.copy()
-                        
-                        # Collect ALL edges used in ANY existing path for this OD pair
-                        # and calculate their distance to destination for dynamic penalties
-                        all_od_edges = {}  # {(u, v): distance_to_dest}
-                        for p in self.od_paths[od_pair]:
-                            for i in range(len(p) - 1):
-                                edge = (p[i], p[i+1])
-                                if edge not in all_od_edges:
-                                    # Calculate remaining distance from the end of this edge to destination
-                                    try:
-                                        dist_to_dest = nx.shortest_path_length(
-                                            self.graph, p[i+1], dest, weight='weight'
-                                        )
-                                        all_od_edges[edge] = dist_to_dest
-                                    except nx.NetworkXNoPath:
-                                        all_od_edges[edge] = 0  # Edge already at destination
-                        
-                        if self.detour_exploration_mode == 'remove':
-                            # Remove already-used edges entirely - forces completely different routes
-                            edges_to_remove = []
-                            for (u, v) in all_od_edges.keys():
-                                if modified_graph.has_edge(u, v):
-                                    edges_to_remove.append((u, v))
-                            modified_graph.remove_edges_from(edges_to_remove)
-                        else:
-                            # Penalize already-used edges with distance-based dynamic factor
-                            # Edges farther from destination get higher penalty (more exploration early)
-                            # Edges closer to destination get lower penalty (less exploration near end)
-                            if all_od_edges:
-                                max_dist = max(all_od_edges.values()) if all_od_edges.values() else 1
-                                
-                                for (u, v), dist_to_dest in all_od_edges.items():
-                                    if modified_graph.has_edge(u, v):
-                                        # Dynamic penalty: scales from base_penalty to base_penalty * detour_penalty_factor
-                                        # based on normalized distance to destination
-                                        if max_dist > 0:
-                                            normalized_dist = dist_to_dest / max_dist
-                                            # Penalty ranges from 1.0 (at dest) to detour_penalty_factor (far from dest)
-                                            dynamic_penalty = 1.0 + (self.detour_penalty_factor - 1.0) * normalized_dist
-                                        else:
-                                            dynamic_penalty = self.detour_penalty_factor
-                                        
-                                        original_weight = modified_graph[u][v].get('weight', 1)
-                                        modified_graph[u][v]['weight'] = original_weight * dynamic_penalty
-                        
                         # Get multiple simple paths from neighbor to destination using modified graph
                         # This encourages finding truly alternative routes
                         detour_paths = enumerate_shortest_simple_paths(
@@ -494,7 +498,10 @@ class PathFinder:
                         # turns_od_dict[turn] = turns_od_dict.get(turn, []) + [od_pair] #no need recalculate
                         # if ods_in_turns is e
                         if not self._initialized:
-                            current_node.ods_in_turns[turn] = current_node.ods_in_turns.get(turn, []) + [od_pair]
+                            # Use set to automatically handle duplicates with O(1) insertion
+                            if turn not in current_node.ods_in_turns:
+                                current_node.ods_in_turns[turn] = set()
+                            current_node.ods_in_turns[turn].add(od_pair)
                         
                 except ValueError:
                     # Current node not in this path
@@ -666,7 +673,7 @@ class PathFinder:
                 prob_sum = 0
                 
                 # Get all OD pairs for this turn
-                od_pairs = node.ods_in_turns.get(turn, [])
+                od_pairs = node.ods_in_turns.get(turn, set())
                 for od_pair in od_pairs:
                     # P(down|up,od) from node_turn_probs
                     self.update_node_turn_probs(node, od_pair, time_step=time_step) # with updating
@@ -690,6 +697,8 @@ class PathFinder:
         # check if the sum of each column equals to 1, if not assign equal probabilities
         for i in range(node.dest_num):
             if np.abs(sum(fract[i]) - 1) > 1e-3:
+                if sum(fract[i]) != 0:
+                    print(f"Warning: turning fractions at node {node.node_id} for downstream {i} do not sum to 1. Normalizing.")
                 fract[i] = 1/(node.source_num - 1)*np.ones(node.source_num - 1)
         node.turning_fractions = fract.flatten()
         return node.turning_fractions

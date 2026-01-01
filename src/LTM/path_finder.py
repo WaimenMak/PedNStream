@@ -691,15 +691,26 @@ class PathFinder:
     @staticmethod
     def check_fractions(node):
         """
-        Check if the turning fractions are valid
+        Check if the turning fractions are valid and normalize if needed.
+        
+        Normalization strategy:
+        - If sum > 0: normalize by dividing by sum (preserves relative magnitudes)
+        - If sum == 0: fall back to equal probabilities (no information available)
         """
         fract = node.turning_fractions.reshape(node.dest_num, node.source_num - 1)
-        # check if the sum of each column equals to 1, if not assign equal probabilities
+        
         for i in range(node.dest_num):
-            if np.abs(sum(fract[i]) - 1) > 1e-3:
-                if sum(fract[i]) != 0:
+            row_sum = np.sum(fract[i])
+            
+            if np.abs(row_sum - 1) > 1e-3:
+                if row_sum > 1e-6:
+                    # Normalize by sum - preserves relative probabilities
+                    fract[i] = fract[i] / row_sum
                     print(f"Warning: turning fractions at node {node.node_id} for downstream {i} do not sum to 1. Normalizing.")
-                fract[i] = 1/(node.source_num - 1)*np.ones(node.source_num - 1)
+                else:
+                    # No information available - use equal probabilities
+                    fract[i] = np.ones(node.source_num - 1) / (node.source_num - 1)
+                    
         node.turning_fractions = fract.flatten()
         return node.turning_fractions
 

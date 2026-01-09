@@ -1,0 +1,8 @@
+{
+  "gate_24": {
+    "max_difference": 86.0,
+    "mean_difference": 12.578130722045898,
+    "num_episodes": 5,
+    "obs_dim": 20
+  }
+}

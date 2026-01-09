@@ -12,7 +12,7 @@ class BaseAgent(ABC):
     """Abstract base class for all agents."""
 
     @abstractmethod
-    def act(self, obs: np.ndarray) -> np.ndarray:
+    def take_action(self, obs: np.ndarray) -> np.ndarray:
         """
         Takes an observation and returns an action.
         """
@@ -23,34 +23,19 @@ class RuleBasedGaterAgent(BaseAgent):
     """
     A rule-based agent for controlling gaters based on pressure differential.
 
-    This agent implements an "Incremental Pressure Balancing" algorithm. It adjusts
-    the gate width based on the difference between upstream pressure (demand) and
-    downstream back-pressure (congestion).
+    The gate will tend to close if the density of it's link is higher than a threshold. And the inflow
+    of the gate is larger than the outflow of the link. Otherwise, the gate will tend to open.
     """
-
-    def __init__(self, num_outgoing_links: int, with_density_obs: bool, K: float = 0.1, W_backpressure: float = 1.5):
-        """
-        Initializes the RuleBasedGaterAgent.
-
-        Args:
-            num_outgoing_links (int): The number of outgoing links this gater controls.
-            with_density_obs (bool): Whether the observation includes density.
-                                     This agent's logic requires density.
-            K (float): Responsiveness parameter determining how fast the gate reacts.
-            W_backpressure (float): Weight for downstream back-pressure. A higher
-                                    value makes the agent more cautious about congestion.
-        """
-        if not with_density_obs:
-            raise ValueError("RuleBasedGaterAgent requires density information ('with_density_obs' must be True).")
-
-        self.num_outgoing_links = num_outgoing_links
-        self.K = K
-        self.W_backpressure = W_backpressure
+    def __init__(self, outgoing_links: list, obs_mode: str, threshold_density: float = 0.8):
+        if obs_mode != "option2":
+            raise ValueError("RuleBasedGaterAgent requires density information ('obs_mode' must be 'option2') with density observation.")
+        self.outgoing_links = outgoing_links
+        self.threshold_density = threshold_density
         self.features_per_link = 4  # density, inflow, reverse_outflow, current_width
 
-    def act(self, obs: np.ndarray) -> np.ndarray:
+    def take_action(self, obs: np.ndarray) -> np.ndarray:
         """
-        Calculates actions based on the incremental pressure balancing algorithm.
+        Calculates actions based on basic rules.
 
         Args:
             obs (np.ndarray): The observation for this agent. It's a flattened
@@ -61,20 +46,33 @@ class RuleBasedGaterAgent(BaseAgent):
             np.ndarray: An array of target gate widths for each outgoing link.
         """
         actions = []
-        for i in range(len(self.num_outgoing_links)):
+        for i in range(len(self.outgoing_links)):
             start_idx = i * self.features_per_link
             link_obs = obs[start_idx: start_idx + self.features_per_link]
 
             # The observation vector is structured as:
             # [density, inflow, reverse_outflow, current_width]
-            p_down = link_obs[0]        # density
-            p_up = link_obs[2]          # reverse_link.outflow
+            density = link_obs[0]        # density
+            outflow = link_obs[2]          # reverse_link.outflow
+            inflow = link_obs[1]          # inflow
             current_width = link_obs[3]
 
             # Calculate the change in width based on pressure differential
-            change_in_width = self.K * (p_up - self.W_backpressure * p_down)
-            new_target_width = current_width + change_in_width
+            # change_in_width = self.K * (p_up - self.W_backpressure * p_down)
+            change_in_width = 1
+            if density >= 6:
+                new_target_width = self.outgoing_links[i].width
+            elif density > self.threshold_density and inflow > outflow:
+                new_target_width = current_width + change_in_width
+            elif density > self.threshold_density and inflow <= outflow:
+                new_target_width = current_width - change_in_width
+            else:
+                # Keep gate open to max width (action space high bound)
+                new_target_width = self.outgoing_links[i].width
+            # new_target_width = self.outgoing_links[i].width
             actions.append(new_target_width)
+            # actions.append(self.outgoing_links[i].width)
+        # actions[3] = 2
 
         return np.array(actions, dtype=np.float32)
 
@@ -129,7 +127,7 @@ class RuleBasedSeparatorAgent(BaseAgent):
         # Return moving average
         return float(np.mean(buffer))
 
-    def act(self, obs: np.ndarray) -> np.ndarray:
+    def take_action(self, obs: np.ndarray) -> np.ndarray:
         """
         Calculates actions based on the inflows of the link and reversed link.
         
@@ -158,31 +156,44 @@ class RuleBasedSeparatorAgent(BaseAgent):
 
 if __name__ == "__main__":
     from rl.pz_pednet_env import PedNetParallelEnv
-    dataset = "long_corridor"
-    env = PedNetParallelEnv(dataset, with_density_obs=True)
+    dataset = "45_intersections"
+    env = PedNetParallelEnv(dataset, obs_mode="option2", render_mode="animate", verbose=True)
 
     #create a rule-based agents
     rule_based_gater_agents = {}
     rule_based_separator_agents = {}
     for agent_id in env.agent_manager.get_gater_agents():
-        rule_based_gater_agents[agent_id] = RuleBasedGaterAgent(env.agent_manager.get_gater_outgoing_links(agent_id), env.with_density_obs)
+        rule_based_gater_agents[agent_id] = RuleBasedGaterAgent(env.agent_manager.get_gater_outgoing_links(agent_id), env.obs_mode, threshold_density=3)
     for agent_id in env.agent_manager.get_separator_agents():
         rule_based_separator_agents[agent_id] = RuleBasedSeparatorAgent(env.agent_manager.get_separator_links(agent_id)[0].width, use_smoothing=True, buffer_size=5)
-    observations, infos = env.reset()
+
+    episode_rewards = {agent_id: 0.0 for agent_id in env.agents}
+    observations, infos = env.reset(seed=None, options={"randomize": False})
+    # observations, infos = env.reset(seed=42, options={"randomize": True})
+    # observations, infos = env.reset(seed=43, options={"randomize": True})
     for step in range(env.simulation_steps):
         actions = {}
         for agent_id in env.agents:
             if agent_id in rule_based_gater_agents:
-                actions[agent_id] = rule_based_gater_agents[agent_id].act(observations[agent_id])
+                actions[agent_id] = rule_based_gater_agents[agent_id].take_action(observations[agent_id])
             elif agent_id in rule_based_separator_agents:
-                actions[agent_id] = rule_based_separator_agents[agent_id].act(observations[agent_id])
-        #     print(actions[agent_id])
-        #     if actions[agent_id] == 0:
+                actions[agent_id] = rule_based_separator_agents[agent_id].take_action(observations[agent_id])
+            print(actions[agent_id])
+            # if agent_id == "gate_24":
+            #     print(f"Step {step}: Agent {agent_id} action: {actions[agent_id]}")
         #         pass
         observations, rewards, terminations, truncations, infos = env.step(actions)
-        # print(rewards)
+        for agent_id in env.agents:
+            episode_rewards[agent_id] += rewards[agent_id]
 
-    env.save(simulation_dir="rule_based_agents")
-    env.render(mode="animate", simulation_dir="../../src/outputs/rule_based_agents", variable='density', vis_actions=True, save_dir='../../src/outputs')
+    # final rewards
+    for agent_id in env.possible_agents:
+        print(f"Agent {agent_id} final reward: {episode_rewards[agent_id]}")
+    # total reward
+    avg_reward = np.mean(list(episode_rewards.values()))
+    print(f"Total reward: {avg_reward}")
+
+    env.save(simulation_dir="../../outputs/rule_based_agents")
+    env.render(simulation_dir="../../outputs/rule_based_agents", variable='density', vis_actions=True, save_dir=None)
 
 

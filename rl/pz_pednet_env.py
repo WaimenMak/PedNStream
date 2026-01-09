@@ -37,26 +37,35 @@ class PedNetParallelEnv(ParallelEnv):
     PettingZoo ParallelEnv for multi-agent pedestrian traffic control.
     
     Agents:
-    - Separators (sep:u_v): control Separator.separator_width for bidirectional corridors
-    - Gaters (gate:n): control Link.front_gate_width for outgoing links at nodes
+    - Separators (sep_u_v): control Separator.separator_width for bidirectional corridors
+    - Gaters (gate_n): control Link.front_gate_width for outgoing links at nodes
     """
     
-    metadata = {"render_modes": ["human"], "name": "pednet_v0"}
+    metadata = {"render_modes": ["human", "animate"], "name": "pednet_v0"}
     
-    def __init__(self, dataset: str, normalize_obs: bool = False, with_density_obs: bool = False):
+    def __init__(self, dataset: str, normalize_obs: bool = False, obs_mode: str = "option1",
+                 render_mode: Optional[str] = None, verbose: bool = False):
         """
         Initialize the PedNet environment.
         
         Args:
-            - dataset: str, network dataset name (e.g., "delft", "melbourne")
+            dataset: str, network dataset name (e.g., "delft", "melbourne")
+            normalize_obs: Whether to normalize observations
+            obs_mode: Observation mode - one of: "option1", "option2", "option3", "option4"
+            render_mode: Rendering mode ("human", "animate", or None)
+            verbose: Whether to enable logging output. Default False for RL training.
         """
         super().__init__()
+        
+        # Store render mode (required by PettingZoo API)
+        self.render_mode = render_mode
+        self.verbose = verbose
         
         # Initialize components (will be set in reset)
         self.env_generator = NetworkEnvGenerator()
         self.dataset = dataset
         
-        self.network = self.env_generator.create_network(dataset)
+        self.network = self.env_generator.create_network(dataset, verbose=verbose)
         # self.timestep = 0
         self.sim_step = 1  # Network simulation starts at t=1
         self.simulation_steps = self.network.params['simulation_steps']
@@ -70,14 +79,16 @@ class PedNetParallelEnv(ParallelEnv):
         
         # Build action and observation spaces
         self.normalize_obs = normalize_obs
-        self.with_density_obs = with_density_obs
-        self.space_builder = SpaceBuilder(self.agent_manager, self.with_density_obs, self._min_sep_width)
-        self._action_spaces = self.space_builder.build_action_spaces()
-        self._observation_spaces = self.space_builder.build_observation_spaces()
-        
+        self.obs_mode = obs_mode
+
         # Initialize observation builder and action applier
-        self.obs_builder = ObservationBuilder(self.network, self.agent_manager, self.normalize_obs, self.with_density_obs)
+        self.obs_builder = ObservationBuilder(self.network, self.agent_manager, self.normalize_obs, self.obs_mode)
         self.action_applier = ActionApplier(self.network, self.agent_manager, self._max_delta_sep_width, self._max_delta_gate_width, self._min_sep_width)
+
+        self.space_builder = SpaceBuilder(self.agent_manager, self.obs_mode, self._min_sep_width)
+        self._action_spaces = self.space_builder.build_action_spaces()
+        self._observation_spaces = self.space_builder.build_observation_spaces(self.obs_builder.features_per_link)
+        
         
         # Initialize cumulative rewards
         self._cumulative_rewards = {agent: 0.0 for agent in self.possible_agents}
@@ -127,10 +138,10 @@ class PedNetParallelEnv(ParallelEnv):
         # Determine reset mode
         # Always re-create network to clear state
         if randomize:
-            self.network = self.env_generator.randomize_network(self.dataset, seed)
+            self.network = self.env_generator.randomize_network(self.dataset, seed, verbose=self.verbose)
         else:
             # Deterministic reset using default configuration
-            self.network = self.env_generator.create_network(self.dataset)
+            self.network = self.env_generator.create_network(self.dataset, verbose=self.verbose)
             
         # Re-initialize components with the new network instance
         self.agent_manager = AgentManager(self.network)
@@ -141,7 +152,7 @@ class PedNetParallelEnv(ParallelEnv):
         #     self.possible_agents = list(new_agents)
             
         # Update builders/appliers with new references
-        self.obs_builder = ObservationBuilder(self.network, self.agent_manager, self.normalize_obs, self.with_density_obs)
+        self.obs_builder = ObservationBuilder(self.network, self.agent_manager, self.normalize_obs, self.obs_mode)
         self.action_applier = ActionApplier(self.network, self.agent_manager, self._max_delta_sep_width, self._max_delta_gate_width, self._min_sep_width)
         
         # Reset environment state
@@ -217,7 +228,7 @@ class PedNetParallelEnv(ParallelEnv):
         preventing both upstream queuing and downstream congestion.
         """
         rewards = {}
-        
+        threshold_density = 4
         for agent_id in self.possible_agents:
             agent_type = self.agent_manager.get_agent_type(agent_id)
             penalty = 0.0
@@ -240,8 +251,13 @@ class PedNetParallelEnv(ParallelEnv):
                         normalized_density = (norm_reverse_link_density + norm_forward_link_density) / 2
                     else:
                         # Regular Link: use get_density() to get combined bidirectional density once
-                        normalized_density = link.get_density(self.sim_step) / (link.k_jam + 1e-6)
-                    
+                        density = link.get_density(self.sim_step)
+                        # high penalty for high density
+                        if density > threshold_density:
+                            penalty += 100 * (density - threshold_density)
+                        normalized_density = density / (link.k_jam + 1e-6)
+                        # normalized_density = link.get_density(self.sim_step)
+
                     penalty += normalized_density
                 # average the penalty of all incoming links
                 penalty /= len(node.incoming_links)
@@ -292,27 +308,36 @@ class PedNetParallelEnv(ParallelEnv):
         
         return infos
 
-    def render(self, mode="human", simulation_dir: str = None, variable = 'density', vis_actions: bool = False, save_dir: str = None):
+    def render(self, simulation_dir: str = None, variable = 'density', vis_actions: bool = False, save_dir: str = None):
         """Render the environment based on mode."""
+        # Use self.render_mode if mode not specified (PettingZoo standard)
+        if self.render_mode is None:
+            return  # No rendering if render_mode is None
+        
         if simulation_dir is not None:  
-            self.visualizer = NetworkVisualizer(simulation_dir=simulation_dir)
+            self.visualizer = NetworkVisualizer(simulation_dir=simulation_dir, pos=self.network.pos)
+            # When loading from saved data, let visualizer determine end_time from saved params
+            end_time = None
         else:
-            self.visualizer = NetworkVisualizer(network=self.network)
-        if mode == "human":
+            self.visualizer = NetworkVisualizer(network=self.network, pos=self.network.pos)
+            # When using live network, use current simulation step
+            end_time = self.sim_step
+            
+        if self.render_mode == "human":
             # Static blocking display of current state
             self.visualizer.visualize_network_state(
-                time_step=self.sim_step,
+                time_step=end_time if end_time else self.sim_step,
                 edge_property=variable,  # Customize as needed (e.g., 'flow', 'speed')
                 with_colorbar=True,
                 set_title=True,
                 figsize=(10, 8)
             )
-        elif mode == "animate":
-            # Full animation from start to current step (blocking)
+        elif self.render_mode == "animate":
+            # Full animation from start to end
             matplotlib.use('macosx')
             ani = self.visualizer.animate_network(
                 start_time=0,
-                end_time=self.sim_step,  # Up to current step
+                end_time=end_time,  # None = use saved simulation length, else current step
                 interval=100,  # Adjust speed as needed
                 edge_property=variable,  # Customize as needed
                 tag=False,  # Optional labels
@@ -325,7 +350,7 @@ class PedNetParallelEnv(ParallelEnv):
                          writer=writer,
                          progress_callback=progress_callback)
         else:
-            raise ValueError(f"Unsupported render mode: {mode}")
+            raise ValueError(f"Unsupported render mode: {self.render_mode}")
 
     def save(self, simulation_dir: str):
         """Save the current network state."""

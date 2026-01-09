@@ -24,7 +24,7 @@ def test_environment():
     dataset = "nine_intersections"
     try:
         # Initialize environment
-        env = PedNetParallelEnv(dataset)
+        env = PedNetParallelEnv(dataset, render_mode="animate")
         print(f"Created PedNet environment with dataset: {dataset}")
         
         # Reset environment
@@ -83,7 +83,7 @@ if __name__ == "__main__":
     # ani = visualizer.animate_network(start_time=0, end_time=env.network.params['simulation_steps'], interval=100, edge_property='density')
     # plt.show()
     # env.render(mode="animate", simulation_dir="../../outputs/rl_example", vis_actions=True, save_dir='../outputs') # save the output animation
-    env.render(mode="animate", simulation_dir="../outputs/rl_example", vis_actions=True)  # visualize without saving
+    env.render(simulation_dir="../outputs/rl_example", vis_actions=True)  # visualize without saving
     # env.render(mode="human") # some bugs with snapshot visualization
 
     # from pettingzoo.test import parallel_api_test

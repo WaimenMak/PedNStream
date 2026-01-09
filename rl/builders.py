@@ -8,6 +8,12 @@
 Observation builders and action appliers for PedNet multi-agent environment.
 
 Handles conversion between agent actions/observations and network state.
+
+Observation Modes:
+    - "flow_only": Only flow features (inflow, outflow) - minimal observation
+    - "with_gate": Flow features + gate width (for gater agents)
+    - "with_density": Flow + density features
+    - "full": All available features (density, flow, gate width)
 """
 
 import numpy as np
@@ -21,7 +27,7 @@ class ObservationBuilder:
     Builds observations for separator and gater agents from network state.
     """
     
-    def __init__(self, network, agent_manager: AgentManager, normalize: bool = True, with_density_obs: bool = False):
+    def __init__(self, network, agent_manager: AgentManager, normalize: bool = False, obs_mode: str = "flow_only"):
         """
         Initialize observation builder.
         
@@ -29,12 +35,25 @@ class ObservationBuilder:
             network: Network instance from LTM simulation
             agent_manager: AgentManager instance with agent mappings
             normalize: Whether to normalize observations
-            with_density_obs: Whether to include density observations
+            obs_mode: Observation mode - one of: "option1", "option2", "option3", "option4"
         """
         self.network = network
         self.agent_manager = agent_manager
         self.normalize = normalize
-        self.with_density_obs = with_density_obs
+        self.obs_mode = obs_mode
+        # Validate obs_mode
+        valid_modes = ["option1", "option2", "option3", "option4"]
+        if obs_mode not in valid_modes:
+            raise ValueError(f"obs_mode must be one of {valid_modes}, got: {obs_mode}")
+        # Determine features per link based on obs_mode for gater
+        if self.obs_mode == "option1":
+            self.features_per_link = 3  # inflow, reverse outflow, gate width
+        elif self.obs_mode == "option2":
+            self.features_per_link = 4  # inflow, reverse outflow, density, gate width
+        elif self.obs_mode == "option3":
+            self.features_per_link = 5  # inoutflow, reverse inoutflow, gate width
+        elif self.obs_mode == "option4":
+            self.features_per_link = None  # density, inflow, reverse outflow, gate width
         
         # Normalization constants (will be refined based on actual features)
         self.density_norm = 6.0    # Typical jam density
@@ -66,27 +85,24 @@ class ObservationBuilder:
         """Build observation for separator agent."""
         forward_link, reverse_link = self.agent_manager.get_separator_links(agent_id)
         
-        # TODO: Extract meaningful features from both directions
-        # Placeholder features:
         features = []
         
         # Forward direction features
-        if self.with_density_obs:
-            features.extend([
-                forward_link.density[time_step] if time_step < len(forward_link.density) else 0.0, # density of the forward link
-                forward_link.inflow[time_step] if time_step < len(forward_link.inflow) else 0.0,
-                forward_link.outflow[time_step] if time_step < len(forward_link.outflow) else 0.0, # outflow of the forward link
-                reverse_link.density[time_step] if time_step < len(reverse_link.density) else 0.0, # density of the reverse link
-                reverse_link.inflow[time_step] if time_step < len(reverse_link.inflow) else 0.0, # inflow of the reverse link
-                reverse_link.outflow[time_step] if time_step < len(reverse_link.outflow) else 0.0, # outflow of the reverse link
-            ])
-        else:
-            features.extend([
-                forward_link.inflow[time_step] if time_step < len(forward_link.inflow) else 0.0,
-                forward_link.outflow[time_step] if time_step < len(forward_link.outflow) else 0.0,
-                reverse_link.inflow[time_step] if time_step < len(reverse_link.inflow) else 0.0,
-                reverse_link.outflow[time_step] if time_step < len(reverse_link.outflow) else 0.0,
-            ])
+        # if self.with_density_obs:
+        #     features.extend([
+        #         forward_link.inflow[time_step] if time_step < len(forward_link.inflow) else 0.0,
+        #         forward_link.outflow[time_step] if time_step < len(forward_link.outflow) else 0.0, # outflow of the forward link
+        #         reverse_link.density[time_step] if time_step < len(reverse_link.density) else 0.0, # density of the reverse link
+        #         reverse_link.inflow[time_step] if time_step < len(reverse_link.inflow) else 0.0, # inflow of the reverse link
+        #         reverse_link.outflow[time_step] if time_step < len(reverse_link.outflow) else 0.0, # outflow of the reverse link
+        #     ])
+        # else:
+        features.extend([
+            forward_link.inflow[time_step] if time_step < len(forward_link.inflow) else 0.0,
+            forward_link.outflow[time_step] if time_step < len(forward_link.outflow) else 0.0,
+            reverse_link.inflow[time_step] if time_step < len(reverse_link.inflow) else 0.0,
+            reverse_link.outflow[time_step] if time_step < len(reverse_link.outflow) else 0.0,
+        ])
         
         obs = np.array(features, dtype=np.float32)
         
@@ -98,34 +114,40 @@ class ObservationBuilder:
     
     def _build_gater_observation(self, agent_id: str, time_step: int) -> np.ndarray:
         """Build observation for gater agent."""
-        # node = self.agent_discovery.get_gater_node(agent_id)
         out_links = self.agent_manager.get_gater_outgoing_links(agent_id)
-        max_outdegree = self.agent_manager.get_max_outdegree()
+        max_outdegree = self.agent_manager.get_max_outdegree(agent_id)  # no padding
         
-        # TODO: Extract per-outgoing-link features
-        # Placeholder: 8 features per link, padded to max_outdegree
-        features_per_link = 4 if self.with_density_obs else 3 # density, inflow of outgoing link, outflow of incoming link, current gate width
-        obs = np.zeros(max_outdegree * features_per_link, dtype=np.float32)
+        obs = np.zeros(max_outdegree * self.features_per_link, dtype=np.float32)
         
         for i, link in enumerate(out_links):
-            start_idx = i * features_per_link
+            start_idx = i * self.features_per_link
             
-            # Extract link features
-            if self.with_density_obs:
+            # Extract link features based on obs_mode
+            if self.obs_mode == "option1":
                 link_features = [
+                    link.inflow[time_step] if time_step < len(link.inflow) else 0.0,
+                    link.reverse_link.outflow[time_step] if time_step < len(link.reverse_link.outflow) else 0.0,
+                    link.back_gate_width,
+                ]
+            elif self.obs_mode == "option2":
+                link_features = [
+                    link.inflow[time_step] if time_step < len(link.inflow) else 0.0,
+                    link.reverse_link.outflow[time_step] if time_step < len(link.reverse_link.outflow) else 0.0,
                     link.get_density(time_step), # shared density
-                    link.inflow[time_step] if time_step < len(link.inflow) else 0.0, # inflow of outgoing link
-                    link.reverse_link.outflow[time_step] if time_step < len(link.reverse_link.outflow) else 0.0, # outflow of incoming link
                     link.back_gate_width,
                 ]
-            else:
+            elif self.obs_mode == "option3":
                 link_features = [
-                    link.inflow[time_step] if time_step < len(link.inflow) else 0.0, # inflow of outgoing link
-                    link.reverse_link.outflow[time_step] if time_step < len(link.reverse_link.outflow) else 0.0, # outflow of incoming link
+                    link.inflow[time_step] if time_step < len(link.inflow) else 0.0,
+                    link.outflow[time_step] if time_step < len(link.outflow) else 0.0,
+                    link.reverse_link.inflow[time_step] if time_step < len(link.reverse_link.inflow) else 0.0,
+                    link.reverse_link.outflow[time_step] if time_step < len(link.reverse_link.outflow) else 0.0,
                     link.back_gate_width,
                 ]
+            elif self.obs_mode == "option4":
+                pass
             
-            obs[start_idx:start_idx + features_per_link] = link_features
+            obs[start_idx:start_idx + self.features_per_link] = link_features
         
         # Apply normalization if enabled
         if self.normalize:
@@ -134,53 +156,63 @@ class ObservationBuilder:
         return obs
     
     def _normalize_separator_obs(self, obs: np.ndarray) -> np.ndarray:
-        """Normalize separator observation features."""
-        # TODO: Apply proper normalization based on feature semantics
-        # Placeholder normalization
+        """Normalize separator observation features based on obs_mode."""
         normalized = obs.copy()
         
-        if self.with_density_obs:
-            # normalize density features (indices 0, 4)
+        if self.obs_mode == "option1":
+            # All flow features (indices 0-3)
+            normalized[:] /= self.flow_norm
+        elif self.obs_mode == "option2":
+            # Flow features (indices 0-3), separator width not normalized (index 4)
+            normalized[:4] /= self.flow_norm
+        elif self.obs_mode == "option3":
+            # Density features (indices 0, 3)
             normalized[[0, 3]] /= self.density_norm
-            # normalize flow features (indices 1, 5)
+            # Flow features (indices 1, 2, 4, 5)
             normalized[[1, 2, 4, 5]] /= self.flow_norm
-        else:
-            # normalize flow features (indices 0, 2)
-            normalized[[0, 1, 2, 3]] /= self.flow_norm
+        elif self.obs_mode == "option4":
+            # Density features (indices 0, 3)
+            normalized[[0, 3]] /= self.density_norm
+            # Flow features (indices 1, 2, 4, 5)
+            normalized[[1, 2, 4, 5]] /= self.flow_norm
+            # Separator width not normalized (index 6)
         
         return normalized
     
     def _normalize_gater_obs(self, obs: np.ndarray) -> np.ndarray:
-        """Normalize gater observation features."""
-        # TODO: Apply proper normalization for per-link features
-        # Placeholder normalization
+        """Normalize gater observation features based on obs_mode."""
         normalized = obs.copy()
         
-        if self.with_density_obs:
-            features_per_link = 4
-        else:
-            features_per_link = 3
         
-        if features_per_link == 0:
+        if self.features_per_link == 0:
             return normalized
 
-        max_outdegree = len(obs) // features_per_link
+        max_outdegree = len(obs) // self.features_per_link
         
         for i in range(max_outdegree):
-            start_idx = i * features_per_link
+            start_idx = i * self.features_per_link
             
-            if self.with_density_obs:
+            if self.obs_mode == "option1":
+                # Normalize both flow features (indices 0, 1)
+                normalized[start_idx] /= self.flow_norm
+                normalized[start_idx + 1] /= self.flow_norm
+            elif self.obs_mode == "option2":
+                # Normalize flow (indices 0, 1), gate width not normalized (index 2)
+                normalized[start_idx] /= self.flow_norm
+                normalized[start_idx + 1] /= self.flow_norm
+            elif self.obs_mode == "option3":
                 # Normalize density (index 0)
                 normalized[start_idx] /= self.density_norm
                 # Normalize flow (indices 1, 2)
                 normalized[start_idx + 1] /= self.flow_norm
                 normalized[start_idx + 2] /= self.flow_norm
-                # Note: gate width (index 3) is not normalized
-            else:
-                # Normalize flow (indices 0, 1)
-                normalized[start_idx] /= self.flow_norm
+            elif self.obs_mode == "option4":
+                # Normalize density (index 0)
+                normalized[start_idx] /= self.density_norm
+                # Normalize flow (indices 1, 2)
                 normalized[start_idx + 1] /= self.flow_norm
-                # Note: gate width (index 2) is not normalized
+                normalized[start_idx + 2] /= self.flow_norm
+                # Gate width not normalized (index 3)
         
         return normalized
 

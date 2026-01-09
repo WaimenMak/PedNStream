@@ -14,6 +14,24 @@ RL agents to control pedestrian traffic flow through:
 """
 
 from .pz_pednet_env import PedNetParallelEnv
+from .rl_utils import (
+    RunningNormalizeWrapper,
+    RunningMeanStd,
+    save_all_agents,
+    load_all_agents,
+    load_normalization_stats,
+    evaluate_agents,
+    compute_gae,
+)
 
-__all__ = ['PedNetParallelEnv']
+__all__ = [
+    'PedNetParallelEnv',
+    'RunningNormalizeWrapper',
+    'RunningMeanStd',
+    'save_all_agents',
+    'load_all_agents',
+    'load_normalization_stats',
+    'evaluate_agents',
+    'compute_gae',
+]
 

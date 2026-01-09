@@ -61,7 +61,7 @@ class AgentManager:
             node1, node2 = node_pair
             # Create undirected pair for consistent naming
             pair = tuple(sorted([node1, node2]))
-            agent_id = f"sep:{pair[0]}_{pair[1]}"
+            agent_id = f"sep_{pair[0]}_{pair[1]}"
             
             # Find forward and reverse links
             forward_link = self.network.links.get((pair[0], pair[1]))
@@ -105,7 +105,7 @@ class AgentManager:
             if not real_out_links:
                 raise ValueError(f"Gater node {node_id} has no real outgoing links to control")
             
-            agent_id = f"gate:{node_id}"
+            agent_id = f"gate_{node_id}"
             self.gater_agents[agent_id] = {
                 "node": node,
                 "out_links": real_out_links
@@ -171,6 +171,8 @@ class AgentManager:
         mask[:num_out_links] = 1.0
         return mask
     
-    def get_max_outdegree(self) -> int:
-        """Return maximum outdegree across all gater agents."""
-        return self.max_outdegree
+    def get_max_outdegree(self, agent_id: str) -> int:
+        """Return maximum outdegree for a given gater agent."""
+        if agent_id not in self.gater_agents:
+            raise ValueError(f"Unknown gater agent: {agent_id}")
+        return len(self.gater_agents[agent_id]["out_links"])

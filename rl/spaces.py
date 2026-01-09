@@ -22,22 +22,23 @@ class SpaceBuilder:
     Builds action and observation spaces for discovered agents.
     """
     
-    def __init__(self, agent_manager: AgentManager, with_density_obs: bool = False, min_sep_width: float = 1.0):
+    def __init__(self, agent_manager: AgentManager, obs_mode: str, min_sep_width: float = 1.0):
         """
         Initialize space builder.
         
         Args:
             agent_manager: AgentManager instance with network mappings
-            with_density_obs: Whether density observations are included
+            obs_mode: Observation mode - one of: "option1", "option2", "option3", "option4"
             min_sep_width: Minimum width for each direction in bidirectional separators
         """
         self.agent_manager = agent_manager
-        self.with_density_obs = with_density_obs
+        # self.with_density_obs = with_density_obs
         self.min_sep_width = min_sep_width
         
         # Observation space dimensions based on actual features
-        self.sep_obs_dim = 6 if with_density_obs else 4  # Forward + reverse link features
-        self.gat_obs_dim_per_link = 4 if with_density_obs else 3  # Features per outgoing link, including current gate width
+        # self.sep_obs_dim = 6 if with_density_obs else 4  # Forward + reverse link features
+        self.sep_obs_dim = 4
+        self.gat_obs_dim_per_link = None  # Features per outgoing link, including current gate width
     
     def build_action_spaces(self) -> Dict[str, spaces.Space]:
         """Build action spaces for all agents with physical width constraints."""
@@ -74,7 +75,7 @@ class SpaceBuilder:
         
         return action_spaces
     
-    def build_observation_spaces(self) -> Dict[str, spaces.Space]:
+    def build_observation_spaces(self, features_per_link: int) -> Dict[str, spaces.Space]:
         """Build observation spaces for all agents."""
         observation_spaces = {}
         
@@ -89,8 +90,10 @@ class SpaceBuilder:
         
         # Gater agents: per-outgoing-link features, padded to max_outdegree
         # Note: Currently using max_outdegree padding for observations (unlike actions)
-        max_outdegree = self.agent_manager.get_max_outdegree()
+        # max_outdegree = self.agent_manager.get_max_outdegree() # for padding
+        self.gat_obs_dim_per_link = features_per_link
         for agent_id in self.agent_manager.get_gater_agents():
+            max_outdegree = self.agent_manager.get_max_outdegree(agent_id) # no padding
             observation_spaces[agent_id] = spaces.Box(
                 low=-np.inf,
                 high=np.inf,

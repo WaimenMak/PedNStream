@@ -8,6 +8,9 @@ networkx>=2.6.0
 pettingzoo>=1.24.0
 gymnasium>=0.29.0
 torch>=2.0.0
+stable-baselines3>=2.0.0
+tensorboard>=2.14.0
+ray[rllib]>=2.9.0
 
 # Additional requirements for video generation functionality
 selenium>=4.0.0

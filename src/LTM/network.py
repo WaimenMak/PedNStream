@@ -60,6 +60,9 @@ class Network:
                  log_level: int = logging.INFO, verbose: bool = True):
         """
         Initialize the network, with nodes and links according to the adjacency matrix
+        
+        Args:
+            verbose: If True, enable logging output. Default True for backward compatibility.
         """
         # Set up logger
         self.logger = self.setup_logger(log_level=log_level)

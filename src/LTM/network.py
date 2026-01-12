@@ -125,7 +125,8 @@ class Network:
             pattern = origin_config.get('pattern', 'gaussian_peaks')   # get the pattern name of the node in the yaml file
             node.demand = self.demand_generator.generate_custom(node.node_id, pattern)
             # log the total demand of the origin node
-            self.logger.info(f"Total demand of origin node {node.node_id}: {np.sum(node.demand)}")
+            if self.logger and self.verbose:
+                self.logger.info(f"Total demand of origin node {node.node_id}: {np.sum(node.demand)}")
         else:
             node.demand = np.zeros(self.simulation_steps) # destination nodes have no demand
 

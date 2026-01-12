@@ -83,7 +83,7 @@ class Network:
             self.logger.info(f"Network initialization started, assign flows type: {self.assign_flows_type}")
         
         # Initialize demand generator with passed logger
-        self.demand_generator = DemandGenerator(self.simulation_steps, params, self.logger)
+        self.demand_generator = DemandGenerator(self.simulation_steps, params, self.logger if self.verbose else None)
         
         if demand_pattern:
             # self.demand_generator.register_pattern(self.params.get('custom_pattern'), demand_pattern)

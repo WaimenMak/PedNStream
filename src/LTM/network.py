@@ -101,7 +101,8 @@ class Network:
 
         # Initialize network structure
         self.init_nodes_and_links()
-        self.logger.info(f"Network initialized with {len(self.nodes)} nodes and {len(self.links)} links")
+        if self.logger and self.verbose:
+            self.logger.info(f"Network initialized with {len(self.nodes)} nodes and {len(self.links)} links")
 
         # Initialize managers if destination nodes are specified
         if destination_nodes:

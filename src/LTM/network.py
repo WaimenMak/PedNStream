@@ -97,7 +97,8 @@ class Network:
             start_node, end_node = link.split('-')
             self.controller_nodes.add(int(start_node))
             self.controller_nodes.add(int(end_node))
-        self.logger.info(f"Controller configuration: enabled: {self.controller_enabled}, nodes: {self.controller_nodes}, links: {self.controller_links}")
+        if self.logger and self.verbose:
+            self.logger.info(f"Controller configuration: enabled: {self.controller_enabled}, nodes: {self.controller_nodes}, links: {self.controller_links}")
 
         # Initialize network structure
         self.init_nodes_and_links()

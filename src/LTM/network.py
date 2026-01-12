@@ -79,7 +79,8 @@ class Network:
         self.path_finder = None
         self.pos = pos
         self.assign_flows_type = params.get('assign_flows_type', 'classic')
-        self.logger.info(f"Network initialization started, assign flows type: {self.assign_flows_type}")
+        if self.logger and self.verbose:
+            self.logger.info(f"Network initialization started, assign flows type: {self.assign_flows_type}")
         
         # Initialize demand generator with passed logger
         self.demand_generator = DemandGenerator(self.simulation_steps, params, self.logger)

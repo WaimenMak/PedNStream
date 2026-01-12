@@ -89,7 +89,8 @@ class Network:
             # self.demand_generator.register_pattern(self.params.get('custom_pattern'), demand_pattern)
             for func in demand_pattern:
                 self.demand_generator.register_pattern(func.__name__, func)
-                self.logger.info(f"Custom demand pattern registered: {func.__name__}")
+                if self.logger and self.verbose:
+                    self.logger.info(f"Custom demand pattern registered: {func.__name__}")
         
 # Controller configuration
         controller_config = params.get('controllers', {})

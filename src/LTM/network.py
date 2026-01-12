@@ -57,7 +57,7 @@ class Network:
                  origin_nodes: list, destination_nodes: list = [], 
                  demand_pattern: List[Callable[[int, dict], np.ndarray]] = None,
                  od_flows: dict = None, pos: dict = None,
-                 log_level: int = logging.INFO):
+                 log_level: int = logging.INFO, verbose: bool = True):
         """
         Initialize the network, with nodes and links according to the adjacency matrix
         """

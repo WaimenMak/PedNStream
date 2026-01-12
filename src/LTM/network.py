@@ -65,7 +65,8 @@ class Network:
             verbose: If True, enable logging output. Default True for backward compatibility.
         """
         # Set up logger
-        self.logger = self.setup_logger(log_level=log_level)
+        self.verbose = verbose
+        self.logger = self.setup_logger(log_level=log_level) if verbose else None
         
         self.adjacency_matrix = adjacency_matrix
         self.nodes = {}

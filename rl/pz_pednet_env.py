@@ -261,6 +261,19 @@ class PedNetParallelEnv(ParallelEnv):
                     penalty += normalized_density
                 # average the penalty of all incoming links
                 penalty /= len(node.incoming_links)
+                
+                # Add variance penalty to discourage blocking behavior
+                # High variance = unbalanced load (e.g., one link blocked, others empty)
+                # Low variance = balanced load (desired)
+                penalty = 0
+                variance_penalty_weight = 10  # Tunable hyperparameter
+                if len(all_densities) > 1:
+                    avg_density = np.mean(all_densities)
+                    # if avg_density > 0.5:
+                    diff = np.mean(np.abs(np.array(all_densities) - avg_density))
+                    # diff = np.max(np.abs(np.array(all_densities) - avg_density))
+                    penalty += variance_penalty_weight * diff
+
                     
             
             elif agent_type == 'sep':

@@ -535,15 +535,38 @@ def load_all_agents(save_dir: str, device: str = "cpu", agent_class=None):
         if agent_type == 'PPO':
             # Import PPOAgent
             if agent_class is None or agent_class.__name__ != 'PPOAgent':
-                from rl.agents.PPO import PPOAgent
+                from rl.agents.PPO_backup import PPOAgent
                 agent_class_to_use = PPOAgent
             else:
                 agent_class_to_use = agent_class
             
             # Create PPO agent with saved config
             use_stacked_obs = config.get('use_stacked_obs', False)
+            use_gat_lstm = config.get('use_gat_lstm', False)
             
-            if use_stacked_obs:
+            if use_gat_lstm:
+                agent = agent_class_to_use(
+                    obs_dim=config['obs_dim'],
+                    act_dim=config['act_dim'],
+                    act_low=config['act_low'],
+                    act_high=config['act_high'],
+                    gamma=config['gamma'],
+                    lmbda=config['lmbda'],
+                    epochs=config['epochs'],
+                    clip_eps=config['clip_eps'],
+                    entropy_coef=config['entropy_coef'],
+                    entropy_coef_decay=config.get('entropy_coef_decay', 0.995),
+                    entropy_coef_min=config.get('entropy_coef_min', 0.0001),
+                    use_delta_actions=config['use_delta_actions'],
+                    max_delta=config['max_delta'],
+                    use_gat_lstm=True,
+                    lstm_hidden_size=config['lstm_hidden_size'],
+                    gat_hidden_size=config['gat_hidden_size'],
+                    gat_num_heads=config['gat_num_heads'],
+                    num_lstm_layers=config.get('num_lstm_layers', 1),
+                    device=device,
+                )
+            elif use_stacked_obs:
                 agent = agent_class_to_use(
                     obs_dim=config['obs_dim'],
                     act_dim=config['act_dim'],
@@ -774,32 +797,23 @@ def compute_network_throughput(network=None, simulation_dir=None):
 
 def compute_network_travel_time(simulation_dir=None):
     """
-    Compute average travel time using flow-weighted approach.
+    Compute average travel time across the network.
     
-    This metric measures the average time pedestrians spend traveling through the network,
-    weighted by the number of people exiting each link at each timestep. This captures
-    congestion effects: when links are congested, travel_time increases, and this metric
-    reflects that directly.
+    This metric calculates the mean travel time across all timesteps for each link,
+    then averages over all links.
     
     Formula: 
-        TotalTravelTime = sum_{links, t} travel_time[link, t] * outflow[link, t]
-        AvgTravelTime = TotalTravelTime / TotalCompletedFlow
+        LinkAvgTravelTime = mean(travel_time[link, t] for all t)
+        NetworkAvgTravelTime = mean(LinkAvgTravelTime for all links)
     
     Args:
         simulation_dir: Path to saved simulation directory
         
     Returns:
         dict: {
-            'avg_travel_time': float,  # Average travel time per person (seconds)
-            'total_travel_time': float,  # Total person-seconds of travel time
-            'total_flow_weight': float,  # Total outflow (for normalization)
-            'flow_weighted_tt': float  # Alias for avg_travel_time
+            'avg_travel_time': float,  # Average travel time across network (seconds)
+            'num_links': int  # Number of links included in calculation
         }
-        
-    Note:
-        - Uses outflow-weighted travel time to capture actual experience of people exiting
-        - Accounts for congestion: when density is high, travel_time increases automatically
-        - More meaningful than simple "time in system" as it's normalized by link capacity
     """
     import numpy as np
     from pathlib import Path
@@ -815,55 +829,373 @@ def compute_network_travel_time(simulation_dir=None):
     with open(link_data_path, 'r') as f:
         link_data = json.load(f)
     
-    # Load network parameters for unit_time
-    network_params_path = sim_path / 'network_params.json'
-    unit_time = 1.0  # Default
-    if network_params_path.exists():
-        with open(network_params_path, 'r') as f:
-            network_params = json.load(f)
-            unit_time = network_params.get('unit_time', 1.0)
-    
-    total_travel_time = 0.0  # Person-seconds of travel time
-    total_flow_weight = 0.0  # Total outflow (for normalization)
+    link_avg_travel_times = []
     
     for link_key, link_info in link_data.items():
         travel_time_array = link_info.get('travel_time', [])
-        outflow_array = link_info.get('outflow', [])
         
-        if not travel_time_array or not outflow_array:
+        if not travel_time_array:
             continue
         
-        # Ensure arrays have same length
-        min_len = min(len(travel_time_array), len(outflow_array))
-        travel_time_array = travel_time_array[:min_len]
-        outflow_array = outflow_array[:min_len]
+        # Filter out invalid values
+        valid_times = [tt for tt in travel_time_array if tt is not None and tt >= 0]
         
-        # Sum travel_time[t] * outflow[t] over all timesteps
-        # This gives "person-seconds of travel time" for people exiting this link
-        for t in range(min_len):
-            tt = travel_time_array[t]
-            flow = outflow_array[t]
-            
-            # Skip invalid values
-            if tt is None or flow is None or tt < 0 or flow < 0:
-                continue
-            
-            # Travel time is in seconds, outflow is in pedestrians per timestep
-            total_travel_time += tt * flow
-            total_flow_weight += flow
+        if valid_times:
+            # Calculate average travel time for this link
+            link_avg_travel_times.append(np.mean(valid_times))
     
-    # Compute average travel time
-    if total_flow_weight > 0:
-        avg_travel_time = total_travel_time / total_flow_weight
+    # Compute average across all links
+    if link_avg_travel_times:
+        avg_travel_time = np.mean(link_avg_travel_times)
     else:
         avg_travel_time = 0.0
     
     return {
         'avg_travel_time': avg_travel_time,
-        'total_travel_time': total_travel_time,
-        'total_flow_weight': total_flow_weight,
-        'flow_weighted_tt': avg_travel_time  # Alias
+        'num_links': len(link_avg_travel_times)
     }
+
+
+def compute_total_network_delay(simulation_dir=None):
+    """
+    Compute total delay across the network.
+    
+    Total delay is calculated as the sum of delay accumulated by all pedestrians
+    over all time steps and links. The delay at each time step is calculated as:
+        Delay_rate = N(t) × (1 - T_free_flow / T_actual(t)) × Δt
+    
+    Where:
+        - N(t) = number of pedestrians on the link at time t
+        - T_free_flow = free flow travel time (length / free_flow_speed)
+        - T_actual(t) = actual travel time at time t
+        - Δt = unit time (time step duration)
+    
+    This gives the total "person-seconds" of delay in the network.
+    
+    Args:
+        simulation_dir: Path to saved simulation directory
+        
+    Returns:
+        dict: {
+            'total_delay': float,  # Total delay in person-seconds
+            'delay_intensity': float,  # Ratio of delay time to total travel time (dimensionless)
+            'total_person_time': float,  # Total person-time in network (seconds)
+            'num_links': int  # Number of links included in calculation
+        }
+    """
+    import numpy as np
+    from pathlib import Path
+    import json
+    
+    sim_path = Path(simulation_dir)
+    
+    # Load network parameters to get unit_time
+    network_params_path = sim_path / 'network_params.json'
+    if not network_params_path.exists():
+        raise FileNotFoundError(f"network_params.json not found in {simulation_dir}")
+    
+    with open(network_params_path, 'r') as f:
+        network_params = json.load(f)
+    
+    unit_time = network_params.get('unit_time', 1.0)  # Default to 1 second if not found
+    
+    # Load link data
+    link_data_path = sim_path / 'link_data.json'
+    if not link_data_path.exists():
+        raise FileNotFoundError(f"link_data.json not found in {simulation_dir}")
+    
+    with open(link_data_path, 'r') as f:
+        link_data = json.load(f)
+    
+    total_delay = 0.0
+    total_person_time = 0.0
+    num_links_processed = 0
+    
+    for link_key, link_info in link_data.items():
+        # Get link parameters
+        params = link_info.get('parameters', {})
+        length = params.get('length')
+        free_flow_speed = params.get('free_flow_speed')
+        
+        if length is None or free_flow_speed is None or free_flow_speed <= 0:
+            continue
+        
+        # Calculate free flow travel time
+        free_flow_travel_time = length / free_flow_speed
+        
+        # Get time series data
+        num_pedestrians_array = link_info.get('num_pedestrians', [])
+        travel_time_array = link_info.get('travel_time', [])
+        
+        if not num_pedestrians_array or not travel_time_array:
+            continue
+        
+        # Ensure both arrays have the same length
+        min_length = min(len(num_pedestrians_array), len(travel_time_array))
+        
+        # Calculate delay for each time step
+        for t in range(min_length):
+            num_peds = num_pedestrians_array[t]
+            actual_travel_time = travel_time_array[t]
+            
+            # Skip invalid data
+            if num_peds is None or actual_travel_time is None or actual_travel_time <= 0:
+                continue
+            
+            # Calculate delay rate (person-seconds per time step)
+            # Delay rate = N(t) × (1 - T_ff / T_actual) × Δt
+            delay_fraction = max(0, 1 - free_flow_travel_time / actual_travel_time)
+            delay_rate = num_peds * delay_fraction * unit_time
+            
+            total_delay += delay_rate
+            total_person_time += num_peds * unit_time
+        
+        num_links_processed += 1
+    
+    # Calculate delay intensity (fraction of time spent in delay)
+    delay_intensity = total_delay / total_person_time if total_person_time > 0 else 0.0
+    
+    return {
+        'total_delay': total_delay,
+        'delay_intensity': delay_intensity,
+        'total_person_time': total_person_time,
+        'num_links': num_links_processed
+    }
+
+
+def compute_average_travel_time_spent(simulation_dir=None):
+    """
+    Compute average travel time spent per trip in the network.
+    
+    This metric calculates the total person-time in the network divided by
+    the total number of trips that entered the network.
+    
+    Formula:
+        Total Person Time = Σ_t Σ_l N(l,t) × Δt
+        Total Trips = Σ_(origin links) cumulative_inflow[-1]
+        Avg Travel Time = Total Person Time / Total Trips
+    
+    Where:
+        - N(l,t) = number of pedestrians on link l at time t
+        - Δt = unit time (time step duration)
+        - Origin links = links connected to origin nodes
+    
+    Args:
+        simulation_dir: Path to saved simulation directory
+        
+    Returns:
+        dict: {
+            'avg_travel_time_spent': float,  # Average travel time per trip (seconds)
+            'total_person_time': float,  # Total person-time in network (seconds)
+            'total_trips': float,  # Total number of trips
+            'num_origin_links': int  # Number of origin links
+        }
+    """
+    import numpy as np
+    from pathlib import Path
+    import json
+    
+    sim_path = Path(simulation_dir)
+    
+    # Load network parameters to get unit_time and origin nodes
+    network_params_path = sim_path / 'network_params.json'
+    if not network_params_path.exists():
+        raise FileNotFoundError(f"network_params.json not found in {simulation_dir}")
+    
+    with open(network_params_path, 'r') as f:
+        network_params = json.load(f)
+    
+    unit_time = network_params.get('unit_time', 1.0)
+    origin_nodes = set(network_params.get('origin_nodes', []))
+    
+    if not origin_nodes:
+        raise ValueError("No origin nodes found in network parameters")
+    
+    # Load link data
+    link_data_path = sim_path / 'link_data.json'
+    if not link_data_path.exists():
+        raise FileNotFoundError(f"link_data.json not found in {simulation_dir}")
+    
+    with open(link_data_path, 'r') as f:
+        link_data = json.load(f)
+    
+    # Calculate total person time
+    total_person_time = 0.0
+    
+    for link_key, link_info in link_data.items():
+        num_pedestrians_array = link_info.get('num_pedestrians', [])
+        
+        if not num_pedestrians_array:
+            continue
+        
+        # Sum person-time for this link
+        for num_peds in num_pedestrians_array:
+            if num_peds is not None and num_peds >= 0:
+                total_person_time += num_peds * unit_time
+    
+    # Calculate total trips from origin links
+    total_trips = 0.0
+    num_origin_links = 0
+    
+    for link_key, link_info in link_data.items():
+        # Parse link key "u-v" to get start node
+        try:
+            parts = link_key.split('-')
+            if len(parts) == 2:
+                start_node = int(parts[0])
+                
+                # Check if this link starts at an origin node
+                if start_node in origin_nodes:
+                    cum_inflow = link_info.get('cumulative_inflow', [])
+                    if cum_inflow:
+                        # Add the final cumulative inflow (last timestep)
+                        total_trips += cum_inflow[-1]
+                        num_origin_links += 1
+        except (ValueError, IndexError):
+            # Skip malformed link keys
+            continue
+    
+    # Calculate average travel time per trip
+    if total_trips > 0:
+        avg_travel_time_spent = total_person_time / total_trips
+    else:
+        avg_travel_time_spent = 0.0
+    
+    return {
+        'avg_travel_time_spent': avg_travel_time_spent,
+        'total_person_time': total_person_time,
+        'total_trips': total_trips,
+        'num_origin_links': num_origin_links
+    }
+
+
+def compute_agent_local_metrics(simulation_dir=None, dataset=None):
+    """
+    Compute local metrics for each agent based on connected links.
+    
+    For each controller (gate/separator), calculate the average density over time
+    on the links connected to that controller.
+    
+    Args:
+        simulation_dir: Path to saved simulation directory
+        dataset: Dataset name (needed to reconstruct network topology)
+        
+    Returns:
+        dict: {
+            agent_id: {
+                'avg_density': float,  # Average density across connected links and time
+                'avg_normalized_density': float,  # Average density normalized by k_jam
+                'num_links': int,  # Number of links connected to this agent
+                'link_densities': {link_key: avg_density}  # Per-link average densities
+            }
+        }
+    """
+    import numpy as np
+    from pathlib import Path
+    import json
+    
+    sim_path = Path(simulation_dir)
+    
+    # Load link data
+    link_data_path = sim_path / 'link_data.json'
+    if not link_data_path.exists():
+        raise FileNotFoundError(f"link_data.json not found in {simulation_dir}")
+    
+    with open(link_data_path, 'r') as f:
+        link_data = json.load(f)
+    
+    # Load network parameters to get agent-link mapping
+    network_params_path = sim_path / 'network_params.json'
+    if not network_params_path.exists():
+        raise FileNotFoundError(f"network_params.json not found in {simulation_dir}")
+    
+    with open(network_params_path, 'r') as f:
+        network_params = json.load(f)
+    
+    # Reconstruct agent manager to get agent-link mappings
+    # We need to recreate the network to access agent information
+    if dataset is None:
+        raise ValueError("dataset parameter is required to compute agent local metrics")
+    
+    from src.utils.env_loader import NetworkEnvGenerator
+    from rl.discovery import AgentManager
+    
+    env_generator = NetworkEnvGenerator()
+    network = env_generator.create_network(dataset, verbose=False)
+    agent_manager = AgentManager(network)
+    
+    agent_metrics = {}
+    
+    # Process each agent
+    for agent_id in agent_manager.get_all_agent_ids():
+        agent_type = agent_manager.get_agent_type(agent_id)
+        
+        # Get connected links based on agent type
+        connected_links = []
+        if agent_type == 'gate':
+            # Gater: get incoming and outgoing links of the controlled node
+            node = agent_manager.get_gater_node(agent_id)
+            for link in node.incoming_links:
+                if not (hasattr(link, 'virtual_incoming_link') and link == link.virtual_incoming_link):
+                    link_key = f"{link.start_node.node_id}-{link.end_node.node_id}"
+                    connected_links.append(link_key)
+            for link in node.outgoing_links:
+                if not (hasattr(link, 'virtual_outgoing_link') and link == link.virtual_outgoing_link):
+                    link_key = f"{link.start_node.node_id}-{link.end_node.node_id}"
+                    connected_links.append(link_key)
+        
+        elif agent_type == 'sep':
+            # Separator: get forward and reverse links of the corridor
+            forward_link, reverse_link = agent_manager.get_separator_links(agent_id)
+            forward_key = f"{forward_link.start_node.node_id}-{forward_link.end_node.node_id}"
+            reverse_key = f"{reverse_link.start_node.node_id}-{reverse_link.end_node.node_id}"
+            connected_links.append(forward_key)
+            connected_links.append(reverse_key)
+        
+        # Calculate metrics for this agent's connected links
+        link_avg_densities = {}
+        link_avg_normalized_densities = {}
+        
+        for link_key in connected_links:
+            if link_key not in link_data:
+                continue
+            
+            link_info = link_data[link_key]
+            density_array = link_info.get('density', [])
+            params = link_info.get('parameters', {})
+            k_jam = params.get('k_jam', 1.0)
+            
+            if not density_array:
+                continue
+            
+            # Filter out invalid values
+            valid_densities = [d for d in density_array if d is not None and d >= 0]
+            
+            if valid_densities:
+                avg_density = np.mean(valid_densities)
+                avg_normalized_density = avg_density / k_jam
+                link_avg_densities[link_key] = avg_density
+                link_avg_normalized_densities[link_key] = avg_normalized_density
+        
+        # Compute agent-level metrics
+        if link_avg_densities:
+            agent_metrics[agent_id] = {
+                'avg_density': np.mean(list(link_avg_densities.values())),
+                'avg_normalized_density': np.mean(list(link_avg_normalized_densities.values())),
+                'num_links': len(link_avg_densities),
+                'link_densities': link_avg_densities,
+                'link_normalized_densities': link_avg_normalized_densities
+            }
+        else:
+            agent_metrics[agent_id] = {
+                'avg_density': 0.0,
+                'avg_normalized_density': 0.0,
+                'num_links': 0,
+                'link_densities': {},
+                'link_normalized_densities': {}
+            }
+    
+    return agent_metrics
 
 
 def compute_network_congestion_metric(simulation_dir=None, threshold_ratio=0.7):
@@ -963,35 +1295,9 @@ def compute_network_congestion_metric(simulation_dir=None, threshold_ratio=0.7):
     }
 
 
-def evaluate_agents(env, agents, delta_actions: bool = False, deterministic: bool = True,
-                    seed: int = None, no_control: bool = False, randomize: bool = False, 
-                    save_dir: str = None, verbose: bool = True):
-    """
-    Evaluate trained agents on a specific environment setting without training.
-    Useful for comparing with rule-based agents.
-    
-    Args:
-        env: PettingZoo ParallelEnv (optionally wrapped with RunningNormalizeWrapper)
-        agents: Dict mapping agent_id -> PPOAgent (or any agent with take_action method)
-        delta_actions: If True, agents output delta actions
-        deterministic: If True, use deterministic actions (mean, no sampling)
-        seed: Random seed for environment reset
-        no_control: If True, skip action computation (no control baseline)
-        randomize: If True, randomize environment at reset
-        save_dir: If provided, save simulation results to this directory
-        verbose: Whether to print results
-        
-    Returns:
-        dict: {
-            'episode_rewards': {agent_id: total_reward},
-            'avg_reward': float,
-            'total_reward': float
-        }
-    """
-    # Set wrapper to evaluation mode if applicable
-    if hasattr(env, 'set_training'):
-        env.set_training(False)
-    
+def _evaluate_single_run(env, agents, delta_actions: bool, deterministic: bool,
+                         seed: int, no_control: bool, randomize: bool):
+    """Run a single evaluation episode. Internal helper function."""
     # Reset environment with specified settings
     reset_options = {'randomize': randomize} if randomize else None
     obs, infos = env.reset(seed=seed, options=reset_options)
@@ -1010,10 +1316,6 @@ def evaluate_agents(env, agents, delta_actions: bool = False, deterministic: boo
     
     episode_rewards = {agent_id: 0.0 for agent_id in agents.keys()}
     done = False
-    step = 0
-    
-    if verbose:
-        print(f"Evaluating agents for {env.simulation_steps} steps...")
     
     while not done:
         actions = {}
@@ -1051,7 +1353,6 @@ def evaluate_agents(env, agents, delta_actions: bool = False, deterministic: boo
                 actions[agent_id] = action
         
         # Step environment
-        # print(f"Step {step}: Actions: {absolute_actions}")
         next_obs, rewards, terms, truncs, infos = env.step(absolute_actions)
         
         # Update state history queues for stacked observations
@@ -1064,7 +1365,6 @@ def evaluate_agents(env, agents, delta_actions: bool = False, deterministic: boo
             episode_rewards[agent_id] += rewards[agent_id]
         
         obs = next_obs
-        step += 1
         
         # Check if episode is done
         done = any(terms.values()) or any(truncs.values())
@@ -1073,27 +1373,135 @@ def evaluate_agents(env, agents, delta_actions: bool = False, deterministic: boo
     total_reward = sum(episode_rewards.values())
     avg_reward = np.mean(list(episode_rewards.values()))
     
-    # Print results
-    if verbose:
-        print("=" * 60)
-        print("Evaluation Results")
-        print("=" * 60)
-        for agent_id in agents.keys():
-            print(f"  Agent {agent_id}: {episode_rewards[agent_id]:.3f}")
-        print(f"  Average reward: {avg_reward:.3f}")
-        print(f"  Total reward: {total_reward:.3f}")
-        print("=" * 60)
-    
-    # Save simulation if requested
-    if save_dir is not None:
-        env.save(save_dir)
-        if verbose:
-            print(f"Saved simulation to {save_dir}")
-    
     return {
         'episode_rewards': episode_rewards,
         'avg_reward': avg_reward,
         'total_reward': total_reward
+    }
+
+
+def evaluate_agents(env, agents, delta_actions: bool = False, deterministic: bool = True,
+                    seed: int = None, no_control: bool = False, randomize: bool = False, 
+                    save_dir: str = None, verbose: bool = True, num_runs: int = 1):
+    """
+    Evaluate trained agents on a specific environment setting without training.
+    Useful for comparing with rule-based agents. Runs multiple evaluations and reports statistics.
+    
+    Args:
+        env: PettingZoo ParallelEnv (optionally wrapped with RunningNormalizeWrapper)
+        agents: Dict mapping agent_id -> PPOAgent (or any agent with take_action method)
+        delta_actions: If True, agents output delta actions
+        deterministic: If True, use deterministic actions (mean, no sampling)
+        seed: Random seed for environment reset (if None and num_runs > 1, uses different seeds)
+        no_control: If True, skip action computation (no control baseline)
+        randomize: If True, randomize environment at reset
+        save_dir: If provided, save simulation results to this directory (saves each run separately)
+        verbose: Whether to print results
+        num_runs: Number of evaluation runs to perform (default: 1)
+        
+    Returns:
+        dict: {
+            'episode_rewards': {agent_id: mean_reward},
+            'episode_rewards_std': {agent_id: std_reward},
+            'avg_reward': float (mean across runs),
+            'avg_reward_std': float (std across runs),
+            'total_reward': float (mean across runs),
+            'total_reward_std': float (std across runs),
+            'all_runs': [list of individual run results]
+        }
+    """
+    # Set wrapper to evaluation mode if applicable
+    if hasattr(env, 'set_training'):
+        env.set_training(False)
+    
+    if verbose and num_runs > 1:
+        print(f"Running {num_runs} evaluation runs...")
+    
+    # Collect results from all runs
+    all_runs = []
+    total_rewards = []
+    avg_rewards = []
+    episode_rewards_all = {agent_id: [] for agent_id in agents.keys()}
+    
+    # Run multiple evaluations
+    for run_idx in range(num_runs):
+        # Use different seed for each run if seed is provided and num_runs > 1
+        run_seed = None
+        if seed is not None:
+            if num_runs > 1:
+                run_seed = seed + run_idx  # Different seed for each run
+            else:
+                run_seed = seed
+        
+        if verbose and num_runs > 1:
+            print(f"  Run {run_idx + 1}/{num_runs}...", end=' ', flush=True)
+        
+        # Run single evaluation
+        result = _evaluate_single_run(env, agents, delta_actions, deterministic,
+                                      run_seed, no_control, randomize)
+        
+        all_runs.append(result)
+        total_rewards.append(result['total_reward'])
+        avg_rewards.append(result['avg_reward'])
+        
+        # Collect individual agent rewards
+        for agent_id in agents.keys():
+            episode_rewards_all[agent_id].append(result['episode_rewards'][agent_id])
+        
+        # Save simulation for this run if requested
+        if save_dir is not None:
+            if num_runs > 1:
+                # Create unique directory for each run
+                run_save_dir = f"{save_dir}_run{run_idx + 1}"
+            else:
+                run_save_dir = save_dir
+            env.save(run_save_dir)
+            if verbose:
+                print(f"Saved run {run_idx + 1} to {run_save_dir}")
+        elif verbose and num_runs > 1:
+            print(f"Total reward: {result['total_reward']:.3f}")
+    
+    # Calculate statistics across runs
+    total_reward_mean = np.mean(total_rewards)
+    total_reward_std = np.std(total_rewards)
+    avg_reward_mean = np.mean(avg_rewards)
+    avg_reward_std = np.std(avg_rewards)
+    
+    episode_rewards_mean = {
+        agent_id: np.mean(rewards) for agent_id, rewards in episode_rewards_all.items()
+    }
+    episode_rewards_std = {
+        agent_id: np.std(rewards) for agent_id, rewards in episode_rewards_all.items()
+    }
+    
+    # Print results
+    if verbose:
+        print("=" * 60)
+        print("Evaluation Results")
+        if num_runs > 1:
+            print(f"  Number of runs: {num_runs}")
+        print("=" * 60)
+        for agent_id in agents.keys():
+            if num_runs > 1:
+                print(f"  Agent {agent_id}: {episode_rewards_mean[agent_id]:.3f} ± {episode_rewards_std[agent_id]:.3f}")
+            else:
+                print(f"  Agent {agent_id}: {episode_rewards_mean[agent_id]:.3f}")
+        if num_runs > 1:
+            print(f"  Average reward: {avg_reward_mean:.3f} ± {avg_reward_std:.3f}")
+            print(f"  Total reward: {total_reward_mean:.3f} ± {total_reward_std:.3f}")
+        else:
+            print(f"  Average reward: {avg_reward_mean:.3f}")
+            print(f"  Total reward: {total_reward_mean:.3f}")
+        print("=" * 60)
+    
+    return {
+        'episode_rewards': episode_rewards_mean,
+        'episode_rewards_std': episode_rewards_std if num_runs > 1 else {agent_id: 0.0 for agent_id in agents.keys()},
+        'avg_reward': avg_reward_mean,
+        'avg_reward_std': avg_reward_std if num_runs > 1 else 0.0,
+        'total_reward': total_reward_mean,
+        'total_reward_std': total_reward_std if num_runs > 1 else 0.0,
+        'all_runs': all_runs
     }
 
 

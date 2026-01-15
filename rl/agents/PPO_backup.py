@@ -80,10 +80,10 @@ class LSTMPolicyNetwork(nn.Module):
 
 class LSTMValueNetwork(nn.Module):
     """Stateful LSTM-based value network that maintains hidden state across timesteps."""
-    def __init__(self, obs_dim, hidden_size=64, num_layers=1):
+    def __init__(self, obs_dim, act_dim, hidden_size=64, num_layers=1):
         super().__init__()
         self.obs_dim = obs_dim
-        # self.act_dim = 4
+        self.act_dim = act_dim
         self.hidden_size = hidden_size
         self.num_layers = num_layers
 
@@ -103,29 +103,6 @@ class LSTMValueNetwork(nn.Module):
         # self.value_head = nn.Linear(hidden_size + gate_hidden_size, 1)
 
     def forward(self, x, hidden=None):
-        """
-        Forward pass with optional hidden state.
-
-        Args:
-            x: Single observation of shape (batch, obs_dim) or sequence (batch, seq_len, obs_dim)
-            hidden: Optional tuple (h, c) of hidden states
-
-        Returns:
-            value: State value estimate
-            hidden: Updated hidden state tuple (h, c)
-        """
-        # Add sequence dimension if single observation
-        if x.dim() == 2:
-            x = x.unsqueeze(1)
-
-        lstm_out, hidden_out = self.lstm(x, hidden)
-        features = lstm_out[:, -1, :]  # Take last timestep
-        # features = self.layer_norm(features)  # Apply layer normalization
-        value = self.value_head(F.relu(features))
-
-        return value, hidden_out
-
-    def forward_all_steps(self, x, hidden=None):
         lstm_out, hidden_out = self.lstm(x, hidden)
         features = lstm_out  # (batch, seq_len, hidden_size)
         # features = self.layer_norm(features)  # Apply layer normalization
@@ -431,6 +408,166 @@ class StackedValueNetwork(nn.Module):
         return value
 
 
+# =============================================================================
+# PPO Agent with upstream and downstream modeling
+# =============================================================================
+class UDLSTMPolicyNetwork(nn.Module):
+    """
+    LSTM-based policy network with upstream/downstream link aggregation.
+    
+    Each link's action is informed by:
+    1. Its own temporal features (from shared LSTM)
+    2. Aggregated features from all other links (upstream/downstream context)
+    """
+    def __init__(self, obs_dim, act_dim, hidden_size=64, num_layers=1,
+                 min_std=1e-3, max_std=10.0):
+        super().__init__()
+        self.obs_dim = obs_dim
+        self.act_dim = act_dim  # num_links = act_dim
+        self.features_per_link = obs_dim // act_dim
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
+        self.min_std = min_std
+        self.max_std = max_std
+
+        # Shared LSTM for processing each link's temporal data
+        self.lstm = nn.LSTM(
+            input_size=self.features_per_link,
+            hidden_size=hidden_size,
+            num_layers=num_layers,
+            batch_first=True
+        )
+        
+        # Link-specific feature extractor
+        self.link_model = nn.Linear(hidden_size, hidden_size)
+        
+        # Upstream/Downstream aggregation model
+        # Input: [link_features, other_links_sum] -> hidden_size
+        self.ud_model = nn.Linear(2 * hidden_size, hidden_size)
+        
+        # Per-link action heads (output 1 action per link)
+        self.mean_head = nn.Linear(hidden_size, 1)
+        self.std_head = nn.Linear(hidden_size, 1)
+
+    def forward(self, x, hidden=None):
+        """
+        Forward pass with upstream/downstream aggregation.
+
+        Args:
+            x: Observations of shape (seq_len, num_links * features_per_link)
+            hidden: Optional tuple (h, c) of hidden states
+
+        Returns:
+            mean: Action mean (seq_len, act_dim)
+            std: Action std (seq_len, act_dim)
+            hidden: Updated hidden state tuple (h, c)
+        """
+        if x.dim() == 3:
+            x = x.squeeze()
+        seq_len = x.shape[0]
+        
+        # Reshape input: (seq_len, num_links * features) -> (num_links, seq_len, features)
+        x_lstm_input = x.view(seq_len, self.act_dim, self.features_per_link).transpose(0, 1)
+        
+        # LSTM forward (shared weights across all links)
+        lstm_out, hidden_out = self.lstm(x_lstm_input, hidden)  # (num_links, seq_len, hidden_size)
+        lstm_features = lstm_out.transpose(0, 1)  # (seq_len, num_links, hidden_size)
+        
+        # Extract link-specific features
+        link_features = self.link_model(lstm_features)  # (seq_len, num_links, hidden_size)
+        
+        # Compute sum of all link features
+        all_links_sum = link_features.sum(dim=1)  # (seq_len, hidden_size)
+        
+        # For each link, get "other links" features by subtracting its own
+        other_links_features = all_links_sum.unsqueeze(1) - link_features  # (seq_len, num_links, hidden_size)
+        
+        # Concatenate each link's features with aggregated other links' features
+        combined_features = torch.cat([link_features, other_links_features], dim=2)  # (seq_len, num_links, 2*hidden_size)
+        
+        # Process through UD model
+        ud_features = self.ud_model(combined_features)  # (seq_len, num_links, hidden_size)
+        
+        # Generate per-link actions
+        mean = self.mean_head(F.relu(ud_features)).squeeze(-1)  # (seq_len, num_links)
+        std = F.softplus(self.std_head(F.relu(ud_features))).squeeze(-1).clamp(self.min_std, self.max_std)  # (seq_len, num_links)
+
+        return mean, std, hidden_out
+
+
+class UDLSTMValueNetwork(nn.Module):
+    """Stateful LSTM-based value network that maintains hidden state across timesteps."""
+    def __init__(self, obs_dim, act_dim, hidden_size=64, num_layers=1):
+        super().__init__()
+        self.obs_dim = obs_dim
+        self.act_dim = act_dim
+        self.num_links = act_dim
+        self.features_per_link = obs_dim // act_dim
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
+
+        self.lstm = nn.LSTM(
+            input_size=self.features_per_link,
+            hidden_size=hidden_size,
+            num_layers=num_layers,
+            batch_first=True
+        )
+
+        self.link_model = nn.Linear(hidden_size, hidden_size)
+        self.ud_model = nn.Linear(2*hidden_size, hidden_size)
+        self.value_head = nn.Linear(hidden_size, 1)
+        # self.value_head = nn.Linear(hidden_size + gate_hidden_size, 1)
+
+    def forward(self, x, hidden=None):
+        """
+        Forward pass with optional hidden state.
+
+        Args:
+            x: Single observation of shape (batch, obs_dim) or sequence (batch, seq_len, obs_dim)
+            hidden: Optional tuple (h, c) of hidden states
+
+        Returns:
+            value: State value estimate
+            hidden: Updated hidden state tuple (h, c)
+        """
+        x = x.squeeze()
+        seq_len = x.shape[0]
+        # batch_size = 1
+
+        # Reshape input
+        x_lstm_input = x.view(seq_len, self.num_links, self.features_per_link).transpose(0, 1) # (num_links, seq_len, features_per_link)
+
+        # LSTM forward
+        lstm_out, hidden_out = self.lstm(x_lstm_input, hidden)
+        lstm_features = lstm_out.transpose(0, 1)  # (seq_len, num_links, lstm_hidden_size)
+        
+        # Extract link-specific features
+        link_features = self.link_model(lstm_features)  # (seq_len, num_links, hidden_size)
+        
+        # For each link, aggregate features from all OTHER links
+        # Create upstream/downstream features by summing all other links
+        
+        # Compute sum of all link features: (seq_len, hidden_size)
+        all_links_sum = link_features.sum(dim=1)  # (seq_len, hidden_size)
+        
+        # For each link, subtract its own features to get "other links" sum
+        # Broadcast: (seq_len, 1, hidden_size) - (seq_len, num_links, hidden_size)
+        other_links_features = all_links_sum.unsqueeze(1) - link_features  # (seq_len, num_links, hidden_size)
+        
+        # Concatenate each link's features with aggregated other links' features
+        combined_features = torch.cat([link_features, other_links_features], dim=2)  # (seq_len, num_links, 2*hidden_size)
+        
+        # Process through UD model
+        ud_features = self.ud_model(combined_features)  # (seq_len, num_links, hidden_size)
+        
+        # Aggregate across links (e.g., mean pooling for global value)
+        global_features = ud_features.mean(dim=1)  # (seq_len, hidden_size)
+        
+        # Compute value
+        value = self.value_head(F.relu(global_features))  # (seq_len, 1)
+
+        return value, hidden_out
+
 
 def train_on_policy_multi_agent(env, agents, delta_actions=False, num_episodes=50,
                                 randomize=False, seed=None,
@@ -708,9 +845,9 @@ class PPOAgent:
             self.actor_hidden = None
             self.critic_hidden = None
             # Create LSTM networks
-            self.actor = LSTMPolicyNetwork(obs_dim, act_dim, hidden_size=lstm_hidden_size,
+            self.actor = UDLSTMPolicyNetwork(obs_dim, act_dim, hidden_size=lstm_hidden_size,
                                           num_layers=num_lstm_layers)
-            self.value_net = LSTMValueNetwork(obs_dim, hidden_size=lstm_hidden_size,
+            self.value_net = UDLSTMValueNetwork(obs_dim, act_dim, hidden_size=lstm_hidden_size,
                                              num_layers=num_lstm_layers)
 
         self.actor_optimizer = torch.optim.Adam(self.actor.parameters(), lr=actor_lr)
@@ -824,10 +961,10 @@ class PPOAgent:
                 current_values = self.value_net(states)
             else:
                 # LSTM version
-                next_values, _ = self.value_net.forward_all_steps(next_states_seq)  # (1, T, 1)
+                next_values, _ = self.value_net(next_states_seq)  # (1, T, 1)
                 next_values = next_values.squeeze(0)  # (T, 1)
 
-                current_values, _ = self.value_net.forward_all_steps(states_seq)  # (1, T, 1)
+                current_values, _ = self.value_net(states_seq)  # (1, T, 1)
                 current_values = current_values.squeeze(0)  # (T, 1)
 
             td_target = rewards + self.gamma * next_values * (1 - dones)
@@ -886,7 +1023,7 @@ class PPOAgent:
             elif self.use_stacked_obs:
                 current_values = self.value_net(states)
             else:
-                current_values, _ = self.value_net.forward_all_steps(states_seq)
+                current_values, _ = self.value_net.forward(states_seq)
                 current_values = current_values.squeeze(0)
             critic_loss = torch.mean(F.mse_loss(current_values, td_target))
 

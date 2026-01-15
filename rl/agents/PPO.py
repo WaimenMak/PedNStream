@@ -13,6 +13,9 @@ from rl.rl_utils import compute_gae, save_with_best_return, layer_init
 import math
 import os
 import collections
+from .SAC import MLPEncoder, StackedEncoder
+from torch_geometric.nn import GATConv
+from torch_geometric.data import Data, Batch
 
 class LSTMPolicyNetwork(nn.Module):
     """Stateful LSTM-based policy network that maintains hidden state across timesteps."""
@@ -20,6 +23,7 @@ class LSTMPolicyNetwork(nn.Module):
                  min_std=1e-3, max_std=10.0):
         super().__init__()
         self.obs_dim = obs_dim
+        self.act_dim = act_dim
         self.hidden_size = hidden_size
         self.num_layers = num_layers
         self.min_std = min_std
@@ -32,10 +36,14 @@ class LSTMPolicyNetwork(nn.Module):
             num_layers=num_layers,
             batch_first=True
         )
-
+        num_gates = 4
+        gate_hidden_size = 32
         # Output heads
+        # self.gate_width_head = nn.Linear(num_gates, gate_hidden_size)
         self.mean_head = nn.Linear(hidden_size, act_dim)
         self.std_head = nn.Linear(hidden_size, act_dim)
+        # self.mean_head = nn.Linear(hidden_size + gate_hidden_size, act_dim)
+        # self.std_head = nn.Linear(hidden_size + gate_hidden_size, act_dim)
 
     def forward(self, x, hidden=None):
         """
@@ -50,15 +58,18 @@ class LSTMPolicyNetwork(nn.Module):
             std: Action std
             hidden: Updated hidden state tuple (h, c)
         """
-        # Add sequence dimension: (batch, 1, obs_dim)
+        # Add sequence dimension: (batch, Steps, obs_dim)
         if x.dim() == 2:
             x = x.unsqueeze(1)
 
+        # gate_widths = x[0, :, :].reshape(x.shape[1], self.act_dim, -1)[:,:,-1]
+        # latent_gate_widths = self.gate_width_head(gate_widths)
         # LSTM forward pass
         lstm_out, hidden_out = self.lstm(x, hidden)  # lstm_out: (batch, 1, hidden_size)
 
         # Extract features from output
-        features = lstm_out.squeeze(1)  # (batch, hidden_size)
+        features = lstm_out.squeeze(0)  # (1, steps, hidden_size) --> (steps, hidden_size)
+        # features = torch.cat([features, latent_gate_widths], dim=1)
 
         # Compute mean and std
         mean = self.mean_head(F.relu(features))
@@ -72,6 +83,7 @@ class LSTMValueNetwork(nn.Module):
     def __init__(self, obs_dim, hidden_size=64, num_layers=1):
         super().__init__()
         self.obs_dim = obs_dim
+        self.act_dim = 4
         self.hidden_size = hidden_size
         self.num_layers = num_layers
 
@@ -84,8 +96,11 @@ class LSTMValueNetwork(nn.Module):
         
         # Layer normalization for stabilizing training
         # self.layer_norm = nn.LayerNorm(hidden_size)
-
+        num_gates = self.act_dim
+        # gate_hidden_size = 32
+        # self.gate_width_head = nn.Linear(num_gates, gate_hidden_size)
         self.value_head = nn.Linear(hidden_size, 1)
+        # self.value_head = nn.Linear(hidden_size + gate_hidden_size, 1)
 
     def forward(self, x, hidden=None):
         """
@@ -114,8 +129,12 @@ class LSTMValueNetwork(nn.Module):
         lstm_out, hidden_out = self.lstm(x, hidden)
         features = lstm_out  # (batch, seq_len, hidden_size)
         # features = self.layer_norm(features)  # Apply layer normalization
-        values = self.value_head(F.relu(features))  # (batch, seq_len, 1)
-
+        # values = self.value_head(F.relu(features))  # (batch, seq_len, 1)
+        
+        # gate_widths = x[0, :, :].reshape(x.shape[1], self.act_dim, -1)[:,:,-1]
+        # latent_gate_widths = self.gate_width_head(gate_widths)
+        # features = torch.cat([features.squeeze(0), latent_gate_widths], dim=1)
+        values = self.value_head(F.relu(features))
         return values, hidden_out
 
 
@@ -123,31 +142,14 @@ class LSTMValueNetwork(nn.Module):
 # Stacked State Networks (similar to SAC)
 # =============================================================================
 
-class StackedEncoder(nn.Module):
-    """Encoder for stacked observations using Conv1d."""
-    def __init__(self, feat_dim, stack_size, hidden_size=64, kernel_size=3):
-        super(StackedEncoder, self).__init__()
-        self.conv1 = layer_init(nn.Conv1d(
-            in_channels=feat_dim,
-            out_channels=hidden_size,
-            kernel_size=kernel_size,
-            stride=1, padding=0
-        ))
-        self.ouput_dim = (stack_size - kernel_size + 1) * hidden_size
-    
-    def forward(self, x):
-        x = F.elu(self.conv1(x))
-        x = x.flatten(start_dim=1)
-        return x
-
-
 class StackedPolicyNetwork(nn.Module):
     """Policy network for stacked observations."""
     def __init__(self, obs_dim, act_dim, stack_size=4, hidden_size=64, kernel_size=3,
                  min_std=1e-3, max_std=10.0):
         super(StackedPolicyNetwork, self).__init__()
-        self.encoder = StackedEncoder(obs_dim, stack_size=stack_size, 
-                                     hidden_size=hidden_size, kernel_size=kernel_size)
+        # self.encoder = StackedEncoder(obs_dim, stack_size=stack_size,
+        #                              hidden_size=hidden_size, kernel_size=kernel_size)
+        self.encoder = MLPEncoder(obs_dim, stack_size=stack_size, hidden_size=hidden_size)
         self.fc = layer_init(nn.Linear(self.encoder.ouput_dim, hidden_size), std=np.sqrt(2))
         self.fc_mu = layer_init(nn.Linear(hidden_size, act_dim), std=0.01)
         self.fc_std = layer_init(nn.Linear(hidden_size, act_dim), std=0.01)
@@ -174,8 +176,9 @@ class StackedValueNetwork(nn.Module):
     """Value network for stacked observations."""
     def __init__(self, obs_dim, stack_size=4, hidden_size=64, kernel_size=3):
         super(StackedValueNetwork, self).__init__()
-        self.encoder = StackedEncoder(obs_dim, stack_size=stack_size,
-                                     hidden_size=hidden_size, kernel_size=kernel_size)
+        # self.encoder = StackedEncoder(obs_dim, stack_size=stack_size,
+        #                              hidden_size=hidden_size, kernel_size=kernel_size)
+        self.encoder = MLPEncoder(obs_dim, stack_size=stack_size, hidden_size=hidden_size)
         self.fc = layer_init(nn.Linear(self.encoder.ouput_dim, hidden_size), std=np.sqrt(2))
         self.value_head = layer_init(nn.Linear(hidden_size, 1), std=1.0)
         # self.ln = nn.LayerNorm(hidden_size)
@@ -332,7 +335,7 @@ def train_on_policy_multi_agent(env, agents, delta_actions=False, num_episodes=5
                 global_episode += 1
 
                 # Save all agents when average return across agents achieves new best
-                if agents_saved_dir:
+                if agents_saved_dir and global_episode > num_episodes/2: # save after half of the training
                     best_avg_return = save_with_best_return(agents, agents_saved_dir, episode_returns=episode_returns, best_avg_return=best_avg_return, global_episode=global_episode)                  
                 # Update progress bar
                 if (i_episode+1) % 10 == 0:
@@ -362,9 +365,10 @@ class PPOAgent:
                  entropy_coef_min=0, kl_tolerance=0.01,
                  use_delta_actions=False, max_delta=2.5,
                  lstm_hidden_size=64, num_lstm_layers=1,
-                 use_stacked_obs=False, stack_size=4, hidden_size=64, kernel_size=3):
+                 use_stacked_obs=False, stack_size=4, hidden_size=64, kernel_size=3,
+                 use_gat_lstm=False, gat_hidden_size=64, gat_num_heads=4):
         """
-        Initialize PPO agent with LSTM or stacked observation networks.
+        Initialize PPO agent with LSTM, stacked observation, or GAT-LSTM networks.
 
         Args:
             obs_dim: Observation space dimension
@@ -383,12 +387,16 @@ class PPOAgent:
             kl_tolerance: KL divergence tolerance for early stopping
             use_delta_actions: If True, agent outputs delta actions
             max_delta: Maximum delta per step (only used if use_delta_actions=True)
-            lstm_hidden_size: Hidden size for LSTM layers (only used if use_stacked_obs=False)
-            num_lstm_layers: Number of LSTM layers (only used if use_stacked_obs=False)
+            lstm_hidden_size: Hidden size for LSTM layers
+            num_lstm_layers: Number of LSTM layers
             use_stacked_obs: If True, use stacked observation networks (similar to SAC)
             stack_size: Number of observations to stack (only used if use_stacked_obs=True)
             hidden_size: Hidden size for stacked networks (only used if use_stacked_obs=True)
             kernel_size: Kernel size for Conv1d in stacked encoder (only used if use_stacked_obs=True)
+            use_gat_lstm: If True, use GAT-LSTM architecture (Temporal -> Spatial)
+            features_per_link: Features per link for GAT-LSTM (required if use_gat_lstm=True)
+            gat_hidden_size: Hidden size for GAT layer (only used if use_gat_lstm=True)
+            gat_num_heads: Number of attention heads in GAT (only used if use_gat_lstm=True)
         """
         self.obs_dim = obs_dim
         self.act_dim = act_dim
@@ -444,9 +452,9 @@ class PPOAgent:
         self.device = device
 
     def reset_buffer(self):
-        """Clear rollout buffer and reset LSTM hidden states (if using LSTM)."""
+        """Clear rollout buffer and reset LSTM hidden states (if using LSTM or GAT-LSTM)."""
         self.transition_dict = {'states': [], 'actions': [], 'next_states': [], 'rewards': [], 'dones': []}
-        # Reset LSTM hidden states (only if using LSTM, will be initialized in first forward pass)
+        # Reset LSTM hidden states (only if using LSTM or GAT-LSTM, will be initialized in first forward pass)
         if not self.use_stacked_obs:
             self.actor_hidden = None
             self.critic_hidden = None
@@ -461,7 +469,7 @@ class PPOAgent:
 
     def take_action(self, state, deterministic: bool = False):
         """
-        Take action given state using LSTM or stacked networks.
+        Take action given state using LSTM, stacked, or GAT-LSTM networks.
 
         Args:
             state: Observation array (single observation) or stacked observations (stack_size, obs_dim)

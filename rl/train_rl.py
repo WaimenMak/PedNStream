@@ -64,8 +64,8 @@ if __name__ == "__main__":
             max_delta=2.5,
             # lstm_hidden_size=64,
             # num_lstm_layers=1,
-            use_stacked_obs=True,
-            stack_size=10,
+            use_stacked_obs=False,
+            stack_size=5,
             hidden_size=64,
             kernel_size=4,
         ) for agent_id in env.possible_agents}

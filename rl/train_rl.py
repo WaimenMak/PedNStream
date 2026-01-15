@@ -57,7 +57,7 @@ if __name__ == "__main__":
             actor_lr=2e-4,
             critic_lr=3e-4,
             # gamma=0.98,
-            # lmbda=0.95,
+            lmbda=0.96,
             entropy_coef=0.01,
             kl_tolerance=0.01,
             use_delta_actions=True,

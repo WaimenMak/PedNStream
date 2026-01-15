@@ -44,7 +44,7 @@ class PedNetParallelEnv(ParallelEnv):
     metadata = {"render_modes": ["human", "animate"], "name": "pednet_v0"}
     
     def __init__(self, dataset: str, normalize_obs: bool = False, obs_mode: str = "option1",
-                 render_mode: Optional[str] = None, verbose: bool = False):
+                 render_mode: Optional[str] = None, verbose: bool = False, action_gap: int = 1):
         """
         Initialize the PedNet environment.
         
@@ -54,6 +54,7 @@ class PedNetParallelEnv(ParallelEnv):
             obs_mode: Observation mode - one of: "option1", "option2", "option3", "option4"
             render_mode: Rendering mode ("human", "animate", or None)
             verbose: Whether to enable logging output. Default False for RL training.
+            action_gap: Number of steps between applying actions. Default 1.
         """
         super().__init__()
         
@@ -92,6 +93,8 @@ class PedNetParallelEnv(ParallelEnv):
         
         # Initialize cumulative rewards
         self._cumulative_rewards = {agent: 0.0 for agent in self.possible_agents}
+        # every action_gap steps, apply the actions
+        self._action_gap = action_gap
 
         # Initialize visualizer
         self.visualizer = None
@@ -185,26 +188,38 @@ class PedNetParallelEnv(ParallelEnv):
         if len(actions) > 0:    
             self.action_applier.apply_all_actions(actions)
         else:
-            print("No actions provided, skipping action application.")
+            if self.sim_step == 1:
+                print("No actions provided, skipping action application.")
+
+        # Initialize cumulative rewards for this action gap
+        cumulative_rewards = {agent_id: 0.0 for agent_id in self.possible_agents}
         
-        # Advance the simulation by one step
-        self.network.network_loading(self.sim_step)
+        for _ in range(self._action_gap): # every action_gap steps, apply the actions
+            # Advance the simulation by one step
+            self.network.network_loading(self.sim_step)
+            
+            # Build new observations
+            observations = self._get_observations()
+            
+            # Compute rewards (placeholder for now)
+            step_rewards = self._compute_rewards()
+            
+            # Accumulate rewards for each agent
+            for agent_id, reward in step_rewards.items():
+                cumulative_rewards[agent_id] += reward
+            
+            # Check termination conditions
+            terminations = self._check_terminations()
+            truncations = self._check_truncations()
+            
+            # Build info dictionary
+            infos = self._get_infos()
+            
+            # Update environment state
+            self.sim_step += 1
         
-        # Build new observations
-        observations = self._get_observations()
-        
-        # Compute rewards (placeholder for now)
-        rewards = self._compute_rewards()
-        
-        # Check termination conditions
-        terminations = self._check_terminations()
-        truncations = self._check_truncations()
-        
-        # Build info dictionary
-        infos = self._get_infos()
-        
-        # Update environment state
-        self.sim_step += 1
+        # Use the cumulative rewards for this action gap
+        rewards = cumulative_rewards
         for agent_id, reward in rewards.items():
             self._cumulative_rewards[agent_id] += reward
         
@@ -217,6 +232,81 @@ class PedNetParallelEnv(ParallelEnv):
             observations[agent_id] = self.obs_builder.build_observation(agent_id, self.sim_step)
         return observations
 
+    # def _compute_rewards(self) -> Dict[str, float]:
+    #     """
+    #     Hybrid Reward: Maximize Intersection Throughput - Minimize Upstream Congestion.
+        
+    #     R_t = (Throughput) - beta * (Congestion_Penalty)
+        
+    #     1. Throughput Term (Service Rate):
+    #        Sum of INFLOWs into the OUTGOING links.
+    #        This measures the rate at which pedestrians are successfully passing the gate/intersection.
+           
+    #     2. Congestion Term (Queue Management):
+    #        Average squared normalized density on INCOMING links.
+    #        This penalizes queue buildup upstream, preventing the "gridlock" trap.
+    #     """
+    #     rewards = {}
+    #     # beta: Weight for balancing throughput vs congestion.
+    #     # Throughput is approx 0-5. Density^2 is 0-1.
+    #     # We scale penalty by 10 to make congestion avoidance a strong priority.
+    #     beta = 1 
+    #     penalty_scale = 10.0
+        
+    #     for agent_id in self.possible_agents:
+    #         agent_type = self.agent_manager.get_agent_type(agent_id)
+    #         reward = 0.0
+            
+    #         if agent_type == 'gate':
+    #             node = self.agent_manager.get_gater_node(agent_id)
+                
+    #             # 1. Throughput: Sum of Inflow to Outgoing Links
+    #             # This is the flow immediately leaving the intersection
+    #             throughput_term = 0.0
+    #             out_links = [l for l in node.outgoing_links 
+    #                          if not (hasattr(l, 'virtual_outgoing_link') and l == l.virtual_outgoing_link)]
+                
+    #             for link in out_links:
+    #                 # We use raw flow (people per step) as the reward signal
+    #                 throughput_term += link.inflow[self.sim_step]
+                
+    #             # 2. Congestion: Penalty on Incoming Links (Upstream Queues)
+    #             # We focus on incoming links because that's where queues form if the gate is closed
+    #             congestion_penalty = 0.0
+    #             in_links = [l for l in node.incoming_links 
+    #                         if not (hasattr(l, 'virtual_incoming_link') and l == l.virtual_incoming_link)]
+                
+    #             for link in in_links:
+    #                 # Normalized density (0 to 1)
+    #                 norm_dens = link.get_density(self.sim_step) / (link.k_jam + 1e-6)
+    #                 congestion_penalty += norm_dens ** 2
+                
+    #             if in_links:
+    #                 congestion_penalty /= len(in_links)
+                
+    #             # Final Reward
+    #             reward = throughput_term - (beta * congestion_penalty * penalty_scale)
+                
+    #         elif agent_type == 'sep':
+    #             # Separator: Maximize corridor flow, minimize corridor density
+    #             f_link, r_link = self.agent_manager.get_separator_links(agent_id)
+                
+    #             # For corridors, we reward flow in both directions
+    #             # Using inflow here too for immediate feedback
+    #             throughput_term = (f_link.inflow[self.sim_step] + r_link.inflow[self.sim_step])
+                
+    #             congestion_penalty = 0.0
+    #             for link in [f_link, r_link]:
+    #                 norm_dens = link.get_density(self.sim_step) / (link.k_jam + 1e-6)
+    #                 congestion_penalty += norm_dens ** 2
+    #             congestion_penalty /= 2
+                
+    #             reward = throughput_term - (beta * congestion_penalty * penalty_scale)
+
+    #         rewards[agent_id] = reward
+            
+    #     return rewards
+
     def _compute_rewards(self) -> Dict[str, float]:
         """
         Compute rewards for all agents based on intersection density minimization.
@@ -228,7 +318,7 @@ class PedNetParallelEnv(ParallelEnv):
         preventing both upstream queuing and downstream congestion.
         """
         rewards = {}
-        threshold_density = 4
+        threshold_density = 3.5
         for agent_id in self.possible_agents:
             agent_type = self.agent_manager.get_agent_type(agent_id)
             penalty = 0.0
@@ -236,6 +326,9 @@ class PedNetParallelEnv(ParallelEnv):
             if agent_type == 'gate':
                 # Get node and its connected links
                 node = self.agent_manager.get_gater_node(agent_id)
+                
+                # Collect densities from all connected links (incoming and outgoing)
+                all_densities = []
                 
                 # Collect all real (non-virtual) incoming links
                 for link in node.incoming_links:
@@ -259,6 +352,23 @@ class PedNetParallelEnv(ParallelEnv):
                         # normalized_density = link.get_density(self.sim_step)
 
                     penalty += normalized_density
+                    all_densities.append(normalized_density)
+                
+                # Collect all real (non-virtual) outgoing links
+                for link in node.outgoing_links:
+                    if hasattr(link, 'virtual_outgoing_link') and link == link.virtual_outgoing_link:
+                        continue
+                    from src.LTM.link import Separator
+                    if isinstance(link, Separator):
+                        norm_reverse_link_density = link.reverse_link.density[self.sim_step] / (link.reverse_link.k_jam + 1e-6)
+                        norm_forward_link_density = link.density[self.sim_step] / (link.k_jam + 1e-6)
+                        normalized_density = (norm_reverse_link_density + norm_forward_link_density) / 2
+                    else:
+                        density = link.get_density(self.sim_step)
+                        normalized_density = density / (link.k_jam + 1e-6)
+                    
+                    all_densities.append(normalized_density)
+                
                 # average the penalty of all incoming links
                 penalty /= len(node.incoming_links)
                 
@@ -288,18 +398,50 @@ class PedNetParallelEnv(ParallelEnv):
             
             # Reward is negative penalty (minimize congestion)
             rewards[agent_id] = -penalty
+            # print(f"Agent {agent_id} reward: {rewards[agent_id]:.3f}")
         
         return rewards
 
     def _check_terminations(self) -> Dict[str, bool]:
-        """Check if any agents should terminate."""
+        """
+        Check if any agents should terminate.
+        
+        Termination conditions:
+        1. Standard: Reached simulation end
+        2. Jam condition: All links controlled by an agent reach jam density
+        """
         # Standard termination: reached simulation end
         terminated = self.sim_step >= self.simulation_steps
         
-        # TODO: Optional early termination on severe congestion
-        # if self.early_stop_on_jam:
-        #     # Check if any link is severely jammed
-        #     pass
+        # Early termination on severe jam: Check if any agent has all its links jammed
+        # if not terminated and self.sim_step > 0:
+        #     for agent_id in self.possible_agents:
+        #         agent_type = self.agent_manager.get_agent_type(agent_id)
+                
+        #         if agent_type == "sep":
+        #             # Separator agent: check both forward and reverse links
+        #             forward_link, reverse_link = self.agent_manager.get_separator_links(agent_id)
+        #             links_to_check = [forward_link, reverse_link]
+        #         elif agent_type == "gate":
+        #             # Gater agent: check all outgoing links
+        #             links_to_check = self.agent_manager.get_gater_outgoing_links(agent_id)
+        #         else:
+        #             continue
+                
+        #         # Check if ALL links for this agent are at jam density
+        #         all_jammed = True
+        #         for link in links_to_check:
+        #             current_density = link.get_density(self.sim_step)
+        #             # Consider jammed if density >= 95% of jam density
+        #             if current_density < 0.99 * link.k_jam:
+        #                 all_jammed = False
+        #                 break
+                
+        #         if all_jammed:
+        #             # This agent's links are all jammed - terminate episode
+        #             terminated = True
+        #             print(f"Agent {agent_id} is terminated because all its links are jammed.")
+        #             break
         
         return {agent_id: terminated for agent_id in self.possible_agents}
 

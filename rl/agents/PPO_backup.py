@@ -564,7 +564,7 @@ class UDLSTMValueNetwork(nn.Module):
         global_features = ud_features.mean(dim=1)  # (seq_len, hidden_size)
         
         # Compute value
-        value = self.value_head(F.relu(global_features))  # (seq_len, 1)
+        value = self.value_head(F.elu(global_features))  # (seq_len, 1)
 
         return value, hidden_out
 

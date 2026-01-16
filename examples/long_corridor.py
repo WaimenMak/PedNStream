@@ -170,7 +170,7 @@ if __name__ == "__main__":
                                     interval=100, edge_property='density', tag=False, vis_actions=True)
 
     # GIf
-    writer = PillowWriter(fps=8, metadata=dict(artist='Me'))
+    # writer = PillowWriter(fps=8, metadata=dict(artist='Me'))
 
     # Save the animation with progress tracking
     anim.save(os.path.join(output_dir, f"{sim_name}", "network_animation.gif"),

@@ -173,9 +173,9 @@ if __name__ == "__main__":
     # writer = PillowWriter(fps=8, metadata=dict(artist='Me'))
 
     # Save the animation with progress tracking
-    anim.save(os.path.join(output_dir, f"{sim_name}", "network_animation.gif"),
-              writer=writer,
-              progress_callback=progress_callback)
+    # anim.save(os.path.join(output_dir, f"{sim_name}", "network_animation.gif"),
+    #           writer=writer,
+    #           progress_callback=progress_callback)
 
     # plt.show()
     

@@ -562,7 +562,7 @@ class PathFinder:
         """Update the turn probabilities for the node, P(down|up,od)"""
         for up_node, down_nodes in node.turns_distances[od_pair].items():
             if down_nodes:
-                turns = list((up_node, down_node) for down_node in down_nodes)
+                turns = list((up_node, down_node) for down_node in down_nodes) # Note, the down_nodes are sorted by the distances
                 distances = list(down_nodes.values())
                 # num_pedestrians = []
                 densities = []

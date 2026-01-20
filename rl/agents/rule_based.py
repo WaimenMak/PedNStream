@@ -45,26 +45,44 @@ class RuleBasedGaterAgent(BaseAgent):
         Returns:
             np.ndarray: An array of target gate widths for each outgoing link.
         """
+        # First, calculate average downstream density across all outgoing links
+        # downstream_densities = []
+        # for i in range(len(self.outgoing_links)):
+        #     start_idx = i * self.features_per_link
+        #     link_obs = obs[start_idx: start_idx + self.features_per_link]
+        #     # The observation vector is structured as:
+        #     # [inflow, reverse_outflow, density, current_width]
+        #     density = link_obs[2]  # density
+        #     downstream_densities.append(density)
+        #
+        # avg_downstream_density = np.mean(downstream_densities) if downstream_densities else 0.0
+        #
+        # # If average downstream density is not higher than threshold, open all gates to max width
+        # if avg_downstream_density <= 2:
+        #     actions = [link.width for link in self.outgoing_links]
+        #     return np.array(actions, dtype=np.float32)
+        
+        # Otherwise, apply per-link logic
         actions = []
         for i in range(len(self.outgoing_links)):
             start_idx = i * self.features_per_link
             link_obs = obs[start_idx: start_idx + self.features_per_link]
 
             # The observation vector is structured as:
-            # [density, inflow, reverse_outflow, current_width]
-            density = link_obs[0]        # density
-            outflow = link_obs[2]          # reverse_link.outflow
-            inflow = link_obs[1]          # inflow
-            current_width = link_obs[3]
+            # [inflow, reverse_outflow, density, current_width]
+            density = link_obs[2]        # density
+            outflow = link_obs[1]          # reverse_link.outflow
+            inflow = link_obs[0]          # inflow
+            current_width = link_obs[-1]
 
             # Calculate the change in width based on pressure differential
             # change_in_width = self.K * (p_up - self.W_backpressure * p_down)
             change_in_width = 1
-            if density >= 6:
-                new_target_width = self.outgoing_links[i].width
-            elif density > self.threshold_density and inflow > outflow:
+            # if density >= 3.5:
+            #     new_target_width = self.outgoing_links[i].width
+            if density > self.threshold_density:
                 new_target_width = current_width + change_in_width
-            elif density > self.threshold_density and inflow <= outflow:
+            elif density > self.threshold_density:
                 new_target_width = current_width - change_in_width
             else:
                 # Keep gate open to max width (action space high bound)
@@ -72,7 +90,8 @@ class RuleBasedGaterAgent(BaseAgent):
             # new_target_width = self.outgoing_links[i].width
             actions.append(new_target_width)
             # actions.append(self.outgoing_links[i].width)
-        # actions[3] = 2
+        # actions[1] = 2
+        # actions[3] = 2.8
 
         return np.array(actions, dtype=np.float32)
 
@@ -86,7 +105,7 @@ class RuleBasedSeparatorAgent(BaseAgent):
     def __init__(self, width: float, use_smoothing: bool = False, buffer_size: int = 5):
         """
         Initializes the RuleBasedSeparatorAgent.
-        
+
         Args:
             width (float): The width of the road
             use_smoothing (bool): If True, uses moving average smoothing on inflows. Default: False
@@ -157,7 +176,8 @@ class RuleBasedSeparatorAgent(BaseAgent):
 if __name__ == "__main__":
     from rl.pz_pednet_env import PedNetParallelEnv
     dataset = "45_intersections"
-    env = PedNetParallelEnv(dataset, obs_mode="option2", render_mode="animate", verbose=True)
+    # dataset = "small_network"
+    env = PedNetParallelEnv(dataset, obs_mode="option2", action_gap=1, render_mode="animate", verbose=True)
 
     #create a rule-based agents
     rule_based_gater_agents = {}
@@ -168,21 +188,24 @@ if __name__ == "__main__":
         rule_based_separator_agents[agent_id] = RuleBasedSeparatorAgent(env.agent_manager.get_separator_links(agent_id)[0].width, use_smoothing=True, buffer_size=5)
 
     episode_rewards = {agent_id: 0.0 for agent_id in env.agents}
-    observations, infos = env.reset(seed=None, options={"randomize": False})
+    observations, infos = env.reset(seed=3, options={"randomize": False})
     # observations, infos = env.reset(seed=42, options={"randomize": True})
     # observations, infos = env.reset(seed=43, options={"randomize": True})
-    for step in range(env.simulation_steps):
+    # for step in range(env.simulation_steps):
+    done = False
+    while not done:
         actions = {}
-        for agent_id in env.agents:
-            if agent_id in rule_based_gater_agents:
-                actions[agent_id] = rule_based_gater_agents[agent_id].take_action(observations[agent_id])
-            elif agent_id in rule_based_separator_agents:
-                actions[agent_id] = rule_based_separator_agents[agent_id].take_action(observations[agent_id])
-            print(actions[agent_id])
+        # for agent_id in env.agents:
+            # if agent_id in rule_based_gater_agents:
+            #     actions[agent_id] = rule_based_gater_agents[agent_id].take_action(observations[agent_id])
+            # elif agent_id in rule_based_separator_agents:
+            #     actions[agent_id] = rule_based_separator_agents[agent_id].take_action(observations[agent_id])
+            # print(actions[agent_id])
             # if agent_id == "gate_24":
             #     print(f"Step {step}: Agent {agent_id} action: {actions[agent_id]}")
         #         pass
         observations, rewards, terminations, truncations, infos = env.step(actions)
+        done = any(terminations.values()) or any(truncations.values())
         for agent_id in env.agents:
             episode_rewards[agent_id] += rewards[agent_id]
 

@@ -70,14 +70,14 @@ class StackedEncoder(torch.nn.Module):
         return x
 
 class MLPEncoder(torch.nn.Module):
-    def __init__(self, obs_dim, stack_size=4, hidden_size=64):
+    def __init__(self, feat_dim, stack_size=4, hidden_size=64):
         super(MLPEncoder, self).__init__()
-        self.fc1 = nn.Linear(obs_dim * stack_size, hidden_size)
+        self.fc1 = nn.Linear(feat_dim * stack_size, hidden_size)
         self.fc2 = nn.Linear(hidden_size, hidden_size)
         self.ouput_dim = hidden_size
 
     def forward(self, x):
-        x = x.flatten(start_dim=1)
+        # x = x.flatten(start_dim=1)
         x = self.fc1(x)
         x = F.relu(x)
         x = self.fc2(x)
@@ -87,41 +87,66 @@ class MLPEncoder(torch.nn.Module):
 class PolicyNetContinuous(torch.nn.Module):
     def __init__(self, obs_dim, act_dim, stack_size=4, hidden_size=64, kernel_size=3, action_bound=2.5):
         super(PolicyNetContinuous, self).__init__()
+        self.feat_dim = obs_dim // act_dim
+        self.seq_len = stack_size
+        self.num_links = act_dim
         # self.encoder = StackedEncoder(obs_dim, stack_size=stack_size, hidden_size=hidden_size, kernel_size=kernel_size)
-        self.encoder = MLPEncoder(obs_dim, stack_size=stack_size, hidden_size=hidden_size)
-        self.fc = nn.Linear(self.encoder.ouput_dim, hidden_size)
-        self.fc_mu = nn.Linear(hidden_size, act_dim)
-        self.fc_std = nn.Linear(hidden_size, act_dim)
+        self.encoder = MLPEncoder(self.feat_dim, stack_size=stack_size, hidden_size=hidden_size)
+        self.link_model = nn.Linear(self.encoder.ouput_dim, hidden_size)
+        self.ud_model = nn.Linear(2*hidden_size, hidden_size)
+        self.fc_mu = nn.Linear(hidden_size, 1) # one action per link
+        self.fc_std = nn.Linear(hidden_size, 1) # one std per link
         self.action_bound = action_bound
         # self.ln = nn.LayerNorm(hidden_size)
 
     def forward(self, x):
         # x: (batch, seq, feat)
-        if x.dim() == 3:
-            x = x.transpose(1, 2)
-        zs = self.encoder(x)
-        features = self.fc(zs)
-        # features = self.ln(features)
-        mu = self.fc_mu(F.relu(features))
-        std = F.softplus(self.fc_std(F.relu(features)))
+        if x.dim() == 2:
+            x = x.unsqueeze(0) # batch size 1
+
+        batch_size = x.shape[0]
+        x = x.view(batch_size, self.seq_len, self.num_links, self.feat_dim).transpose(1, 2)
+        zs = self.encoder(x.reshape(batch_size, self.num_links, -1)) # (batch_size, num_links, hidden_size)
+        link_features = self.link_model(zs)
+        all_links_sum = link_features.sum(dim=1)
+        other_links_features = all_links_sum.unsqueeze(1) - link_features
+        combined_features = torch.cat([link_features, other_links_features], dim=2)
+        ud_features = self.ud_model(combined_features)
+        # ud_features = ud_features.mean(dim=1)
+        mu = self.fc_mu(F.relu(ud_features))
+        std = F.softplus(self.fc_std(F.relu(ud_features)))
         return mu, std
 
 class QValueNetContinuous(torch.nn.Module):
     def __init__(self, obs_dim, act_dim, stack_size=4, hidden_size=64, kernel_size=3, action_bound=2.5):
         super(QValueNetContinuous, self).__init__()
+        self.feat_dim = obs_dim // act_dim
+        self.num_links = act_dim
+        self.seq_len = stack_size
         # self.encoder = StackedEncoder(obs_dim, stack_size=stack_size, hidden_size=hidden_size, kernel_size=kernel_size)
-        self.encoder = MLPEncoder(obs_dim, stack_size=stack_size, hidden_size=hidden_size)
-        self.fc = nn.Linear(self.encoder.ouput_dim + act_dim + 1, hidden_size)
+        self.encoder = MLPEncoder(self.feat_dim, stack_size=stack_size, hidden_size=hidden_size)
+        self.link_model = nn.Linear(self.encoder.ouput_dim, hidden_size)
+        self.ud_model = nn.Linear(2*hidden_size, hidden_size)
+        self.global_model = nn.Linear(hidden_size + act_dim, hidden_size)
         self.fc_out = nn.Linear(hidden_size, 1)
 
     def forward(self, s, a):
-        if s.dim() == 3:
-            s = s.transpose(1, 2)
-        zs = self.encoder(s)
-        gate_widths = s[:, -1, -1].unsqueeze(1)  # get the last time step gate widths
-        features = torch.cat([zs, a, gate_widths], dim=1)
-        features = self.fc(features)
-        value = self.fc_out(features)
+        if s.dim() == 2:
+            s = s.unsqueeze(0) # batch size 1
+
+        batch_size = s.shape[0]
+        s = s.view(batch_size, self.seq_len, self.num_links, self.feat_dim).transpose(1, 2)
+        zs = self.encoder(s.reshape(batch_size, self.num_links, -1)) # (batch_size, num_links, hidden_size)
+        link_features = self.link_model(zs)
+        all_links_sum = link_features.sum(dim=1)
+        other_links_features = all_links_sum.unsqueeze(1) - link_features
+        combined_features = torch.cat([link_features, other_links_features], dim=2)
+        ud_features = self.ud_model(combined_features)
+        global_features = ud_features.mean(dim=1)
+        # gate_widths = s[:, -1, -1].unsqueeze(1)  # get the last time step gate widths
+        features = torch.cat([global_features, a.squeeze()], dim=1)
+        features = self.global_model(features)
+        value = self.fc_out(F.elu(features))
         return value
 
 def train_off_policy_multi_agent(
@@ -307,7 +332,7 @@ class SACAgent:
         q2_value = self.target_critic_2(next_states, next_actions)
 
         next_value = torch.min(q1_value,
-                               q2_value) + self.log_alpha.exp() * entropy
+                               q2_value) + self.log_alpha.exp() * entropy.squeeze(-1)
         td_target = rewards + self.gamma * next_value * (1 - dones)
         return td_target
 

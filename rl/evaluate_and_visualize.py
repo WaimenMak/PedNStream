@@ -408,6 +408,38 @@ def run_tests(dataset, algorithms, num_runs=10, seed=42, randomize=False):
                 print(f"  Average reward: {results['avg_reward']:.3f} ± {results['avg_reward_std']:.3f}")
                 print(f"  Total reward: {results['total_reward']:.3f} ± {results['total_reward_std']:.3f}")
             
+            elif algo == 'optimization_based':
+                # Create environment and optimization-based agents
+                env = PedNetParallelEnv(
+                    dataset=dataset, normalize_obs=False, obs_mode="option2", render_mode="animate"
+                )
+                
+                from rl.agents.optimization_based import DecentralizedOptimizationAgent
+                
+                optimization_based_agents = {
+                    agent_id: DecentralizedOptimizationAgent(
+                        env.network,
+                        env.agent_manager,
+                        agent_id=agent_id,
+                        verbose=False
+                    )
+                    for agent_id in env.agent_manager.get_gater_agents()
+                }
+                
+                # Run evaluation
+                results = evaluate_agents(
+                    env, optimization_based_agents,
+                    delta_actions=False,
+                    seed=seed,
+                    randomize=randomize,
+                    num_runs=num_runs,
+                    save_dir=str(project_root / "outputs" / "rl_training" / dataset / "optimization_based")
+                )
+                
+                print(f"\nOPTIMIZATION-BASED Results:")
+                print(f"  Average reward: {results['avg_reward']:.3f} ± {results['avg_reward_std']:.3f}")
+                print(f"  Total reward: {results['total_reward']:.3f} ± {results['total_reward_std']:.3f}")
+            
             elif algo == 'no_control':
                 # Create environment with no control
                 env = PedNetParallelEnv(
@@ -455,7 +487,7 @@ Examples:
   python evaluate_and_visualize.py --dataset 45_intersections --run-test --num-runs 10
 
   # Run tests for specific algorithms
-  python evaluate_and_visualize.py --dataset 45_intersections --run-test --algorithms ppo sac
+  python evaluate_and_visualize.py --dataset 45_intersections --run-test --algorithms ppo sac optimization_based
 
   # Evaluate existing results for all algorithms
   python evaluate_and_visualize.py --dataset 45_intersections --evaluate
@@ -493,8 +525,8 @@ Examples:
     parser.add_argument('--threshold', type=float, default=0.7,
                         help='Congestion threshold ratio (default: 0.7)')
     parser.add_argument('--algorithms', type=str, nargs='+',
-                        default=['ppo', 'sac', 'rule_based', 'no_control'],
-                        help='List of algorithms to evaluate (default: ppo sac rule_based no_control)')
+                        default=['ppo', 'sac', 'rule_based', 'optimization_based', 'no_control'],
+                        help='List of algorithms to evaluate (default: ppo sac rule_based optimization_based no_control)')
     parser.add_argument('--run-test', action='store_true',
                         help='Run agents and generate test results before evaluation')
     parser.add_argument('--num-runs', type=int, default=10,

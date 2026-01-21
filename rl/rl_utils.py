@@ -13,9 +13,16 @@ import torch
 import json
 from pathlib import Path
 from datetime import datetime
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, TYPE_CHECKING
 import collections
 import random
+
+# Avoid circular imports: only import agent classes for type checking
+if TYPE_CHECKING:
+    from rl.agents.PPO import PPOAgent
+    from rl.agents.SAC import SACAgent
+    from rl.agents.rule_based import RuleBasedGaterAgent
+    from rl.agents.optimization_based import DecentralizedOptimizationAgent
 
 def layer_init(layer, std=np.sqrt(2), bias_const=0.0):
     """
@@ -622,7 +629,7 @@ def load_all_agents(save_dir: str, device: str = "cpu", agent_class=None):
         elif agent_type == 'SAC':
             # Import SACAgent
             if agent_class is None or agent_class.__name__ != 'SACAgent':
-                from rl.agents.SAC import SACAgent
+                from rl.agents.SAC_copy import SACAgent
                 agent_class_to_use = SACAgent
             else:
                 agent_class_to_use = agent_class
@@ -1298,6 +1305,12 @@ def compute_network_congestion_metric(simulation_dir=None, threshold_ratio=0.7):
 def _evaluate_single_run(env, agents, delta_actions: bool, deterministic: bool,
                          seed: int, no_control: bool, randomize: bool):
     """Run a single evaluation episode. Internal helper function."""
+    # Lazy import to avoid circular dependency (import only when function is called)
+    from rl.agents.PPO import PPOAgent
+    from rl.agents.SAC import SACAgent
+    from rl.agents.rule_based import RuleBasedGaterAgent
+    from rl.agents.optimization_based import DecentralizedOptimizationAgent
+    
     # Reset environment with specified settings
     reset_options = {'randomize': randomize} if randomize else None
     obs, infos = env.reset(seed=seed, options=reset_options)
@@ -1313,10 +1326,15 @@ def _evaluate_single_run(env, agents, delta_actions: bool, deterministic: bool,
             for _ in range(stack_size):
                 state_history_queue[agent_id].append(obs[agent_id])
             state_stack[agent_id] = np.array(state_history_queue[agent_id])
+        if isinstance(agent, DecentralizedOptimizationAgent):
+            agent.network = env.network
+            agent.agent_manager = env.agent_manager
+            # Rebuild topology cache to use new network's link/node objects
+            agent._build_topology_cache()
     
     episode_rewards = {agent_id: 0.0 for agent_id in agents.keys()}
     done = False
-    
+    # step = 0
     while not done:
         actions = {}
         absolute_actions = {}
@@ -1335,10 +1353,14 @@ def _evaluate_single_run(env, agents, delta_actions: bool, deterministic: bool,
                 
                 # Check if agent has deterministic option (PPOAgent)
                 if hasattr(agent, 'take_action'):
-                    try:
+                    if isinstance(agent, (PPOAgent, SACAgent)):
                         action = agent.take_action(agent_state, deterministic=deterministic)
-                    except TypeError:
+                    elif isinstance(agent, DecentralizedOptimizationAgent):
                         # Agent doesn't support deterministic kwarg
+                        # action = agent.take_action(agent_state, time_step=env.sim_step-1)
+                        action = agent.take_action(agent_state, time_step=env.sim_step-1)
+                        # step += 1
+                    else:
                         action = agent.take_action(agent_state)
                 else:
                     action = agent.act(agent_state)

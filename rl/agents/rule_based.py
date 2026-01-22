@@ -195,11 +195,11 @@ if __name__ == "__main__":
     done = False
     while not done:
         actions = {}
-        # for agent_id in env.agents:
-            # if agent_id in rule_based_gater_agents:
-            #     actions[agent_id] = rule_based_gater_agents[agent_id].take_action(observations[agent_id])
-            # elif agent_id in rule_based_separator_agents:
-            #     actions[agent_id] = rule_based_separator_agents[agent_id].take_action(observations[agent_id])
+        for agent_id in env.agents:
+            if agent_id in rule_based_gater_agents:
+                actions[agent_id] = rule_based_gater_agents[agent_id].take_action(observations[agent_id])
+            elif agent_id in rule_based_separator_agents:
+                actions[agent_id] = rule_based_separator_agents[agent_id].take_action(observations[agent_id])
             # print(actions[agent_id])
             # if agent_id == "gate_24":
             #     print(f"Step {step}: Agent {agent_id} action: {actions[agent_id]}")

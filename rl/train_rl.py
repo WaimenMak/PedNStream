@@ -155,6 +155,20 @@ if __name__ == "__main__":
         save_dir=f"rl_training/{dataset}/rule_based"
     )
 
+    # Evaluate optimization-based agents
+    env = PedNetParallelEnv(
+        dataset=dataset, normalize_obs=False, obs_mode="option2", render_mode="animate", action_gap=action_gap
+    )
+    optimization_based_agents = {agent_id: DecentralizedOptimizationAgent(env.network, env.agent_manager, agent_id=agent_id, verbose=False) for agent_id in env.agent_manager.get_gater_agents()}
+    optimization_based_results = evaluate_agents(
+        env, optimization_based_agents,
+        delta_actions=False,
+        seed=SEED,  # Same seed for fair comparison
+        randomize=randomized,
+        num_runs=10,
+        save_dir=f"rl_training/{dataset}/optimization_based"
+    )
+
     # no control policy
     env = PedNetParallelEnv(
         dataset=dataset, normalize_obs=False, obs_mode="option2", render_mode="animate"

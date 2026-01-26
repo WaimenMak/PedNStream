@@ -49,163 +49,6 @@ class ReplayBuffer:
     def size(self): 
         return len(self.buffer)
 
-# class LazyFrameStackReplayBuffer:
-#     def __init__(self, capacity, stack_size=4):
-#         self.capacity = capacity
-#         self.stack_size = stack_size
-#         self.ptr = 0
-#         self.buffer_size = 0
-#         self.initialized = False
-        
-#         # 我们暂时不初始化数组，等第一条数据进来时再根据数据的形状初始化
-#         self.states = None
-#         self.actions = None
-#         self.rewards = None
-#         self.next_states = None
-#         self.dones = None
-
-#     def _init_memory(self, state, action, reward, next_state, done):
-#         # 自动推断维度
-#         state_dim = state.shape if hasattr(state, 'shape') else (len(state),)
-#         action_dim = action.shape if hasattr(action, 'shape') else (len(action),)
-        
-#         # 预分配内存 (N, state_dim) - 注意这里只存单帧！
-#         self.states = np.zeros((self.capacity, *state_dim), dtype=np.float32)
-#         self.next_states = np.zeros((self.capacity, *state_dim), dtype=np.float32)
-        
-#         # 根据 action 是离散还是连续决定类型，这里默认 float
-#         self.actions = np.zeros((self.capacity, *action_dim), dtype=np.float32)
-#         self.rewards = np.zeros((self.capacity, 1), dtype=np.float32)
-#         self.dones = np.zeros((self.capacity, 1), dtype=np.bool_)
-        
-#         self.initialized = True
-
-#     def add(self, state, action, reward, next_state, done):
-#         # 第一次调用时初始化 Buffer
-#         if not self.initialized:
-#             self._init_memory(state, action, reward, next_state, done)
-            
-#         # 存入数据
-#         self.states[self.ptr] = state
-#         self.actions[self.ptr] = action
-#         self.rewards[self.ptr] = reward
-#         self.next_states[self.ptr] = next_state
-#         self.dones[self.ptr] = done
-
-#         # 更新指针 (环形移动)
-#         self.ptr = (self.ptr + 1) % self.capacity
-#         self.buffer_size = min(self.buffer_size + 1, self.capacity)
-
-#     def _get_history(self, index, source_array, current_frame=None):
-#         """
-#         核心逻辑：向前回溯 stack_size 帧。
-#         source_array: 通常是 self.states
-#         current_frame: 如果是计算 next_state 的 stack，最新的那一帧还没存进 buffer (或者存了但逻辑不同)，
-#                        可以显式传入最新的帧。
-#         """
-#         frames = []
-        
-#         # 确定最新的那一帧以及其形状（用于零填充）
-#         # 如果是取 state stack，最新的就是 source_array[index]
-#         # 如果是取 next_state stack，最新的通常是 source_array[index] 的 next_state，即 current_frame
-#         if current_frame is not None:
-#             latest_frame = current_frame
-#         else:
-#             # 如果没有提供 current_frame，使用 source_array[index] 作为最新帧
-#             latest_frame = source_array[index]
-        
-#         # 获取帧的形状用于零填充
-#         frame_shape = latest_frame.shape if hasattr(latest_frame, 'shape') else (len(latest_frame),)
-#         zero_frame = np.zeros(frame_shape, dtype=np.float32)
-        
-#         frames.append(latest_frame)
-        
-#         # 我们需要凑齐 stack_size 帧
-#         # 比如 stack=4, 如果 current_frame 有值，循环 3 次；否则循环 4 次
-#         needed = self.stack_size - len(frames)
-        
-#         for i in range(1, needed + 1):  # i从1开始，因为index本身已经在frames里了
-#             # 回溯索引: index-1, index-2, ...
-#             # 注意：index 是当前的 buffer 指针，我们往回找
-            
-#             # 修复：正确处理负数索引，避免错误的循环包装
-#             prev_idx = index - i
-            
-#             # 边界检查关键点：
-#             # 如果这一帧是 Done（上个回合结束），或者我们回溯到了 Buffer 的还没写数据的地方(buffer_size check)
-#             # 就停止回溯，用零值填充剩下的位置 (Zero Padding)
-            
-#             # 1. 检查是否越过 buffer 有效区
-#             # 如果 prev_idx < 0，说明我们回溯到了 buffer 开始之前
-#             # 注意: prev_idx >= buffer_size 永远不会发生，因为 index 从 [0, buffer_size) 采样，
-#             # 而 prev_idx = index - i (i >= 1)，所以 prev_idx < buffer_size 总是成立（除非 prev_idx < 0）
-#             if prev_idx < 0:
-#                 # Buffer 还没满，回溯到了无效区域
-#                 if self.buffer_size < self.capacity:
-#                     # 用零值填充（表示没有历史信息）
-#                     while len(frames) < self.stack_size:
-#                         frames.append(zero_frame)
-#                     break
-#                 else:
-#                     # Buffer 已满，需要包装到 buffer 末尾
-#                     # 例如：如果 index=1, i=2, 则 prev_idx=-1 -> capacity-1
-#                     prev_idx = prev_idx % self.capacity
-#                     # 当buffer满时，所有索引都是有效的，所以可以继续
-
-#             # 2. 检查 Done 标记
-#             # 如果 prev_idx 这一步是 Done，说明它是上一个 Episode 的结尾。
-#             # 那么 prev_idx 这一帧本身是属于上一个 Episode 的，不能用！
-#             # 或者是如果我们正在取 index 的 stack，遇到 index-1 是 done，说明 index 是新 Episode 的开始。
-#             if self.dones[prev_idx] and len(frames) < self.stack_size:
-#                 # 遇到了断点，后面的帧（其实是更早的时间）都属于上个回合
-#                 # 用零值填充（表示新episode开始，没有更早的历史）
-#                 while len(frames) < self.stack_size:
-#                     frames.append(zero_frame)
-#                 break
-                
-#             frames.append(source_array[prev_idx])
-            
-#         # 确保我们有足够的帧（如果还没填满，用零值填充）
-#         if len(frames) < self.stack_size:
-#             while len(frames) < self.stack_size:
-#                 frames.append(zero_frame)
-            
-#         # 现在的 frames 是 [t, t-1, t-2, t-3]，我们需要反转成 [t-3, t-2, t-1, t]
-#         return np.array(frames[::-1])
-
-#     def sample(self, batch_size):
-#         indices = np.random.randint(0, self.buffer_size, size=batch_size)
-        
-#         stacked_states = []
-#         stacked_next_states = []
-        
-#         for idx in indices:
-#             # 1. 构建 Current State Stack
-#             # 这里的逻辑是：取 buffer[idx] 以及它之前的 k-1 帧
-#             s_stack = self._get_history(idx, self.states)
-#             stacked_states.append(s_stack)
-            
-#             # 2. 构建 Next State Stack
-#             # Next State 的 stack 应该是：[..., s[t-1], s[t], s[t+1]]
-#             # 其中 s[t+1] 就是存进去的 self.next_states[idx]
-#             # 所以我们要基于 self.states 回溯，但是把最新的帧替换成 next_state[idx]
-#             ns_stack = self._get_history(idx, self.states, current_frame=self.next_states[idx])
-#             stacked_next_states.append(ns_stack)
-
-#         # 转换格式: (Batch, Stack, Dim)
-#         # 注意: 如果你用 Conv1d，通常希望 Dim 在中间，可能需要 transpose
-#         return (
-#             np.array(stacked_states), 
-#             self.actions[indices], 
-#             self.rewards[indices], 
-#             np.array(stacked_next_states), 
-#             self.dones[indices]
-#         )
-
-#     def size(self):
-#         return self.buffer_size
-
-
 
 # =============================================================================
 # Running Normalization Wrapper
@@ -258,7 +101,7 @@ class RunningNormalizeWrapper:
     """
     
     def __init__(self, env, norm_obs: bool = True, norm_reward: bool = False,
-                 clip_obs: float = 10.0, clip_reward: float = 10.0,
+                 clip_obs: float = 50.0, clip_reward: float = 50.0,
                  gamma: float = 0.99, training: bool = True):
         """
         Initialize the normalization wrapper.
@@ -309,6 +152,12 @@ class RunningNormalizeWrapper:
         
         if self.norm_obs:
             obs = self._normalize_obs(obs, update=self.training)
+        
+        # Store true (un-normalized) rewards in infos for tracking
+        for aid in rewards.keys():
+            if aid not in infos:
+                infos[aid] = {}
+            infos[aid]['true_reward'] = rewards[aid]
         
         if self.norm_reward:
             rewards = self._normalize_rewards(rewards, terms, update=self.training)
@@ -1073,6 +922,116 @@ def compute_average_travel_time_spent(simulation_dir=None):
         'total_person_time': total_person_time,
         'total_trips': total_trips,
         'num_origin_links': num_origin_links
+    }
+
+
+def compute_served_trips_rate(simulation_dir=None):
+    """
+    Compute the served trips rate (completion rate).
+    
+    This metric calculates the ratio of trips that reached destinations
+    to the total trips that entered the network from origins.
+    
+    Formula:
+        Total Inflow = Σ_(origin links) cumulative_inflow[-1]
+        Total Outflow = Σ_(destination links) cumulative_outflow[-1]
+        Served Trips Rate = Total Outflow / Total Inflow
+    
+    Where:
+        - Origin links = links starting from origin nodes
+        - Destination links = links ending at destination nodes
+    
+    Args:
+        simulation_dir: Path to saved simulation directory
+        
+    Returns:
+        dict: {
+            'served_trips_rate': float,  # Ratio of served trips (0 to 1)
+            'total_inflow': float,  # Total trips entering from origins
+            'total_outflow': float,  # Total trips exiting at destinations
+            'num_origin_links': int,  # Number of origin links
+            'num_destination_links': int  # Number of destination links
+        }
+    """
+    from pathlib import Path
+    import json
+    
+    sim_path = Path(simulation_dir)
+    
+    # Load network parameters to get origin and destination nodes
+    network_params_path = sim_path / 'network_params.json'
+    if not network_params_path.exists():
+        raise FileNotFoundError(f"network_params.json not found in {simulation_dir}")
+    
+    with open(network_params_path, 'r') as f:
+        network_params = json.load(f)
+    
+    origin_nodes = set(network_params.get('origin_nodes', []))
+    destination_nodes = set(network_params.get('destination_nodes', []))
+    
+    if not origin_nodes:
+        raise ValueError("No origin nodes found in network parameters")
+    if not destination_nodes:
+        raise ValueError("No destination nodes found in network parameters")
+    
+    # Load link data
+    link_data_path = sim_path / 'link_data.json'
+    if not link_data_path.exists():
+        raise FileNotFoundError(f"link_data.json not found in {simulation_dir}")
+    
+    with open(link_data_path, 'r') as f:
+        link_data = json.load(f)
+    
+    # Calculate total inflow from origin links
+    total_inflow = 0.0
+    num_origin_links = 0
+    
+    for link_key, link_info in link_data.items():
+        try:
+            parts = link_key.split('-')
+            if len(parts) == 2:
+                start_node = int(parts[0])
+                
+                # Check if this link starts at an origin node
+                if start_node in origin_nodes:
+                    cum_inflow = link_info.get('cumulative_inflow', [])
+                    if cum_inflow:
+                        total_inflow += cum_inflow[-1]
+                        num_origin_links += 1
+        except (ValueError, IndexError):
+            continue
+    
+    # Calculate total outflow to destination links
+    total_outflow = 0.0
+    num_destination_links = 0
+    
+    for link_key, link_info in link_data.items():
+        try:
+            parts = link_key.split('-')
+            if len(parts) == 2:
+                end_node = int(parts[1])
+                
+                # Check if this link ends at a destination node
+                if end_node in destination_nodes:
+                    cum_outflow = link_info.get('cumulative_outflow', [])
+                    if cum_outflow:
+                        total_outflow += cum_outflow[-1]
+                        num_destination_links += 1
+        except (ValueError, IndexError):
+            continue
+    
+    # Calculate served trips rate
+    if total_inflow > 0:
+        served_trips_rate = total_outflow / total_inflow
+    else:
+        served_trips_rate = 0.0
+    
+    return {
+        'served_trips_rate': served_trips_rate,
+        'total_inflow': total_inflow,
+        'total_outflow': total_outflow,
+        'num_origin_links': num_origin_links,
+        'num_destination_links': num_destination_links
     }
 
 

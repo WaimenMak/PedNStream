@@ -444,7 +444,10 @@ class UDLSTMPolicyNetwork(nn.Module):
         # Upstream/Downstream aggregation model
         # Input: [link_features, other_links_sum] -> hidden_size
         self.ud_model = nn.Linear(2 * hidden_size, hidden_size)
-        
+
+        # Shared latent layer for action coordination
+        self.shared_latent_layer = nn.Linear(hidden_size * act_dim, hidden_size * act_dim)
+
         # Per-link action heads (output 1 action per link)
         self.mean_head = nn.Linear(hidden_size, 1)
         self.std_head = nn.Linear(hidden_size, 1)
@@ -487,10 +490,18 @@ class UDLSTMPolicyNetwork(nn.Module):
         
         # Process through UD model
         ud_features = self.ud_model(combined_features)  # (seq_len, num_links, hidden_size)
-        
+
+        # Flatten features for shared latent layer
+        shared_features = ud_features.view(seq_len, -1)  # (seq_len, num_links * hidden_size)
+        shared_latent = self.shared_latent_layer(shared_features)  # (seq_len, num_links * hidden_size)
+        shared_latent = shared_latent.view(seq_len, self.act_dim, self.hidden_size)  # (seq_len, num_links, hidden_size)
+
         # Generate per-link actions
-        mean = self.mean_head(F.relu(ud_features)).squeeze(-1)  # (seq_len, num_links)
-        std = F.softplus(self.std_head(F.relu(ud_features))).squeeze(-1).clamp(self.min_std, self.max_std)  # (seq_len, num_links)
+        mean = self.mean_head(F.relu(shared_latent)).squeeze(-1)  # (seq_len, num_links)
+        std = F.softplus(self.std_head(F.relu(shared_latent))).squeeze(-1).clamp(self.min_std, self.max_std)  # (seq_len, num_links)
+        # # Generate per-link actions
+        # mean = self.mean_head(F.relu(ud_features)).squeeze(-1)  # (seq_len, num_links)
+        # std = F.softplus(self.std_head(F.relu(ud_features))).squeeze(-1).clamp(self.min_std, self.max_std)  # (seq_len, num_links)
 
         return mean, std, hidden_out
 
@@ -569,6 +580,161 @@ class UDLSTMValueNetwork(nn.Module):
         return value, hidden_out
 
 
+class AttentionPolicy(nn.Module):
+    def __init__(self, obs_dim, act_dim, hidden_size=64, num_layers=1,
+                 min_std=1e-3, max_std=10.0):
+        super().__init__()
+        self.obs_dim = obs_dim
+        self.act_dim = act_dim 
+        self.features_per_link = obs_dim // act_dim
+        self.hidden_size = hidden_size
+        self.min_std = min_std
+        self.max_std = max_std
+
+        # Shared LSTM (Kept the same)
+        self.lstm = nn.LSTM(
+            input_size=self.features_per_link,
+            hidden_size=hidden_size,
+            num_layers=num_layers,
+            batch_first=True
+        )
+        
+        # Link-specific feature extractor
+        self.link_model = nn.Linear(hidden_size, hidden_size)
+        
+        # --- IMPROVEMENT START ---
+        # Instead of a fixed Linear(N*H, N*H), we use Multi-Head Attention.
+        # This allows "All-to-All" communication but uses shared weights.
+        # It is invariant to the number of links and their order.
+        self.attention_layer = nn.MultiheadAttention(
+            embed_dim=hidden_size, 
+            num_heads=1,
+            batch_first=True
+        )
+        # --- IMPROVEMENT END ---
+
+        # Per-link action heads (Shared weights, applied per link)
+        self.mean_head = nn.Linear(hidden_size, 1)
+        self.std_head = nn.Linear(hidden_size, 1)
+
+    def forward(self, x, hidden=None):
+        if x.dim() == 3:
+            x = x.squeeze()
+        seq_len = x.shape[0]
+        
+        # 1. Prepare Input
+        # (seq_len, num_links, features)
+        x_lstm_input = x.view(seq_len, self.act_dim, self.features_per_link).transpose(0, 1)
+        
+        # 2. LSTM (Independent processing)
+        lstm_out, hidden_out = self.lstm(x_lstm_input, hidden) 
+        lstm_features = lstm_out.transpose(0, 1) # (seq_len, num_links, hidden_size)
+        
+        # 3. Link Features
+        link_features = self.link_model(lstm_features) 
+
+        # 4. Coordination via Attention (The Fix)
+        # We treat 'num_links' as the sequence length for the transformer logic.
+        # We reshape to mix time/batch so attention happens purely between links at the same timestep.
+        
+        # Shape: (seq_len * num_links, hidden_size) -> This loses "who is who"
+        # We need: (seq_len, num_links, hidden_size)
+        
+        # Attention expects: (Batch, Sequence, Features)
+        # Here "Batch" is actual_seq_len, "Sequence" is num_links
+        # This creates "All-to-all" communication between links
+        attn_out, _ = self.attention_layer(
+            query=link_features, 
+            key=link_features, 
+            value=link_features
+        )
+        
+        # Residual connection (optional but recommended)
+        coordinated_features = link_features + attn_out
+        
+        # 5. Final Heads
+        # The 'coordinated_features' now contains info from self + all other links
+        mean = self.mean_head(F.relu(coordinated_features)).squeeze(-1) 
+        std = F.softplus(self.std_head(F.relu(coordinated_features))).squeeze(-1).clamp(self.min_std, self.max_std)
+
+        return mean, std, hidden_out
+
+class AttentionValueNetwork(nn.Module):
+    def __init__(self, obs_dim, act_dim, hidden_size=64, num_layers=1):
+        super().__init__()
+        self.obs_dim = obs_dim
+        self.act_dim = act_dim
+        self.features_per_link = obs_dim // act_dim
+        self.hidden_size = hidden_size
+        
+        # 1. Shared LSTM (Same as Policy)
+        self.lstm = nn.LSTM(
+            input_size=self.features_per_link,
+            hidden_size=hidden_size,
+            num_layers=num_layers,
+            batch_first=True
+        )
+
+        # 2. Link Feature Extractor
+        self.link_model = nn.Linear(hidden_size, hidden_size)
+
+        # 3. Attention (The Upgrade)
+        # Replaces the manual "sum of others" logic
+        self.attention = nn.MultiheadAttention(
+            embed_dim=hidden_size,
+            num_heads=1,
+            batch_first=True
+        )
+        
+        # 4. Global Value Head
+        # Takes the aggregated system state and outputs 1 value
+        self.value_head = nn.Linear(hidden_size, 1)
+
+    def forward(self, x, hidden=None):
+        """
+        Returns:
+            value: (seq_len, 1)
+            hidden: (h, c)
+        """
+        if x.dim() == 3:
+            x = x.squeeze()
+        seq_len = x.shape[0]
+
+        # --- Phase 1: Individual Link Processing ---
+        # Reshape: (seq_len, num_links, features)
+        x_lstm_input = x.view(seq_len, self.act_dim, self.features_per_link).transpose(0, 1)
+        
+        # LSTM Forward
+        lstm_out, hidden_out = self.lstm(x_lstm_input, hidden)
+        lstm_features = lstm_out.transpose(0, 1) # (seq_len, num_links, hidden_size)
+        
+        # Linear projection
+        link_features = self.link_model(lstm_features)
+
+        # --- Phase 2: Coordination (Attention) ---
+        # "All-to-All" communication.
+        # Links exchange info. If Link A is jammed, Link B knows about it here.
+        attn_out, _ = self.attention(
+            query=link_features,
+            key=link_features,
+            value=link_features
+        )
+        
+        # Residual Connection (Important for gradient flow)
+        coordinated_features = link_features + attn_out # (seq_len, num_links, hidden_size)
+
+        # --- Phase 3: Global Aggregation ---
+        # Now that every link vector contains info about the global state (thanks to attention),
+        # we can safely average them to get the "System Representation".
+        
+        # (seq_len, num_links, hidden) -> (seq_len, hidden)
+        global_state = coordinated_features.mean(dim=1) 
+        
+        # --- Phase 4: Value Estimation ---
+        value = self.value_head(F.elu(global_state)) # (seq_len, 1)
+
+        return value, hidden_out
+
 def train_on_policy_multi_agent(env, agents, delta_actions=False, num_episodes=50,
                                 randomize=False, seed=None,
                                 agents_saved_dir: str = None):
@@ -628,6 +794,7 @@ def train_on_policy_multi_agent(env, agents, delta_actions=False, num_episodes=5
                         state_stack[agent_id] = np.array(state_history_queue[agent_id])
 
                 episode_returns = {agent_id: 0.0 for agent_id in agents.keys()}
+                episode_true_returns = {agent_id: 0.0 for agent_id in agents.keys()}  # Track true (un-normalized) rewards
                 done = False
                 step = 0 # only for progress bar
 
@@ -681,6 +848,11 @@ def train_on_policy_multi_agent(env, agents, delta_actions=False, num_episodes=5
                             done = terms[agent_id],
                         )
                         episode_returns[agent_id] += rewards[agent_id]
+                        # Track true (un-normalized) rewards if available
+                        if agent_id in infos and 'true_reward' in infos[agent_id]:
+                            episode_true_returns[agent_id] += infos[agent_id]['true_reward']
+                        else:
+                            episode_true_returns[agent_id] += rewards[agent_id]
 
 
                     obs = next_obs
@@ -705,15 +877,17 @@ def train_on_policy_multi_agent(env, agents, delta_actions=False, num_episodes=5
                 # Increment global episode counter
                 global_episode += 1
 
-                # Save all agents when average return across agents achieves new best
+                # Save all agents when average return across agents achieves new best (using TRUE rewards)
                 if agents_saved_dir and global_episode > num_episodes/2: # save after half of the training
-                    best_avg_return = save_with_best_return(agents, agents_saved_dir, episode_returns=episode_returns, best_avg_return=best_avg_return, global_episode=global_episode)
-                # Update progress bar
+                    best_avg_return = save_with_best_return(agents, agents_saved_dir, episode_returns=episode_true_returns, best_avg_return=best_avg_return, global_episode=global_episode)
+                # Update progress bar with both normalized and true returns
                 if (i_episode+1) % 10 == 0:
                     avg_return = np.mean([np.mean(return_dict[aid][-10:]) for aid in agents.keys()])
+                    avg_true_return = np.mean(list(episode_true_returns.values()))
                     pbar.set_postfix({
                         'episode': '%d' % (num_episodes/10 * i + i_episode+1),
-                        'avg_return': '%.3f' % avg_return,
+                        'norm_ret': '%.3f' % avg_return,
+                        'true_ret': '%.3f' % avg_true_return,
                         'steps': step
                     })
                 pbar.update(1)
@@ -849,7 +1023,14 @@ class PPOAgent:
                                           num_layers=num_lstm_layers)
             self.value_net = UDLSTMValueNetwork(obs_dim, act_dim, hidden_size=lstm_hidden_size,
                                              num_layers=num_lstm_layers)
-
+            # self.actor = LSTMPolicyNetwork(obs_dim, act_dim, hidden_size=lstm_hidden_size,
+            #                               num_layers=num_lstm_layers)
+            # self.value_net = LSTMValueNetwork(obs_dim, act_dim, hidden_size=lstm_hidden_size,
+            #                                num_layers=num_lstm_layers)
+            # self.actor = AttentionPolicy(obs_dim, act_dim, hidden_size=lstm_hidden_size,
+            #                               num_layers=num_lstm_layers)
+            # self.value_net = AttentionValueNetwork(obs_dim, act_dim, hidden_size=lstm_hidden_size,
+            #                                        num_layers=num_lstm_layers)
         self.actor_optimizer = torch.optim.Adam(self.actor.parameters(), lr=actor_lr)
         self.critic_optimizer = torch.optim.Adam(self.value_net.parameters(), lr=critic_lr)
         self.device = device

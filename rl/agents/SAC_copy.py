@@ -178,6 +178,7 @@ def train_off_policy_multi_agent(
         with tqdm(total=int(num_episodes/10), desc='Iteration %d' % i) as pbar:
             for i_episode in range(int(num_episodes/10)):
                 episode_returns = {agent_id: 0.0 for agent_id in agents.keys()}
+                episode_true_returns = {agent_id: 0.0 for agent_id in agents.keys()}  # Track true (un-normalized) rewards
                 obs, infos = env.reset(seed=seed, options={'randomize': randomize})
                 # initialize state history queue
                 state_stack = {}
@@ -210,6 +211,11 @@ def train_off_policy_multi_agent(
                         next_state_stack[agent_id] = np.array(state_history_queue[agent_id])
                         agent.replay_buffer.add(state_stack[agent_id], actions[agent_id], rewards[agent_id], next_state_stack[agent_id], terms[agent_id])
                         episode_returns[agent_id] += rewards[agent_id]
+                        # Track true (un-normalized) rewards if available
+                        if agent_id in infos and 'true_reward' in infos[agent_id]:
+                            episode_true_returns[agent_id] += infos[agent_id]['true_reward']
+                        else:
+                            episode_true_returns[agent_id] += rewards[agent_id]
                         # update agent
                         if agent.replay_buffer.size() > minimal_size:
                             b_s, b_a, b_r, b_ns, b_d = agent.replay_buffer.sample(batch_size)
@@ -232,13 +238,15 @@ def train_off_policy_multi_agent(
 
                 global_episode += 1
                 if agents_saved_dir and  global_episode > num_episodes/2:
-                    best_avg_return = save_with_best_return(agents, agents_saved_dir, episode_returns=episode_returns, best_avg_return=best_avg_return, global_episode=global_episode)
-                # Update progress bar
+                    best_avg_return = save_with_best_return(agents, agents_saved_dir, episode_returns=episode_true_returns, best_avg_return=best_avg_return, global_episode=global_episode)
+                # Update progress bar with both normalized and true returns
                 if (i_episode+1) % 10 == 0:
                     avg_return = np.mean([np.mean(return_dict[aid][-10:]) for aid in agents.keys()])
+                    avg_true_return = np.mean(list(episode_true_returns.values()))
                     pbar.set_postfix({
                         'episode': '%d' % (num_episodes/10 * i + i_episode+1),
-                        'avg_return': '%.3f' % avg_return,
+                        'norm_ret': '%.3f' % avg_return,
+                        'true_ret': '%.3f' % avg_true_return,
                         'steps': step
                     })
                 pbar.update(1)

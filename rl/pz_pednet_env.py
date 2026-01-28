@@ -141,7 +141,8 @@ class PedNetParallelEnv(ParallelEnv):
         # Determine reset mode
         # Always re-create network to clear state
         if randomize:
-            self.network = self.env_generator.randomize_network(self.dataset, seed, verbose=self.verbose)
+            # Use stored seed for randomization (set at construction time)
+            self.network = self.env_generator.randomize_network(self.dataset, self._seed, verbose=self.verbose)
         else:
             # Deterministic reset using default configuration
             self.network = self.env_generator.create_network(self.dataset, verbose=self.verbose)

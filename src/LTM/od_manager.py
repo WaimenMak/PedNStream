@@ -149,5 +149,7 @@ class DemandGenerator:
         evening_peak = config.peak_lambda * np.exp(-(self.time - 3*t/4)**2 / (2 * (t/20)**2))
         lambda_t = config.base_lambda + morning_peak + evening_peak
         
-        np.random.seed(self.seed)  # use the seed from the simulation params
+        # Only reseed if seed is explicitly provided, otherwise use current random state
+        if self.seed is not None:
+            np.random.seed(self.seed)
         return np.random.poisson(lam=lambda_t)

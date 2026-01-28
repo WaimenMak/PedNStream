@@ -132,11 +132,9 @@ class PedNetParallelEnv(ParallelEnv):
         # Extract options
         randomize = options.get('randomize', False) if options else False
         
-        # Set random seed
-        if seed is not None:
-            np.random.seed(seed)
-            if hasattr(self.network, 'demand_generator'):
-                self.network.demand_generator.seed = seed
+        # Note: seed parameter is ignored. Seed should be set at construction time via __init__.
+        # This maintains API compatibility with PettingZoo but ensures reproducibility
+        # is controlled at environment creation, not at each reset.
         
         # Determine reset mode
         # Always re-create network to clear state

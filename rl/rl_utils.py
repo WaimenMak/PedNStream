@@ -101,7 +101,7 @@ class RunningNormalizeWrapper:
     """
     
     def __init__(self, env, norm_obs: bool = True, norm_reward: bool = False,
-                 clip_obs: float = 50.0, clip_reward: float = 50.0,
+                 clip_obs: float = 50.0, clip_reward: float = 10.0,
                  gamma: float = 0.99, training: bool = True):
         """
         Initialize the normalization wrapper.
@@ -124,8 +124,22 @@ class RunningNormalizeWrapper:
         self.training = training
         
         # Initialize running statistics for each agent
-        self.obs_rms = {aid: RunningMeanStd(shape=(env.observation_space(aid).shape[0],)) 
-                        for aid in env.possible_agents}
+        # For gater agents, track only non-gate-width features
+        self.obs_rms = {}
+        for aid in env.possible_agents:
+            agent_type = env.agent_manager.get_agent_type(aid)
+            if agent_type == "gate":
+                # For gater agents: track only non-gate-width features per link
+                features_per_link = env.obs_builder.features_per_link
+                obs_dim = env.observation_space(aid).shape[0]
+                num_links = obs_dim // features_per_link
+                # RMS shape: only non-gate-width features (features_per_link - 1) per link
+                non_gate_dim = num_links * (features_per_link - 1)
+                self.obs_rms[aid] = RunningMeanStd(shape=(non_gate_dim,))
+            else:
+                # For other agents: track full observation
+                self.obs_rms[aid] = RunningMeanStd(shape=(env.observation_space(aid).shape[0],))
+        
         self.ret_rms = RunningMeanStd(shape=()) if norm_reward else None
         
         # Track returns for reward normalization
@@ -165,31 +179,72 @@ class RunningNormalizeWrapper:
         return obs, rewards, terms, truncs, infos
     
     def _normalize_obs(self, obs: Dict[str, np.ndarray], update: bool = True) -> Dict[str, np.ndarray]:
-        """Normalize observations using running mean/std, excluding gate width for gater agents."""
+        """
+        Normalize observations using running mean/std, excluding gate width per link.
+        
+        For agents with per-link observations (e.g., gater agents):
+        - Observation structure: [action_dim * obs_dim_per_link]
+        - Each link has features, with gate width as the last feature
+        - Normalize all features except the gate width (last dim of each link)
+        """
         normalized = {}
         for aid, o in obs.items():
-            # Update RMS with all observations (for tracking statistics)
-            if update:
-                self.obs_rms[aid].update(o.reshape(1, -1))
-            
-            # Normalize the observation
-            o_normalized = np.clip(
-                (o - self.obs_rms[aid].mean) / np.sqrt(self.obs_rms[aid].var + 1e-8),
-                -self.clip_obs, self.clip_obs
-            ).astype(np.float32)
-            
-            # For gater agents, restore un-normalized gate width values
             agent_type = self.env.agent_manager.get_agent_type(aid)
+            
+            # Check if agent has per-link observation structure
             if agent_type == "gate":
-                # Gate_width is the last feature per link - don't normalize it
+                # Gater agents have per-link observations
                 features_per_link = self.env.obs_builder.features_per_link
                 num_links = len(o) // features_per_link
-                # Restore original gate width values (last feature of each link)
+                
+                # Extract non-gate-width features (all features except last per link)
+                non_gate_features = []
+                gate_widths = []
+                
                 for i in range(num_links):
-                    gate_width_idx = i * features_per_link + (features_per_link - 1)
-                    o_normalized[gate_width_idx] = o[gate_width_idx]
-            
-            normalized[aid] = o_normalized
+                    start_idx = i * features_per_link
+                    end_idx = start_idx + features_per_link
+                    link_features = o[start_idx:end_idx]
+                    
+                    # Separate gate width (last feature) from other features
+                    non_gate_features.append(link_features[:-1])
+                    gate_widths.append(link_features[-1])
+                
+                # Flatten non-gate-width features for RMS update and normalization
+                non_gate_flat = np.concatenate(non_gate_features)
+                
+                # Update RMS with only non-gate-width features
+                if update:
+                    self.obs_rms[aid].update(non_gate_flat.reshape(1, -1))
+                
+                # Normalize only non-gate-width features
+                non_gate_normalized = np.clip(
+                    (non_gate_flat - self.obs_rms[aid].mean) / np.sqrt(self.obs_rms[aid].var + 1e-8),
+                    -self.clip_obs, self.clip_obs
+                ).astype(np.float32)
+                
+                # Reconstruct observation: interleave normalized features with gate widths
+                o_normalized = np.zeros_like(o, dtype=np.float32)
+                for i in range(num_links):
+                    start_idx = i * features_per_link
+                    # Insert normalized non-gate features
+                    o_normalized[start_idx:start_idx + features_per_link - 1] = \
+                        non_gate_normalized[i * (features_per_link - 1):(i + 1) * (features_per_link - 1)]
+                    # Keep gate width unchanged (last feature)
+                    o_normalized[start_idx + features_per_link - 1] = gate_widths[i]
+                
+                normalized[aid] = o_normalized
+            else:
+                # For other agents (e.g., separator), normalize entire observation
+                if update:
+                    self.obs_rms[aid].update(o.reshape(1, -1))
+                
+                o_normalized = np.clip(
+                    (o - self.obs_rms[aid].mean) / np.sqrt(self.obs_rms[aid].var + 1e-8),
+                    -self.clip_obs, self.clip_obs
+                ).astype(np.float32)
+                
+                normalized[aid] = o_normalized
         
         return normalized
     
@@ -248,10 +303,118 @@ class RunningNormalizeWrapper:
 # =============================================================================
 # Model Save/Load Utilities
 # =============================================================================
+def validate_agents(env, agents, delta_actions: bool = False, num_episodes: int = 3,
+                    randomize: bool = False) -> dict:
+    """
+    Run validation episodes with deterministic actions to evaluate agent performance.
+    
+    Args:
+        env: PettingZoo ParallelEnv (can be wrapped with RunningNormalizeWrapper)
+        agents: Dict mapping agent_id -> PPOAgent or SACAgent
+        delta_actions: If True, agents output delta actions
+        num_episodes: Number of validation episodes to run (default: 3)
+        randomize: If True, randomize environment at reset
+    
+    Returns:
+        dict: {
+            'avg_return': float,  # Average true return across all episodes and agents
+            'episode_returns': list,  # List of per-episode average returns
+            'agent_returns': dict  # Per-agent average returns
+        }
+    """
+    # Check if any agent uses stacked observations
+    first_agent_id = next(iter(agents))
+    uses_stacked_obs = hasattr(agents[first_agent_id], 'stack_size')
+    
+    if uses_stacked_obs:
+        stack_size = agents[first_agent_id].stack_size
+    
+    all_episode_returns = []
+    agent_total_returns = {agent_id: 0.0 for agent_id in agents.keys()}
+    
+    for ep in range(num_episodes):
+        # Reset environment
+        obs, infos = env.reset(options={'randomize': randomize})
+        
+        # Initialize state history queues for stacked observations
+        state_history_queue = {}
+        state_stack = {}
+        if uses_stacked_obs:
+            for agent_id in agents.keys():
+                state_history_queue[agent_id] = collections.deque(maxlen=stack_size)
+                for _ in range(stack_size):
+                    state_history_queue[agent_id].append(obs[agent_id])
+                state_stack[agent_id] = np.array(state_history_queue[agent_id])
+        
+        episode_true_returns = {agent_id: 0.0 for agent_id in agents.keys()}
+        done = False
+        
+        while not done:
+            actions = {}
+            absolute_actions = {}
+            
+            for agent_id, agent in agents.items():
+                # Use stacked state if agent uses stacked observations
+                if agent_id in state_stack:
+                    agent_state = state_stack[agent_id]
+                else:
+                    agent_state = obs[agent_id]
+                
+                # Use deterministic action for validation
+                action = agent.take_action(agent_state, deterministic=True)
+                
+                if delta_actions:
+                    absolute_action = obs[agent_id].reshape(agent.act_dim, -1)[:, -1] + action
+                    absolute_action = np.clip(absolute_action, agent.act_low, agent.act_high)
+                    absolute_actions[agent_id] = absolute_action
+                else:
+                    absolute_actions[agent_id] = action
+                actions[agent_id] = action
+            
+            # Step environment
+            next_obs, rewards, terms, truncs, infos = env.step(absolute_actions)
+            
+            # Update state history queues for stacked observations
+            if uses_stacked_obs:
+                for agent_id in state_history_queue.keys():
+                    state_history_queue[agent_id].append(next_obs[agent_id])
+                    state_stack[agent_id] = np.array(state_history_queue[agent_id])
+            
+            # Accumulate true rewards
+            for agent_id in agents.keys():
+                if agent_id in infos and 'true_reward' in infos[agent_id]:
+                    episode_true_returns[agent_id] += infos[agent_id]['true_reward']
+                else:
+                    episode_true_returns[agent_id] += rewards[agent_id]
+            
+            obs = next_obs
+            done = any(terms.values()) or any(truncs.values())
+        
+        # Store episode results
+        ep_avg_return = np.mean(list(episode_true_returns.values()))
+        all_episode_returns.append(ep_avg_return)
+        
+        for agent_id in agents.keys():
+            agent_total_returns[agent_id] += episode_true_returns[agent_id]
+    
+    # Compute averages
+    avg_return = np.mean(all_episode_returns)
+    agent_avg_returns = {aid: total / num_episodes for aid, total in agent_total_returns.items()}
+    
+    return {
+        'avg_return': avg_return,
+        'episode_returns': all_episode_returns,
+        'agent_returns': agent_avg_returns
+    }
+
+
 def save_with_best_return(agents: dict, save_dir: str, metadata: dict = None,
                           episode_returns: dict = None, best_avg_return: float = float('-inf'), global_episode: int = 0):
     """
-    Save all agents' parameters to a directory.
+    Save all agents' parameters to a directory based on episode returns.
+    
+    Note: For more robust model selection, use validate_and_save_best() which runs
+    multiple validation episodes with deterministic actions.
     """
     avg_episode_return = np.mean(list(episode_returns.values()))
     
@@ -268,6 +431,67 @@ def save_with_best_return(agents: dict, save_dir: str, metadata: dict = None,
         save_all_agents(agents, save_dir, metadata=metadata)
         print(f"New best average return achieved: {best_avg_return:.3f} at episode {global_episode} (saved all agents to {save_dir})")
 
+    return best_avg_return
+
+
+def validate_and_save_best(env, agents, save_dir: str, delta_actions: bool = False,
+                           num_val_episodes: int = 3, randomize: bool = False,
+                           best_avg_return: float = float('-inf'), global_episode: int = 0,
+                           use_wandb: bool = False) -> float:
+    """
+    Run validation episodes and save agents if new best return is achieved.
+    
+    Args:
+        env: PettingZoo ParallelEnv
+        agents: Dict mapping agent_id -> PPOAgent or SACAgent
+        save_dir: Directory to save agent checkpoints
+        delta_actions: If True, agents output delta actions
+        num_val_episodes: Number of validation episodes (default: 3)
+        randomize: If True, randomize environment at reset
+        best_avg_return: Current best average return
+        global_episode: Current training episode number
+        use_wandb: If True, log validation metrics to wandb
+    
+    Returns:
+        float: Updated best average return
+    """
+    # Run validation
+    val_result = validate_agents(env, agents, delta_actions=delta_actions,
+                                 num_episodes=num_val_episodes, randomize=randomize)
+    
+    avg_val_return = val_result['avg_return']
+    
+    # Log validation metrics to wandb
+    if use_wandb:
+        try:
+            import wandb
+            if wandb.run is not None:
+                log_dict = {
+                    'val_episode': global_episode,
+                    'val_avg_return': avg_val_return,
+                    'val_return_std': np.std(val_result['episode_returns']),
+                }
+                for agent_id, agent_return in val_result['agent_returns'].items():
+                    log_dict[f'val_agent_{agent_id}_return'] = agent_return
+                wandb.log(log_dict)
+        except ImportError:
+            pass
+    
+    # Save if new best
+    if avg_val_return > best_avg_return:
+        best_avg_return = avg_val_return
+        
+        metadata = {
+            'episode': global_episode,
+            'val_avg_return': float(avg_val_return),
+            'val_episode_returns': val_result['episode_returns'],
+            'val_agent_returns': {aid: float(r) for aid, r in val_result['agent_returns'].items()},
+            'num_val_episodes': num_val_episodes
+        }
+        save_all_agents(agents, save_dir, metadata=metadata)
+        print(f"[Validation] New best avg return: {best_avg_return:.3f} at episode {global_episode} "
+              f"(over {num_val_episodes} val episodes, saved to {save_dir})")
+    
     return best_avg_return
 
 
@@ -656,7 +880,8 @@ def compute_network_travel_time(simulation_dir=None):
     Compute average travel time across the network.
     
     This metric calculates the mean travel time across all timesteps for each link,
-    then averages over all links.
+    then averages over all **OD-path links** (i.e., links that belong to at least
+    one origin-destination path defined in network_params.json).
     
     Formula: 
         LinkAvgTravelTime = mean(travel_time[link, t] for all t)
@@ -684,10 +909,31 @@ def compute_network_travel_time(simulation_dir=None):
     
     with open(link_data_path, 'r') as f:
         link_data = json.load(f)
-    
+
+    # Load network parameters to get OD paths
+    network_params_path = sim_path / 'network_params.json'
+    od_links = set()
+    if network_params_path.exists():
+        with open(network_params_path, 'r') as f:
+            network_params = json.load(f)
+        od_paths = network_params.get('od_paths', {})
+
+        # Build set of link keys (u-v) that lie on any OD path
+        for _, paths in od_paths.items():
+            for path in paths:
+                # path is a list of node ids, e.g. [0, 2, 3, 6]
+                for i in range(len(path) - 1):
+                    u = path[i]
+                    v = path[i + 1]
+                    od_links.add(f"{u}-{v}")
+
     link_avg_travel_times = []
     
     for link_key, link_info in link_data.items():
+        # If we have OD-path links identified, restrict to them
+        if od_links and link_key not in od_links:
+            continue
+
         travel_time_array = link_info.get('travel_time', [])
         
         if not travel_time_array:
@@ -700,7 +946,7 @@ def compute_network_travel_time(simulation_dir=None):
             # Calculate average travel time for this link
             link_avg_travel_times.append(np.mean(valid_times))
     
-    # Compute average across all links
+    # Compute average across selected links
     if link_avg_travel_times:
         avg_travel_time = np.mean(link_avg_travel_times)
     else:
@@ -1164,7 +1410,7 @@ def compute_agent_local_metrics(simulation_dir=None, dataset=None):
     return agent_metrics
 
 
-def compute_network_congestion_metric(simulation_dir=None, threshold_ratio=0.7):
+def compute_network_congestion_metric(simulation_dir=None):
     """
     Compute congestion metric using density-normalized approach.
     
@@ -1174,11 +1420,10 @@ def compute_network_congestion_metric(simulation_dir=None, threshold_ratio=0.7):
     
     Formula:
         NormalizedDensity[t] = density[t] / k_jam
-        CongestionTime = sum_{links, t} max(0, NormalizedDensity[t] - threshold) * area * dt
+        CongestionTime = sum_{links, t} max(0, density[t] - k_critical) * area * dt
         
     Args:
         simulation_dir: Path to saved simulation directory
-        threshold_ratio: Threshold for congestion (default 0.7 = 70% of jam density)
         
     Returns:
         dict: {
@@ -1219,6 +1464,7 @@ def compute_network_congestion_metric(simulation_dir=None, threshold_ratio=0.7):
         density_array = link_info.get('density', [])
         params = link_info.get('parameters', {})
         k_jam = params.get('k_jam', 1.0)
+        k_critical = params.get('k_critical', 1.0)
         length = params.get('length', 1.0)
         width = params.get('width', 1.0)
         area = length * width
@@ -1231,7 +1477,7 @@ def compute_network_congestion_metric(simulation_dir=None, threshold_ratio=0.7):
                 continue
             
             # Normalize density by jam density
-            normalized_density = density / k_jam
+            # normalized_density = density / k_jam
             
             # Area-time for this link-timestep
             area_time = area * unit_time
@@ -1239,10 +1485,12 @@ def compute_network_congestion_metric(simulation_dir=None, threshold_ratio=0.7):
             total_timesteps += 1
             
             # Check if congested (above threshold)
-            if normalized_density > threshold_ratio:
+            # if normalized_density > threshold_ratio:
+            if density > k_critical:
                 congestion_timesteps += 1
                 # Weight by excess density above threshold
-                excess_density = normalized_density - threshold_ratio
+                # excess_density = normalized_density - threshold_ratio
+                excess_density = density - k_critical
                 total_congestion_time += excess_density * area_time
     
     # Compute metrics
@@ -1261,8 +1509,7 @@ def compute_network_congestion_metric(simulation_dir=None, threshold_ratio=0.7):
     }
 
 
-def _evaluate_single_run(env, agents, delta_actions: bool, deterministic: bool,
-                         seed: int, no_control: bool, randomize: bool):
+def _evaluate_single_run(env, agents, delta_actions: bool, deterministic: bool, no_control: bool, randomize: bool):
     """Run a single evaluation episode. Internal helper function."""
     # Lazy import to avoid circular dependency (import only when function is called)
     from rl.agents.PPO import PPOAgent
@@ -1271,8 +1518,9 @@ def _evaluate_single_run(env, agents, delta_actions: bool, deterministic: bool,
     from rl.agents.optimization_based import DecentralizedOptimizationAgent
     
     # Reset environment with specified settings
+    # Note: seed is not passed to reset() - it should be set at env construction time
     reset_options = {'randomize': randomize} if randomize else None
-    obs, infos = env.reset(seed=seed, options=reset_options)
+    obs, infos = env.reset(options=reset_options)
     
     # Initialize state history queues for stacked observations (for agents that need them)
     state_history_queue = {}
@@ -1292,6 +1540,7 @@ def _evaluate_single_run(env, agents, delta_actions: bool, deterministic: bool,
             agent._build_topology_cache()
     
     episode_rewards = {agent_id: 0.0 for agent_id in agents.keys()}
+    episode_true_rewards = {agent_id: 0.0 for agent_id in agents.keys()}  # Track true (un-normalized) rewards
     done = False
     # step = 0
     while not done:
@@ -1341,21 +1590,27 @@ def _evaluate_single_run(env, agents, delta_actions: bool, deterministic: bool,
             state_history_queue[agent_id].append(next_obs[agent_id])
             state_stack[agent_id] = np.array(state_history_queue[agent_id])
         
-        # Accumulate rewards
+        # Accumulate rewards (both normalized and true)
         for agent_id in agents.keys():
             episode_rewards[agent_id] += rewards[agent_id]
+            # Use true reward from infos if available (when using RunningNormalizeWrapper)
+            if agent_id in infos and 'true_reward' in infos[agent_id]:
+                episode_true_rewards[agent_id] += infos[agent_id]['true_reward']
+            else:
+                episode_true_rewards[agent_id] += rewards[agent_id]
         
         obs = next_obs
         
         # Check if episode is done
         done = any(terms.values()) or any(truncs.values())
     
-    # Calculate summary metrics
-    total_reward = sum(episode_rewards.values())
-    avg_reward = np.mean(list(episode_rewards.values()))
+    # Calculate summary metrics using TRUE rewards for evaluation
+    total_reward = sum(episode_true_rewards.values())
+    avg_reward = np.mean(list(episode_true_rewards.values()))
     
     return {
-        'episode_rewards': episode_rewards,
+        'episode_rewards': episode_true_rewards,  # Return true rewards for evaluation
+        'episode_normalized_rewards': episode_rewards,  # Also return normalized for reference
         'avg_reward': avg_reward,
         'total_reward': total_reward
     }
@@ -1413,13 +1668,13 @@ def evaluate_agents(env, agents, delta_actions: bool = False, deterministic: boo
                 run_seed = seed + run_idx  # Different seed for each run
             else:
                 run_seed = seed
-        
+        env.seed(run_seed)
         if verbose and num_runs > 1:
             print(f"  Run {run_idx + 1}/{num_runs}...", end=' ', flush=True)
         
         # Run single evaluation
         result = _evaluate_single_run(env, agents, delta_actions, deterministic,
-                                      run_seed, no_control, randomize)
+                                      no_control, randomize)
         
         all_runs.append(result)
         total_rewards.append(result['total_reward'])

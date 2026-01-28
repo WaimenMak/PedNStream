@@ -179,6 +179,11 @@ class PedNetParallelEnv(ParallelEnv):
         Returns:
             Tuple of (observations, rewards, terminations, truncations, infos)
         """
+        # record the actions for current step
+        self.current_actions = actions
+        if self.last_actions is None:
+            self.last_actions = actions
+
         # Validate actions
         for agent_id, action in actions.items():
             if agent_id not in self.possible_agents:

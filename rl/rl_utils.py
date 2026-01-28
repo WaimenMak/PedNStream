@@ -1561,9 +1561,9 @@ def _evaluate_single_run(env, agents, delta_actions: bool, deterministic: bool, 
                 
                 # Check if agent has deterministic option (PPOAgent)
                 if hasattr(agent, 'take_action'):
-                    if isinstance(agent, (PPOAgent, SACAgent)):
-                        action = agent.take_action(agent_state, deterministic=deterministic)
-                    elif isinstance(agent, DecentralizedOptimizationAgent):
+                    # if isinstance(agent, PPOAgent) or isinstance(agent, SACAgent):
+                    #     action = agent.take_action(agent_state, deterministic=deterministic)
+                    if isinstance(agent, DecentralizedOptimizationAgent):
                         # Agent doesn't support deterministic kwarg
                         # action = agent.take_action(agent_state, time_step=env.sim_step-1)
                         action = agent.take_action(agent_state, time_step=env.sim_step-1)

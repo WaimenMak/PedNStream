@@ -877,9 +877,33 @@ def train_on_policy_multi_agent(env, agents, delta_actions=False, num_episodes=5
                 # Increment global episode counter
                 global_episode += 1
 
-                # Save all agents when average return across agents achieves new best (using TRUE rewards)
-                if agents_saved_dir and global_episode > num_episodes/2: # save after half of the training
-                    best_avg_return = save_with_best_return(agents, agents_saved_dir, episode_returns=episode_true_returns, best_avg_return=best_avg_return, global_episode=global_episode)
+                # Log rewards to wandb after each update step
+                if use_wandb and WANDB_AVAILABLE and wandb.run is not None:
+                    log_dict = {
+                        'episode': global_episode,
+                        'avg_normalized_return': np.mean(list(episode_returns.values())),
+                        'avg_true_return': np.mean(list(episode_true_returns.values())),
+                        'total_normalized_return': sum(episode_returns.values()),
+                        'total_true_return': sum(episode_true_returns.values()),
+                        'episode_steps': step
+                    }
+                    # Log per-agent rewards
+                    for agent_id in agents.keys():
+                        log_dict[f'agent_{agent_id}_normalized_return'] = episode_returns[agent_id]
+                        log_dict[f'agent_{agent_id}_true_return'] = episode_true_returns[agent_id]
+                    wandb.log(log_dict)
+
+                # Run validation and save best model (after half of training, every val_freq episodes)
+                if agents_saved_dir and global_episode > num_episodes/2 and global_episode % val_freq == 0:
+                    best_avg_return = validate_and_save_best(
+                        env, agents, agents_saved_dir,
+                        delta_actions=delta_actions,
+                        num_val_episodes=num_val_episodes,
+                        randomize=True,
+                        best_avg_return=best_avg_return,
+                        global_episode=global_episode,
+                        use_wandb=use_wandb and WANDB_AVAILABLE
+                    )
                 # Update progress bar with both normalized and true returns
                 if (i_episode+1) % 10 == 0:
                     avg_return = np.mean([np.mean(return_dict[aid][-10:]) for aid in agents.keys()])

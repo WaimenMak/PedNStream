@@ -196,7 +196,7 @@ def evaluate_policy(checkpoint_path, dataset="nine_intersections", num_episodes=
     episode_lengths = []
     
     for episode in range(num_episodes):
-        obs, infos = base_env.reset(seed=episode)
+        obs, infos = base_env.reset()
         episode_reward = {agent_id: 0.0 for agent_id in base_env.possible_agents}
         episode_length = 0
         done = False

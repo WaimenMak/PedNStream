@@ -86,8 +86,10 @@ class PedNetSB3Wrapper:
         self.obs_dims = [space.shape[0] for space in obs_spaces]
     
     def reset(self, seed=None, options=None):
-        """Reset environment and return concatenated observation."""
-        obs_dict, infos = self.env.reset(seed=seed, options=options)
+        """Reset environment and return concatenated observation.
+        Note: seed parameter is ignored here - seed should be set at env construction.
+        """
+        obs_dict, infos = self.env.reset(options=options)
         
         # Concatenate observations
         obs_list = [obs_dict[agent] for agent in self.agents]

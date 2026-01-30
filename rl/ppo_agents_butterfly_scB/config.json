@@ -1,0 +1,58 @@
+{
+  "agent_configs": {
+    "gate_2": {
+      "obs_dim": 25,
+      "act_dim": 5,
+      "act_low": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "act_high": [
+        6.0,
+        2.0,
+        2.0,
+        2.0,
+        3.0
+      ],
+      "gamma": 0.99,
+      "lmbda": 0.96,
+      "epochs": 10,
+      "clip_eps": 0.2,
+      "entropy_coef": 0.01,
+      "entropy_coef_decay": 0.995,
+      "entropy_coef_min": 0,
+      "use_delta_actions": true,
+      "max_delta": 2.5,
+      "use_stacked_obs": false,
+      "use_gat_lstm": false,
+      "use_param_noise": false,
+      "param_noise_std": 0.1,
+      "param_noise_std_min": 0,
+      "use_action_noise": true,
+      "action_noise_std": 0.1,
+      "action_noise_std_min": 0.01,
+      "total_updates": 80,
+      "lstm_hidden_size": 64,
+      "num_lstm_layers": 1
+    }
+  },
+  "metadata": {
+    "episode": 150,
+    "val_avg_return": -515098.40625,
+    "val_episode_returns": [
+      -565981.4375,
+      -308787.53125,
+      -571331.3125,
+      -567204.25,
+      -562187.4375
+    ],
+    "val_agent_returns": {
+      "gate_2": -515098.40625
+    },
+    "num_val_episodes": 5
+  },
+  "saved_at": "2026-01-30T22:25:42.450269"
+}

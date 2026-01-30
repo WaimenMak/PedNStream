@@ -16,7 +16,7 @@
         4.0
       ],
       "stack_size": 10,
-      "hidden_size": 32,
+      "hidden_size": 128,
       "kernel_size": 4,
       "actor_lr": 0.0003,
       "critic_lr": 0.003,
@@ -26,16 +26,16 @@
       "gamma": 0.99,
       "buffer_size": 100000,
       "max_delta": 2.5,
-      "log_alpha": -10.753763198852539
+      "log_alpha": -13.368339538574219
     }
   },
   "metadata": {
-    "episode": 38,
-    "avg_return": -0.055129827276278034,
-    "best_avg_return": -0.055129827276278034,
+    "episode": 55,
+    "avg_return": 22.998354483967535,
+    "best_avg_return": 22.998354483967535,
     "individual_returns": {
-      "gate_24": -0.055129827276278034
+      "gate_24": 22.998354483967535
     }
   },
-  "saved_at": "2026-01-09T21:29:56.022449"
+  "saved_at": "2026-01-11T16:10:05.218424"
 }

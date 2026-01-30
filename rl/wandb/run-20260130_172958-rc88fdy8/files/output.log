@@ -1,0 +1,322 @@
+Iteration 0: 100%|██████████| 10/10 [00:21<00:00,  2.12s/it, episode=10, norm_ret=-8.902, true_ret=-571571.875, steps=600]
+Agent gate_2 episode reward: [-53.45309346]
+All agents episode reward: [-53.45309346]
+Agent gate_2 episode reward: [-16.17535509]
+All agents episode reward: [-16.17535509]
+Agent gate_2 episode reward: [-2.64569439]
+All agents episode reward: [-2.64569439]
+Agent gate_2 episode reward: [-1.88452552]
+All agents episode reward: [-1.88452552]
+Agent gate_2 episode reward: [-4.12584208]
+All agents episode reward: [-4.12584208]
+Agent gate_2 episode reward: [-2.04167783]
+All agents episode reward: [-2.04167783]
+Agent gate_2 episode reward: [-2.1124483]
+All agents episode reward: [-2.1124483]
+Agent gate_2 episode reward: [-2.10390555]
+All agents episode reward: [-2.10390555]
+Agent gate_2 episode reward: [-2.19274194]
+All agents episode reward: [-2.19274194]
+Agent gate_2 episode reward: [-2.28100188]
+All agents episode reward: [-2.28100188]
+Iteration 1: 100%|██████████| 10/10 [00:20<00:00,  2.10s/it, episode=20, norm_ret=-2.897, true_ret=-563619.938, steps=600]
+Agent gate_2 episode reward: [-2.36214064]
+All agents episode reward: [-2.36214064]
+Agent gate_2 episode reward: [-2.46056417]
+All agents episode reward: [-2.46056417]
+Agent gate_2 episode reward: [-2.53877872]
+All agents episode reward: [-2.53877872]
+Agent gate_2 episode reward: [-2.6387351]
+All agents episode reward: [-2.6387351]
+Agent gate_2 episode reward: [-2.73744629]
+All agents episode reward: [-2.73744629]
+Agent gate_2 episode reward: [-2.75918378]
+All agents episode reward: [-2.75918378]
+Agent gate_2 episode reward: [-2.83673061]
+All agents episode reward: [-2.83673061]
+Agent gate_2 episode reward: [-2.89556417]
+All agents episode reward: [-2.89556417]
+Agent gate_2 episode reward: [-4.7284017]
+All agents episode reward: [-4.7284017]
+Agent gate_2 episode reward: [-3.0158896]
+All agents episode reward: [-3.0158896]
+Iteration 2: 100%|██████████| 10/10 [00:22<00:00,  2.24s/it, episode=30, norm_ret=-3.393, true_ret=-575036.938, steps=600]
+Agent gate_2 episode reward: [-3.042251]
+All agents episode reward: [-3.042251]
+Agent gate_2 episode reward: [-3.18496261]
+All agents episode reward: [-3.18496261]
+Agent gate_2 episode reward: [-3.28757974]
+All agents episode reward: [-3.28757974]
+Agent gate_2 episode reward: [-3.2754671]
+All agents episode reward: [-3.2754671]
+Agent gate_2 episode reward: [-3.47157431]
+All agents episode reward: [-3.47157431]
+Agent gate_2 episode reward: [-3.49156925]
+All agents episode reward: [-3.49156925]
+Agent gate_2 episode reward: [-3.32780531]
+All agents episode reward: [-3.32780531]
+Agent gate_2 episode reward: [-3.53562157]
+All agents episode reward: [-3.53562157]
+Agent gate_2 episode reward: [-3.62816005]
+All agents episode reward: [-3.62816005]
+Agent gate_2 episode reward: [-3.68675755]
+All agents episode reward: [-3.68675755]
+Iteration 3: 100%|██████████| 10/10 [00:22<00:00,  2.20s/it, episode=40, norm_ret=-3.976, true_ret=-571612.750, steps=600]
+Agent gate_2 episode reward: [-3.83416153]
+All agents episode reward: [-3.83416153]
+Agent gate_2 episode reward: [-3.80183952]
+All agents episode reward: [-3.80183952]
+Agent gate_2 episode reward: [-3.83000812]
+All agents episode reward: [-3.83000812]
+Agent gate_2 episode reward: [-3.90455052]
+All agents episode reward: [-3.90455052]
+Agent gate_2 episode reward: [-3.96818113]
+All agents episode reward: [-3.96818113]
+Agent gate_2 episode reward: [-3.9976384]
+All agents episode reward: [-3.9976384]
+Agent gate_2 episode reward: [-4.01736754]
+All agents episode reward: [-4.01736754]
+Agent gate_2 episode reward: [-4.10526429]
+All agents episode reward: [-4.10526429]
+Agent gate_2 episode reward: [-4.12567455]
+All agents episode reward: [-4.12567455]
+Agent gate_2 episode reward: [-4.17135288]
+All agents episode reward: [-4.17135288]
+Iteration 4: 100%|██████████| 10/10 [00:22<00:00,  2.25s/it, episode=50, norm_ret=-4.415, true_ret=-574686.938, steps=600]
+Agent gate_2 episode reward: [-4.23874959]
+All agents episode reward: [-4.23874959]
+Agent gate_2 episode reward: [-4.30903748]
+All agents episode reward: [-4.30903748]
+Agent gate_2 episode reward: [-4.31188729]
+All agents episode reward: [-4.31188729]
+Agent gate_2 episode reward: [-4.13987536]
+All agents episode reward: [-4.13987536]
+Agent gate_2 episode reward: [-4.37545219]
+All agents episode reward: [-4.37545219]
+Agent gate_2 episode reward: [-4.49606357]
+All agents episode reward: [-4.49606357]
+Agent gate_2 episode reward: [-4.48882251]
+All agents episode reward: [-4.48882251]
+Agent gate_2 episode reward: [-4.5465725]
+All agents episode reward: [-4.5465725]
+Agent gate_2 episode reward: [-4.60941465]
+All agents episode reward: [-4.60941465]
+Agent gate_2 episode reward: [-4.63449777]
+All agents episode reward: [-4.63449777]
+Iteration 5: 100%|██████████| 10/10 [00:25<00:00,  2.54s/it, episode=60, norm_ret=-4.840, true_ret=-575600.812, steps=600]
+Agent gate_2 episode reward: [-4.66776758]
+All agents episode reward: [-4.66776758]
+Agent gate_2 episode reward: [-4.61601039]
+All agents episode reward: [-4.61601039]
+Agent gate_2 episode reward: [-4.76872442]
+All agents episode reward: [-4.76872442]
+Agent gate_2 episode reward: [-4.76101452]
+All agents episode reward: [-4.76101452]
+Agent gate_2 episode reward: [-4.80746337]
+All agents episode reward: [-4.80746337]
+Agent gate_2 episode reward: [-4.80563804]
+All agents episode reward: [-4.80563804]
+Agent gate_2 episode reward: [-4.8943929]
+All agents episode reward: [-4.8943929]
+Agent gate_2 episode reward: [-4.99352499]
+All agents episode reward: [-4.99352499]
+Agent gate_2 episode reward: [-5.05385101]
+All agents episode reward: [-5.05385101]
+Saved 1 agents to ppo_agents_butterfly_scA
+[Validation] New best avg return: -563376.562 at episode 60 (over 5 val episodes, saved to ppo_agents_butterfly_scA)
+Agent gate_2 episode reward: [-5.03328878]
+All agents episode reward: [-5.03328878]
+Iteration 6: 100%|██████████| 10/10 [00:26<00:00,  2.61s/it, episode=70, norm_ret=-5.822, true_ret=-619024.562, steps=600]
+Agent gate_2 episode reward: [-5.65918528]
+All agents episode reward: [-5.65918528]
+Agent gate_2 episode reward: [-5.62402455]
+All agents episode reward: [-5.62402455]
+Agent gate_2 episode reward: [-5.69616489]
+All agents episode reward: [-5.69616489]
+Agent gate_2 episode reward: [-5.75324317]
+All agents episode reward: [-5.75324317]
+Agent gate_2 episode reward: [-5.79895142]
+All agents episode reward: [-5.79895142]
+Agent gate_2 episode reward: [-5.94865979]
+All agents episode reward: [-5.94865979]
+Agent gate_2 episode reward: [-5.87195943]
+All agents episode reward: [-5.87195943]
+Agent gate_2 episode reward: [-5.93093573]
+All agents episode reward: [-5.93093573]
+Agent gate_2 episode reward: [-5.9582235]
+All agents episode reward: [-5.9582235]
+Agent gate_2 episode reward: [-5.98233696]
+All agents episode reward: [-5.98233696]
+Iteration 7: 100%|██████████| 10/10 [00:26<00:00,  2.66s/it, episode=80, norm_ret=-6.034, true_ret=-586184.250, steps=600]
+Agent gate_2 episode reward: [-5.82039703]
+All agents episode reward: [-5.82039703]
+Agent gate_2 episode reward: [-5.8977366]
+All agents episode reward: [-5.8977366]
+Agent gate_2 episode reward: [-5.94046814]
+All agents episode reward: [-5.94046814]
+Agent gate_2 episode reward: [-5.99571341]
+All agents episode reward: [-5.99571341]
+Agent gate_2 episode reward: [-6.43280932]
+All agents episode reward: [-6.43280932]
+Agent gate_2 episode reward: [-6.00946056]
+All agents episode reward: [-6.00946056]
+Agent gate_2 episode reward: [-5.95777089]
+All agents episode reward: [-5.95777089]
+Agent gate_2 episode reward: [-6.05806691]
+All agents episode reward: [-6.05806691]
+Agent gate_2 episode reward: [-6.09538891]
+All agents episode reward: [-6.09538891]
+Saved 1 agents to ppo_agents_butterfly_scA
+[Validation] New best avg return: -534455.125 at episode 80 (over 5 val episodes, saved to ppo_agents_butterfly_scA)
+Agent gate_2 episode reward: [-6.13000893]
+All agents episode reward: [-6.13000893]
+Iteration 8: 100%|██████████| 10/10 [00:26<00:00,  2.62s/it, episode=90, norm_ret=-6.640, true_ret=-605768.062, steps=600]
+Agent gate_2 episode reward: [-6.4908342]
+All agents episode reward: [-6.4908342]
+Agent gate_2 episode reward: [-6.58798589]
+All agents episode reward: [-6.58798589]
+Agent gate_2 episode reward: [-6.55091853]
+All agents episode reward: [-6.55091853]
+Agent gate_2 episode reward: [-6.58578435]
+All agents episode reward: [-6.58578435]
+Agent gate_2 episode reward: [-6.64443494]
+All agents episode reward: [-6.64443494]
+Agent gate_2 episode reward: [-6.6683624]
+All agents episode reward: [-6.6683624]
+Agent gate_2 episode reward: [-6.67432738]
+All agents episode reward: [-6.67432738]
+Agent gate_2 episode reward: [-6.72086239]
+All agents episode reward: [-6.72086239]
+Agent gate_2 episode reward: [-6.7201283]
+All agents episode reward: [-6.7201283]
+Agent gate_2 episode reward: [-6.76136096]
+All agents episode reward: [-6.76136096]
+Iteration 9: 100%|██████████| 10/10 [00:26<00:00,  2.67s/it, episode=100, norm_ret=-5.237, true_ret=-476806.406, steps=600]
+Agent gate_2 episode reward: [-5.08523324]
+All agents episode reward: [-5.08523324]
+Agent gate_2 episode reward: [-5.16316001]
+All agents episode reward: [-5.16316001]
+Agent gate_2 episode reward: [-5.24157007]
+All agents episode reward: [-5.24157007]
+Agent gate_2 episode reward: [-5.14372736]
+All agents episode reward: [-5.14372736]
+Agent gate_2 episode reward: [-5.17065738]
+All agents episode reward: [-5.17065738]
+Agent gate_2 episode reward: [-5.21270403]
+All agents episode reward: [-5.21270403]
+Agent gate_2 episode reward: [-5.19745897]
+All agents episode reward: [-5.19745897]
+Agent gate_2 episode reward: [-5.18450015]
+All agents episode reward: [-5.18450015]
+Agent gate_2 episode reward: [-5.34824481]
+All agents episode reward: [-5.34824481]
+Agent gate_2 episode reward: [-5.62140736]
+All agents episode reward: [-5.62140736]
+Loaded 1 agents from ppo_agents_butterfly_scA
+Running 10 evaluation runs...
+  Run 1/10... Avg agent reward (episode): -272727.625 | Total reward: -272727.625
+Saved run 1 to rl_training/butterfly_scA/ppo_run1
+  Run 2/10... Avg agent reward (episode): -490689.875 | Total reward: -490689.875
+Saved run 2 to rl_training/butterfly_scA/ppo_run2
+  Run 3/10... Avg agent reward (episode): -597446.125 | Total reward: -597446.125
+Saved run 3 to rl_training/butterfly_scA/ppo_run3
+  Run 4/10... Avg agent reward (episode): -532406.125 | Total reward: -532406.125
+Saved run 4 to rl_training/butterfly_scA/ppo_run4
+  Run 5/10... Avg agent reward (episode): -622170.562 | Total reward: -622170.562
+Saved run 5 to rl_training/butterfly_scA/ppo_run5
+  Run 6/10... Avg agent reward (episode): -592498.812 | Total reward: -592498.812
+Saved run 6 to rl_training/butterfly_scA/ppo_run6
+  Run 7/10... Avg agent reward (episode): -598949.812 | Total reward: -598949.812
+Saved run 7 to rl_training/butterfly_scA/ppo_run7
+  Run 8/10... Avg agent reward (episode): -550361.875 | Total reward: -550361.875
+Saved run 8 to rl_training/butterfly_scA/ppo_run8
+  Run 9/10... Avg agent reward (episode): -590151.062 | Total reward: -590151.062
+Saved run 9 to rl_training/butterfly_scA/ppo_run9
+  Run 10/10... Avg agent reward (episode): -617299.062 | Total reward: -617299.062
+Saved run 10 to rl_training/butterfly_scA/ppo_run10
+============================================================
+Evaluation Results
+  Number of runs: 10
+============================================================
+  Agent gate_2: -546470.125 ± 99189.703
+  Average reward: -546470.125 ± 99189.703
+  Total reward: -546470.125 ± 99189.703
+============================================================
+Running 10 evaluation runs...
+  Run 1/10... Avg agent reward (episode): -272727.625 | Total reward: -272727.625
+Saved run 1 to rl_training/butterfly_scA/rule_based_run1
+  Run 2/10... Avg agent reward (episode): -490689.875 | Total reward: -490689.875
+Saved run 2 to rl_training/butterfly_scA/rule_based_run2
+  Run 3/10... Avg agent reward (episode): -597446.125 | Total reward: -597446.125
+Saved run 3 to rl_training/butterfly_scA/rule_based_run3
+  Run 4/10... Avg agent reward (episode): -532406.125 | Total reward: -532406.125
+Saved run 4 to rl_training/butterfly_scA/rule_based_run4
+  Run 5/10... Avg agent reward (episode): -622170.562 | Total reward: -622170.562
+Saved run 5 to rl_training/butterfly_scA/rule_based_run5
+  Run 6/10... Avg agent reward (episode): -592498.812 | Total reward: -592498.812
+Saved run 6 to rl_training/butterfly_scA/rule_based_run6
+  Run 7/10... Avg agent reward (episode): -598949.812 | Total reward: -598949.812
+Saved run 7 to rl_training/butterfly_scA/rule_based_run7
+  Run 8/10... Avg agent reward (episode): -550361.875 | Total reward: -550361.875
+Saved run 8 to rl_training/butterfly_scA/rule_based_run8
+  Run 9/10... Avg agent reward (episode): -590151.062 | Total reward: -590151.062
+Saved run 9 to rl_training/butterfly_scA/rule_based_run9
+  Run 10/10... Avg agent reward (episode): -617299.062 | Total reward: -617299.062
+Saved run 10 to rl_training/butterfly_scA/rule_based_run10
+============================================================
+Evaluation Results
+  Number of runs: 10
+============================================================
+  Agent gate_2: -546470.125 ± 99189.703
+  Average reward: -546470.125 ± 99189.703
+  Total reward: -546470.125 ± 99189.703
+============================================================
+Running 10 evaluation runs...
+  Run 1/10... No actions provided, skipping action application.
+Avg agent reward (episode): -272727.625 | Total reward: -272727.625
+Saved run 1 to rl_training/butterfly_scA/no_control_run1
+  Run 2/10... No actions provided, skipping action application.
+Avg agent reward (episode): -490689.875 | Total reward: -490689.875
+Saved run 2 to rl_training/butterfly_scA/no_control_run2
+  Run 3/10... No actions provided, skipping action application.
+Avg agent reward (episode): -597446.125 | Total reward: -597446.125
+Saved run 3 to rl_training/butterfly_scA/no_control_run3
+  Run 4/10... No actions provided, skipping action application.
+Avg agent reward (episode): -532406.125 | Total reward: -532406.125
+Saved run 4 to rl_training/butterfly_scA/no_control_run4
+  Run 5/10... No actions provided, skipping action application.
+Avg agent reward (episode): -622170.562 | Total reward: -622170.562
+Saved run 5 to rl_training/butterfly_scA/no_control_run5
+  Run 6/10... No actions provided, skipping action application.
+Avg agent reward (episode): -592498.812 | Total reward: -592498.812
+Saved run 6 to rl_training/butterfly_scA/no_control_run6
+  Run 7/10... No actions provided, skipping action application.
+Avg agent reward (episode): -598949.812 | Total reward: -598949.812
+Saved run 7 to rl_training/butterfly_scA/no_control_run7
+  Run 8/10... No actions provided, skipping action application.
+Avg agent reward (episode): -550361.875 | Total reward: -550361.875
+Saved run 8 to rl_training/butterfly_scA/no_control_run8
+  Run 9/10... No actions provided, skipping action application.
+Avg agent reward (episode): -590151.062 | Total reward: -590151.062
+Saved run 9 to rl_training/butterfly_scA/no_control_run9
+  Run 10/10... No actions provided, skipping action application.
+Avg agent reward (episode): -617299.062 | Total reward: -617299.062
+Saved run 10 to rl_training/butterfly_scA/no_control_run10
+============================================================
+Evaluation Results
+  Number of runs: 10
+============================================================
+  Agent gate_2: -546470.125 ± 99189.703
+  Average reward: -546470.125 ± 99189.703
+  Total reward: -546470.125 ± 99189.703
+============================================================
+
+============================================================
+Comparison of All Methods
+============================================================
+ppo avg reward:        -546470.125
+Rule-based avg reward: -546470.125
+No control avg reward: -546470.125
+============================================================
+/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/matplotlib/patches.py:3421: RuntimeWarning: invalid value encountered in scalar divide
+  cos_t, sin_t = head_length / head_dist, head_width / head_dist

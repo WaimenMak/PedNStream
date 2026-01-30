@@ -1,0 +1,1972 @@
+2026-01-30 15:20:34,182 INFO    MainThread:19616 [wandb_setup.py:_flush():81] Current SDK version is 0.24.0
+2026-01-30 15:20:34,182 INFO    MainThread:19616 [wandb_setup.py:_flush():81] Configure stats pid to 19616
+2026-01-30 15:20:34,182 INFO    MainThread:19616 [wandb_setup.py:_flush():81] Loading settings from environment variables
+2026-01-30 15:20:34,182 INFO    MainThread:19616 [wandb_init.py:setup_run_log_directory():717] Logging user logs to /Users/mmai/Devs/Crowd-Control/rl/wandb/run-20260130_152034-pn876h76/logs/debug.log
+2026-01-30 15:20:34,182 INFO    MainThread:19616 [wandb_init.py:setup_run_log_directory():718] Logging internal logs to /Users/mmai/Devs/Crowd-Control/rl/wandb/run-20260130_152034-pn876h76/logs/debug-internal.log
+2026-01-30 15:20:34,182 INFO    MainThread:19616 [wandb_init.py:init():844] calling init triggers
+2026-01-30 15:20:34,182 INFO    MainThread:19616 [wandb_init.py:init():849] wandb.init called with sweep_config: {}
+config: {'_wandb': {}}
+2026-01-30 15:20:34,182 INFO    MainThread:19616 [wandb_init.py:init():892] starting backend
+2026-01-30 15:20:34,689 INFO    MainThread:19616 [wandb_init.py:init():895] sending inform_init request
+2026-01-30 15:20:34,729 INFO    MainThread:19616 [wandb_init.py:init():903] backend started and connected
+2026-01-30 15:20:34,733 INFO    MainThread:19616 [wandb_init.py:init():973] updated telemetry
+2026-01-30 15:20:34,772 INFO    MainThread:19616 [wandb_init.py:init():997] communicating run to backend with 90.0 second timeout
+2026-01-30 15:20:35,302 INFO    MainThread:19616 [wandb_init.py:init():1044] starting run threads in backend
+2026-01-30 15:20:35,452 INFO    MainThread:19616 [wandb_run.py:_console_start():2529] atexit reg
+2026-01-30 15:20:35,452 INFO    MainThread:19616 [wandb_run.py:_redirect():2377] redirect: wrap_raw
+2026-01-30 15:20:35,452 INFO    MainThread:19616 [wandb_run.py:_redirect():2446] Wrapping output streams.
+2026-01-30 15:20:35,452 INFO    MainThread:19616 [wandb_run.py:_redirect():2469] Redirects installed.
+2026-01-30 15:20:35,454 INFO    MainThread:19616 [wandb_init.py:init():1084] run started, returning control to user process
+2026-01-30 15:25:10,046 INFO    wandb-AsyncioManager-main:19616 [service_client.py:_forward_responses():80] Reached EOF.
+2026-01-30 15:25:10,046 INFO    wandb-AsyncioManager-main:19616 [mailbox.py:close():137] Closing mailbox, abandoning 1 handles.
+2026-01-30 15:25:10,050 ERROR   wandb-AsyncioManager-main:19616 [asyncio_manager.py:fn_wrap_exceptions():183] Uncaught exception in run_soon callback.
+Traceback (most recent call last):
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 392, in drain
+    await self._protocol._drain_helper()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 166, in _drain_helper
+    raise ConnectionResetError('Connection lost')
+ConnectionResetError: Connection lost
+2026-01-30 15:25:10,052 ERROR   wandb-AsyncioManager-main:19616 [asyncio_manager.py:fn_wrap_exceptions():183] Uncaught exception in run_soon callback.
+Traceback (most recent call last):
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 392, in drain
+    await self._protocol._drain_helper()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 166, in _drain_helper
+    raise ConnectionResetError('Connection lost')
+ConnectionResetError: Connection lost
+2026-01-30 15:25:10,052 ERROR   wandb-AsyncioManager-main:19616 [asyncio_manager.py:fn_wrap_exceptions():183] Uncaught exception in run_soon callback.
+Traceback (most recent call last):
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 392, in drain
+    await self._protocol._drain_helper()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 166, in _drain_helper
+    raise ConnectionResetError('Connection lost')
+ConnectionResetError: Connection lost
+2026-01-30 15:25:10,052 ERROR   wandb-AsyncioManager-main:19616 [asyncio_manager.py:fn_wrap_exceptions():183] Uncaught exception in run_soon callback.
+Traceback (most recent call last):
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 392, in drain
+    await self._protocol._drain_helper()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 166, in _drain_helper
+    raise ConnectionResetError('Connection lost')
+ConnectionResetError: Connection lost
+2026-01-30 15:25:10,052 ERROR   wandb-AsyncioManager-main:19616 [asyncio_manager.py:fn_wrap_exceptions():183] Uncaught exception in run_soon callback.
+Traceback (most recent call last):
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 392, in drain
+    await self._protocol._drain_helper()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 166, in _drain_helper
+    raise ConnectionResetError('Connection lost')
+ConnectionResetError: Connection lost
+2026-01-30 15:25:10,052 ERROR   wandb-AsyncioManager-main:19616 [asyncio_manager.py:fn_wrap_exceptions():183] Uncaught exception in run_soon callback.
+Traceback (most recent call last):
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 392, in drain
+    await self._protocol._drain_helper()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 166, in _drain_helper
+    raise ConnectionResetError('Connection lost')
+ConnectionResetError: Connection lost
+2026-01-30 15:25:10,052 ERROR   wandb-AsyncioManager-main:19616 [asyncio_manager.py:fn_wrap_exceptions():183] Uncaught exception in run_soon callback.
+Traceback (most recent call last):
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 392, in drain
+    await self._protocol._drain_helper()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 166, in _drain_helper
+    raise ConnectionResetError('Connection lost')
+ConnectionResetError: Connection lost
+2026-01-30 15:25:10,053 ERROR   wandb-AsyncioManager-main:19616 [asyncio_manager.py:fn_wrap_exceptions():183] Uncaught exception in run_soon callback.
+Traceback (most recent call last):
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 392, in drain
+    await self._protocol._drain_helper()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 166, in _drain_helper
+    raise ConnectionResetError('Connection lost')
+ConnectionResetError: Connection lost
+2026-01-30 15:25:10,053 ERROR   wandb-AsyncioManager-main:19616 [asyncio_manager.py:fn_wrap_exceptions():183] Uncaught exception in run_soon callback.
+Traceback (most recent call last):
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 392, in drain
+    await self._protocol._drain_helper()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 166, in _drain_helper
+    raise ConnectionResetError('Connection lost')
+ConnectionResetError: Connection lost
+2026-01-30 15:25:10,053 ERROR   wandb-AsyncioManager-main:19616 [asyncio_manager.py:fn_wrap_exceptions():183] Uncaught exception in run_soon callback.
+Traceback (most recent call last):
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 392, in drain
+    await self._protocol._drain_helper()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 166, in _drain_helper
+    raise ConnectionResetError('Connection lost')
+ConnectionResetError: Connection lost
+2026-01-30 15:25:10,053 ERROR   wandb-AsyncioManager-main:19616 [asyncio_manager.py:fn_wrap_exceptions():183] Uncaught exception in run_soon callback.
+Traceback (most recent call last):
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 392, in drain
+    await self._protocol._drain_helper()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 166, in _drain_helper
+    raise ConnectionResetError('Connection lost')
+ConnectionResetError: Connection lost
+2026-01-30 15:25:10,054 ERROR   wandb-AsyncioManager-main:19616 [asyncio_manager.py:fn_wrap_exceptions():183] Uncaught exception in run_soon callback.
+Traceback (most recent call last):
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 392, in drain
+    await self._protocol._drain_helper()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 166, in _drain_helper
+    raise ConnectionResetError('Connection lost')
+ConnectionResetError: Connection lost
+2026-01-30 15:25:10,054 ERROR   wandb-AsyncioManager-main:19616 [asyncio_manager.py:fn_wrap_exceptions():183] Uncaught exception in run_soon callback.
+Traceback (most recent call last):
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 392, in drain
+    await self._protocol._drain_helper()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 166, in _drain_helper
+    raise ConnectionResetError('Connection lost')
+ConnectionResetError: Connection lost
+2026-01-30 15:25:10,054 ERROR   wandb-AsyncioManager-main:19616 [asyncio_manager.py:fn_wrap_exceptions():183] Uncaught exception in run_soon callback.
+Traceback (most recent call last):
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 392, in drain
+    await self._protocol._drain_helper()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 166, in _drain_helper
+    raise ConnectionResetError('Connection lost')
+ConnectionResetError: Connection lost
+2026-01-30 15:25:10,054 ERROR   wandb-AsyncioManager-main:19616 [asyncio_manager.py:fn_wrap_exceptions():183] Uncaught exception in run_soon callback.
+Traceback (most recent call last):
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 392, in drain
+    await self._protocol._drain_helper()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 166, in _drain_helper
+    raise ConnectionResetError('Connection lost')
+ConnectionResetError: Connection lost
+2026-01-30 15:25:10,054 ERROR   wandb-AsyncioManager-main:19616 [asyncio_manager.py:fn_wrap_exceptions():183] Uncaught exception in run_soon callback.
+Traceback (most recent call last):
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 392, in drain
+    await self._protocol._drain_helper()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 166, in _drain_helper
+    raise ConnectionResetError('Connection lost')
+ConnectionResetError: Connection lost
+2026-01-30 15:25:10,054 ERROR   wandb-AsyncioManager-main:19616 [asyncio_manager.py:fn_wrap_exceptions():183] Uncaught exception in run_soon callback.
+Traceback (most recent call last):
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 392, in drain
+    await self._protocol._drain_helper()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 166, in _drain_helper
+    raise ConnectionResetError('Connection lost')
+ConnectionResetError: Connection lost
+2026-01-30 15:25:10,054 ERROR   wandb-AsyncioManager-main:19616 [asyncio_manager.py:fn_wrap_exceptions():183] Uncaught exception in run_soon callback.
+Traceback (most recent call last):
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 392, in drain
+    await self._protocol._drain_helper()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 166, in _drain_helper
+    raise ConnectionResetError('Connection lost')
+ConnectionResetError: Connection lost
+2026-01-30 15:25:10,055 ERROR   wandb-AsyncioManager-main:19616 [asyncio_manager.py:fn_wrap_exceptions():183] Uncaught exception in run_soon callback.
+Traceback (most recent call last):
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_connection.py", line 65, in teardown_atexit
+    conn.teardown(hooks.exit_code)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_connection.py", line 310, in teardown
+    self._asyncer.run(publish_teardown_and_close)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 136, in run
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/concurrent/futures/_base.py", line 456, in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/concurrent/futures/_base.py", line 401, in __get_result
+    raise self._exception
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 219, in _wrap
+    return await fn()
+           ^^^^^^^^^^
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_connection.py", line 301, in publish_teardown_and_close
+    await self._client.publish(
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/selector_events.py", line 1061, in write
+    n = self._sock.send(data)
+        ^^^^^^^^^^^^^^^^^^^^^
+BrokenPipeError: [Errno 32] Broken pipe
+2026-01-30 15:25:10,196 ERROR   wandb-AsyncioManager-main:19616 [asyncio_manager.py:fn_wrap_exceptions():183] Uncaught exception in run_soon callback.
+Traceback (most recent call last):
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_connection.py", line 65, in teardown_atexit
+    conn.teardown(hooks.exit_code)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_connection.py", line 310, in teardown
+    self._asyncer.run(publish_teardown_and_close)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 136, in run
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/concurrent/futures/_base.py", line 456, in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/concurrent/futures/_base.py", line 401, in __get_result
+    raise self._exception
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 219, in _wrap
+    return await fn()
+           ^^^^^^^^^^
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_connection.py", line 301, in publish_teardown_and_close
+    await self._client.publish(
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/selector_events.py", line 1061, in write
+    n = self._sock.send(data)
+        ^^^^^^^^^^^^^^^^^^^^^
+BrokenPipeError: [Errno 32] Broken pipe
+2026-01-30 15:25:10,197 ERROR   wandb-AsyncioManager-main:19616 [asyncio_manager.py:fn_wrap_exceptions():183] Uncaught exception in run_soon callback.
+Traceback (most recent call last):
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_connection.py", line 65, in teardown_atexit
+    conn.teardown(hooks.exit_code)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_connection.py", line 310, in teardown
+    self._asyncer.run(publish_teardown_and_close)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 136, in run
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/concurrent/futures/_base.py", line 456, in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/concurrent/futures/_base.py", line 401, in __get_result
+    raise self._exception
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 219, in _wrap
+    return await fn()
+           ^^^^^^^^^^
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_connection.py", line 301, in publish_teardown_and_close
+    await self._client.publish(
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/selector_events.py", line 1061, in write
+    n = self._sock.send(data)
+        ^^^^^^^^^^^^^^^^^^^^^
+BrokenPipeError: [Errno 32] Broken pipe
+2026-01-30 15:25:10,198 ERROR   wandb-AsyncioManager-main:19616 [asyncio_manager.py:fn_wrap_exceptions():183] Uncaught exception in run_soon callback.
+Traceback (most recent call last):
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_connection.py", line 65, in teardown_atexit
+    conn.teardown(hooks.exit_code)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_connection.py", line 310, in teardown
+    self._asyncer.run(publish_teardown_and_close)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 136, in run
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/concurrent/futures/_base.py", line 456, in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/concurrent/futures/_base.py", line 401, in __get_result
+    raise self._exception
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 219, in _wrap
+    return await fn()
+           ^^^^^^^^^^
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_connection.py", line 301, in publish_teardown_and_close
+    await self._client.publish(
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/selector_events.py", line 1061, in write
+    n = self._sock.send(data)
+        ^^^^^^^^^^^^^^^^^^^^^
+BrokenPipeError: [Errno 32] Broken pipe
+2026-01-30 15:25:10,199 ERROR   wandb-AsyncioManager-main:19616 [asyncio_manager.py:fn_wrap_exceptions():183] Uncaught exception in run_soon callback.
+Traceback (most recent call last):
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_connection.py", line 65, in teardown_atexit
+    conn.teardown(hooks.exit_code)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_connection.py", line 310, in teardown
+    self._asyncer.run(publish_teardown_and_close)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 136, in run
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/concurrent/futures/_base.py", line 456, in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/concurrent/futures/_base.py", line 401, in __get_result
+    raise self._exception
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 219, in _wrap
+    return await fn()
+           ^^^^^^^^^^
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_connection.py", line 301, in publish_teardown_and_close
+    await self._client.publish(
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/selector_events.py", line 1061, in write
+    n = self._sock.send(data)
+        ^^^^^^^^^^^^^^^^^^^^^
+BrokenPipeError: [Errno 32] Broken pipe
+2026-01-30 15:25:10,199 ERROR   wandb-AsyncioManager-main:19616 [asyncio_manager.py:fn_wrap_exceptions():183] Uncaught exception in run_soon callback.
+Traceback (most recent call last):
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_connection.py", line 65, in teardown_atexit
+    conn.teardown(hooks.exit_code)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_connection.py", line 310, in teardown
+    self._asyncer.run(publish_teardown_and_close)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 136, in run
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/concurrent/futures/_base.py", line 456, in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/concurrent/futures/_base.py", line 401, in __get_result
+    raise self._exception
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 219, in _wrap
+    return await fn()
+           ^^^^^^^^^^
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_connection.py", line 301, in publish_teardown_and_close
+    await self._client.publish(
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/selector_events.py", line 1061, in write
+    n = self._sock.send(data)
+        ^^^^^^^^^^^^^^^^^^^^^
+BrokenPipeError: [Errno 32] Broken pipe
+2026-01-30 15:25:10,200 ERROR   wandb-AsyncioManager-main:19616 [asyncio_manager.py:fn_wrap_exceptions():183] Uncaught exception in run_soon callback.
+Traceback (most recent call last):
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_connection.py", line 65, in teardown_atexit
+    conn.teardown(hooks.exit_code)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_connection.py", line 310, in teardown
+    self._asyncer.run(publish_teardown_and_close)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 136, in run
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/concurrent/futures/_base.py", line 456, in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/concurrent/futures/_base.py", line 401, in __get_result
+    raise self._exception
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 219, in _wrap
+    return await fn()
+           ^^^^^^^^^^
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_connection.py", line 301, in publish_teardown_and_close
+    await self._client.publish(
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/selector_events.py", line 1061, in write
+    n = self._sock.send(data)
+        ^^^^^^^^^^^^^^^^^^^^^
+BrokenPipeError: [Errno 32] Broken pipe
+2026-01-30 15:25:10,200 ERROR   wandb-AsyncioManager-main:19616 [asyncio_manager.py:fn_wrap_exceptions():183] Uncaught exception in run_soon callback.
+Traceback (most recent call last):
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_connection.py", line 65, in teardown_atexit
+    conn.teardown(hooks.exit_code)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_connection.py", line 310, in teardown
+    self._asyncer.run(publish_teardown_and_close)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 136, in run
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/concurrent/futures/_base.py", line 456, in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/concurrent/futures/_base.py", line 401, in __get_result
+    raise self._exception
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 219, in _wrap
+    return await fn()
+           ^^^^^^^^^^
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_connection.py", line 301, in publish_teardown_and_close
+    await self._client.publish(
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/selector_events.py", line 1061, in write
+    n = self._sock.send(data)
+        ^^^^^^^^^^^^^^^^^^^^^
+BrokenPipeError: [Errno 32] Broken pipe
+2026-01-30 15:25:10,201 ERROR   wandb-AsyncioManager-main:19616 [asyncio_manager.py:fn_wrap_exceptions():183] Uncaught exception in run_soon callback.
+Traceback (most recent call last):
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_connection.py", line 65, in teardown_atexit
+    conn.teardown(hooks.exit_code)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_connection.py", line 310, in teardown
+    self._asyncer.run(publish_teardown_and_close)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 136, in run
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/concurrent/futures/_base.py", line 456, in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/concurrent/futures/_base.py", line 401, in __get_result
+    raise self._exception
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 219, in _wrap
+    return await fn()
+           ^^^^^^^^^^
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_connection.py", line 301, in publish_teardown_and_close
+    await self._client.publish(
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/selector_events.py", line 1061, in write
+    n = self._sock.send(data)
+        ^^^^^^^^^^^^^^^^^^^^^
+BrokenPipeError: [Errno 32] Broken pipe
+2026-01-30 15:25:10,202 ERROR   wandb-AsyncioManager-main:19616 [asyncio_manager.py:fn_wrap_exceptions():183] Uncaught exception in run_soon callback.
+Traceback (most recent call last):
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_connection.py", line 65, in teardown_atexit
+    conn.teardown(hooks.exit_code)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_connection.py", line 310, in teardown
+    self._asyncer.run(publish_teardown_and_close)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 136, in run
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/concurrent/futures/_base.py", line 456, in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/concurrent/futures/_base.py", line 401, in __get_result
+    raise self._exception
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 219, in _wrap
+    return await fn()
+           ^^^^^^^^^^
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_connection.py", line 301, in publish_teardown_and_close
+    await self._client.publish(
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/selector_events.py", line 1061, in write
+    n = self._sock.send(data)
+        ^^^^^^^^^^^^^^^^^^^^^
+BrokenPipeError: [Errno 32] Broken pipe
+2026-01-30 15:25:10,202 ERROR   wandb-AsyncioManager-main:19616 [asyncio_manager.py:fn_wrap_exceptions():183] Uncaught exception in run_soon callback.
+Traceback (most recent call last):
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_connection.py", line 65, in teardown_atexit
+    conn.teardown(hooks.exit_code)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_connection.py", line 310, in teardown
+    self._asyncer.run(publish_teardown_and_close)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 136, in run
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/concurrent/futures/_base.py", line 456, in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/concurrent/futures/_base.py", line 401, in __get_result
+    raise self._exception
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 219, in _wrap
+    return await fn()
+           ^^^^^^^^^^
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_connection.py", line 301, in publish_teardown_and_close
+    await self._client.publish(
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/selector_events.py", line 1061, in write
+    n = self._sock.send(data)
+        ^^^^^^^^^^^^^^^^^^^^^
+BrokenPipeError: [Errno 32] Broken pipe
+2026-01-30 15:25:10,203 ERROR   wandb-AsyncioManager-main:19616 [asyncio_manager.py:fn_wrap_exceptions():183] Uncaught exception in run_soon callback.
+Traceback (most recent call last):
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_connection.py", line 65, in teardown_atexit
+    conn.teardown(hooks.exit_code)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_connection.py", line 310, in teardown
+    self._asyncer.run(publish_teardown_and_close)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 136, in run
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/concurrent/futures/_base.py", line 456, in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/concurrent/futures/_base.py", line 401, in __get_result
+    raise self._exception
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 219, in _wrap
+    return await fn()
+           ^^^^^^^^^^
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_connection.py", line 301, in publish_teardown_and_close
+    await self._client.publish(
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/selector_events.py", line 1061, in write
+    n = self._sock.send(data)
+        ^^^^^^^^^^^^^^^^^^^^^
+BrokenPipeError: [Errno 32] Broken pipe
+2026-01-30 15:25:10,204 ERROR   wandb-AsyncioManager-main:19616 [asyncio_manager.py:fn_wrap_exceptions():183] Uncaught exception in run_soon callback.
+Traceback (most recent call last):
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_connection.py", line 65, in teardown_atexit
+    conn.teardown(hooks.exit_code)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_connection.py", line 310, in teardown
+    self._asyncer.run(publish_teardown_and_close)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 136, in run
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/concurrent/futures/_base.py", line 456, in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/concurrent/futures/_base.py", line 401, in __get_result
+    raise self._exception
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 219, in _wrap
+    return await fn()
+           ^^^^^^^^^^
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_connection.py", line 301, in publish_teardown_and_close
+    await self._client.publish(
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/selector_events.py", line 1061, in write
+    n = self._sock.send(data)
+        ^^^^^^^^^^^^^^^^^^^^^
+BrokenPipeError: [Errno 32] Broken pipe
+2026-01-30 15:25:10,205 ERROR   wandb-AsyncioManager-main:19616 [asyncio_manager.py:fn_wrap_exceptions():183] Uncaught exception in run_soon callback.
+Traceback (most recent call last):
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_connection.py", line 65, in teardown_atexit
+    conn.teardown(hooks.exit_code)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_connection.py", line 310, in teardown
+    self._asyncer.run(publish_teardown_and_close)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 136, in run
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/concurrent/futures/_base.py", line 456, in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/concurrent/futures/_base.py", line 401, in __get_result
+    raise self._exception
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 219, in _wrap
+    return await fn()
+           ^^^^^^^^^^
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_connection.py", line 301, in publish_teardown_and_close
+    await self._client.publish(
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/selector_events.py", line 1061, in write
+    n = self._sock.send(data)
+        ^^^^^^^^^^^^^^^^^^^^^
+BrokenPipeError: [Errno 32] Broken pipe
+2026-01-30 15:25:10,206 ERROR   wandb-AsyncioManager-main:19616 [asyncio_manager.py:fn_wrap_exceptions():183] Uncaught exception in run_soon callback.
+Traceback (most recent call last):
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_connection.py", line 65, in teardown_atexit
+    conn.teardown(hooks.exit_code)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_connection.py", line 310, in teardown
+    self._asyncer.run(publish_teardown_and_close)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 136, in run
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/concurrent/futures/_base.py", line 456, in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/concurrent/futures/_base.py", line 401, in __get_result
+    raise self._exception
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 219, in _wrap
+    return await fn()
+           ^^^^^^^^^^
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_connection.py", line 301, in publish_teardown_and_close
+    await self._client.publish(
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/selector_events.py", line 1061, in write
+    n = self._sock.send(data)
+        ^^^^^^^^^^^^^^^^^^^^^
+BrokenPipeError: [Errno 32] Broken pipe
+2026-01-30 15:25:10,207 ERROR   wandb-AsyncioManager-main:19616 [asyncio_manager.py:fn_wrap_exceptions():183] Uncaught exception in run_soon callback.
+Traceback (most recent call last):
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_connection.py", line 65, in teardown_atexit
+    conn.teardown(hooks.exit_code)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_connection.py", line 310, in teardown
+    self._asyncer.run(publish_teardown_and_close)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 136, in run
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/concurrent/futures/_base.py", line 456, in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/concurrent/futures/_base.py", line 401, in __get_result
+    raise self._exception
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 219, in _wrap
+    return await fn()
+           ^^^^^^^^^^
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_connection.py", line 301, in publish_teardown_and_close
+    await self._client.publish(
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/selector_events.py", line 1061, in write
+    n = self._sock.send(data)
+        ^^^^^^^^^^^^^^^^^^^^^
+BrokenPipeError: [Errno 32] Broken pipe
+2026-01-30 15:25:10,217 ERROR   wandb-AsyncioManager-main:19616 [asyncio_manager.py:fn_wrap_exceptions():183] Uncaught exception in run_soon callback.
+Traceback (most recent call last):
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 181, in fn_wrap_exceptions
+    await fn()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_connection.py", line 65, in teardown_atexit
+    conn.teardown(hooks.exit_code)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_connection.py", line 310, in teardown
+    self._asyncer.run(publish_teardown_and_close)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 136, in run
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/concurrent/futures/_base.py", line 456, in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/concurrent/futures/_base.py", line 401, in __get_result
+    raise self._exception
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 219, in _wrap
+    return await fn()
+           ^^^^^^^^^^
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_connection.py", line 301, in publish_teardown_and_close
+    await self._client.publish(
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 38, in publish
+    await self._send_server_request(request)
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/site-packages/wandb/sdk/lib/service/service_client.py", line 64, in _send_server_request
+    await self._writer.drain()
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/streams.py", line 380, in drain
+    raise exc
+  File "/Users/mmai/anaconda3/envs/control/lib/python3.11/asyncio/selector_events.py", line 1061, in write
+    n = self._sock.send(data)
+        ^^^^^^^^^^^^^^^^^^^^^
+BrokenPipeError: [Errno 32] Broken pipe

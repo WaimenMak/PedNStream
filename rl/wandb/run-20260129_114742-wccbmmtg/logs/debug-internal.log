@@ -1,0 +1,6 @@
+{"time":"2026-01-29T11:47:42.641279+01:00","level":"INFO","msg":"stream: starting","core version":"0.24.0"}
+{"time":"2026-01-29T11:47:42.913859+01:00","level":"INFO","msg":"stream: created new stream","id":"wccbmmtg"}
+{"time":"2026-01-29T11:47:42.913943+01:00","level":"INFO","msg":"handler: started","stream_id":"wccbmmtg"}
+{"time":"2026-01-29T11:47:42.914409+01:00","level":"INFO","msg":"stream: started","id":"wccbmmtg"}
+{"time":"2026-01-29T11:47:42.914593+01:00","level":"INFO","msg":"writer: started","stream_id":"wccbmmtg"}
+{"time":"2026-01-29T11:47:42.914704+01:00","level":"INFO","msg":"sender: started","stream_id":"wccbmmtg"}

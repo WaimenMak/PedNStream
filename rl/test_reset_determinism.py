@@ -45,8 +45,8 @@ def collect_episode_states(env, episode_id: int, seed: int, verbose: bool = True
             }
         }
     """
-    # Reset environment with same seed
-    obs, infos = env.reset(seed=seed, options={'randomize': True})
+    # Reset environment (seed should be set at env construction time)
+    obs, infos = env.reset(options={'randomize': True})
     
     # Store states: agent_id -> list of (timestep, observation)
     states = defaultdict(list)

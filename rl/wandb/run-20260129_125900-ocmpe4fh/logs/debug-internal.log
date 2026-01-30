@@ -1,0 +1,6 @@
+{"time":"2026-01-29T12:59:01.025048+01:00","level":"INFO","msg":"stream: starting","core version":"0.24.0"}
+{"time":"2026-01-29T12:59:01.307996+01:00","level":"INFO","msg":"stream: created new stream","id":"ocmpe4fh"}
+{"time":"2026-01-29T12:59:01.308176+01:00","level":"INFO","msg":"handler: started","stream_id":"ocmpe4fh"}
+{"time":"2026-01-29T12:59:01.308462+01:00","level":"INFO","msg":"stream: started","id":"ocmpe4fh"}
+{"time":"2026-01-29T12:59:01.30848+01:00","level":"INFO","msg":"writer: started","stream_id":"ocmpe4fh"}
+{"time":"2026-01-29T12:59:01.308532+01:00","level":"INFO","msg":"sender: started","stream_id":"ocmpe4fh"}

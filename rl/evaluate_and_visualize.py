@@ -38,6 +38,7 @@ def evaluate_all_runs(base_dir, dataset, algorithms, threshold_ratio=0.7, comput
         compute_network_travel_time,
         compute_total_network_delay,
         compute_average_travel_time_spent,
+        compute_served_trips_rate,
         compute_agent_local_metrics
     )
     
@@ -77,6 +78,8 @@ def evaluate_all_runs(base_dir, dataset, algorithms, threshold_ratio=0.7, comput
         total_delays = []
         delay_intensities = []
         avg_travel_times_spent = []
+        total_trips_list = []
+        served_trips_rates = []
         local_metrics_all = []  # Store local metrics for each run
         
         for run_dir in run_dirs:
@@ -84,7 +87,6 @@ def evaluate_all_runs(base_dir, dataset, algorithms, threshold_ratio=0.7, comput
                 # Compute congestion metric
                 congestion_result = compute_network_congestion_metric(
                     simulation_dir=str(run_dir),
-                    threshold_ratio=threshold_ratio
                 )
                 congestion_times.append(congestion_result['congestion_time'])
                 congestion_fractions.append(congestion_result['congestion_fraction'])
@@ -108,6 +110,13 @@ def evaluate_all_runs(base_dir, dataset, algorithms, threshold_ratio=0.7, comput
                     simulation_dir=str(run_dir)
                 )
                 avg_travel_times_spent.append(travel_time_spent_result['avg_travel_time_spent'])
+                total_trips_list.append(travel_time_spent_result['total_trips'])
+                
+                # Compute served trips rate metric
+                served_trips_result = compute_served_trips_rate(
+                    simulation_dir=str(run_dir)
+                )
+                served_trips_rates.append(served_trips_result['served_trips_rate'])
                 
                 # Compute local agent metrics if requested
                 if compute_local:
@@ -120,8 +129,9 @@ def evaluate_all_runs(base_dir, dataset, algorithms, threshold_ratio=0.7, comput
                 print(f"  {run_dir.name}: "
                       f"Congestion={congestion_result['congestion_time']:.2f}, "
                       f"TravelTime={travel_time_result['avg_travel_time']:.2f}s, "
-                    #   f"TotalDelay={delay_result['total_delay']:.2f}s, "
-                      f"AvgTimeSpent={travel_time_spent_result['avg_travel_time_spent']:.2f}s")
+                      f"AvgTimeSpent={travel_time_spent_result['avg_travel_time_spent']:.2f}s, "
+                      f"TotalTrips={travel_time_spent_result['total_trips']:.0f}, "
+                      f"ServedRate={served_trips_result['served_trips_rate']:.2%}")
             
             except Exception as e:
                 print(f"  Error evaluating {run_dir.name}: {e}")
@@ -164,6 +174,16 @@ def evaluate_all_runs(base_dir, dataset, algorithms, threshold_ratio=0.7, comput
                     'mean': np.mean(avg_travel_times_spent),
                     'std': np.std(avg_travel_times_spent),
                     'values': avg_travel_times_spent
+                },
+                'total_trips': {
+                    'mean': np.mean(total_trips_list),
+                    'std': np.std(total_trips_list),
+                    'values': total_trips_list
+                },
+                'served_trips_rate': {
+                    'mean': np.mean(served_trips_rates),
+                    'std': np.std(served_trips_rates),
+                    'values': served_trips_rates
                 }
             }
             
@@ -198,11 +218,12 @@ def evaluate_all_runs(base_dir, dataset, algorithms, threshold_ratio=0.7, comput
 
 def print_comparison_table(results):
     """Print a formatted comparison table of all algorithms."""
-    print("\n" + "=" * 160)
+    print("\n" + "=" * 200)
     print("EVALUATION RESULTS - COMPARISON TABLE")
-    print("=" * 160)
-    print(f"{'Algorithm':<20} {'Runs':<8} {'Congestion Time':<25} {'Travel Time (s)':<25} {'Avg Time Spent (s)':<25}")
-    print("-" * 160)
+    print("=" * 200)
+    print(f"{'Algorithm':<20} {'Runs':<8} {'Congestion Time':<25} {'Travel Time (s)':<25} "
+          f"{'Avg Time Spent (s)':<25} {'Total Trips':<20} {'Served Rate':<20}")
+    print("-" * 200)
     
     for algo, data in results.items():
         num_runs = data['num_runs']
@@ -212,23 +233,32 @@ def print_comparison_table(results):
         tt_std = data['travel_time']['std']
         time_spent_mean = data['avg_travel_time_spent']['mean']
         time_spent_std = data['avg_travel_time_spent']['std']
+        total_trips_mean = data['total_trips']['mean']
+        total_trips_std = data['total_trips']['std']
+        served_rate_mean = data['served_trips_rate']['mean']
+        served_rate_std = data['served_trips_rate']['std']
         
         if num_runs > 1:
             cong_str = f"{cong_mean:.2f} ± {cong_std:.2f}"
             tt_str = f"{tt_mean:.2f} ± {tt_std:.2f}"
             time_spent_str = f"{time_spent_mean:.2f} ± {time_spent_std:.2f}"
+            total_trips_str = f"{total_trips_mean:.0f} ± {total_trips_std:.0f}"
+            served_rate_str = f"{served_rate_mean:.2%} ± {served_rate_std:.2%}"
         else:
             cong_str = f"{cong_mean:.2f}"
             tt_str = f"{tt_mean:.2f}"
             time_spent_str = f"{time_spent_mean:.2f}"
+            total_trips_str = f"{total_trips_mean:.0f}"
+            served_rate_str = f"{served_rate_mean:.2%}"
         
-        print(f"{algo:<20} {num_runs:<8} {cong_str:<25} {tt_str:<25} {time_spent_str:<25}")
+        print(f"{algo:<20} {num_runs:<8} {cong_str:<25} {tt_str:<25} "
+              f"{time_spent_str:<25} {total_trips_str:<20} {served_rate_str:<20}")
     
-    print("=" * 160)
+    print("=" * 200)
     
     # Print detailed metrics
     print("\nDETAILED METRICS")
-    print("=" * 160)
+    print("=" * 200)
     for algo, data in results.items():
         print(f"\n{algo.upper()}:")
         print(f"  Number of runs: {data['num_runs']}")
@@ -239,6 +269,8 @@ def print_comparison_table(results):
         # print(f"  Total Delay: {data['total_delay']['mean']:.3f} ± {data['total_delay']['std']:.3f} person-seconds")
         print(f"  Delay Intensity: {data['delay_intensity']['mean']:.3f} ± {data['delay_intensity']['std']:.3f} (ratio)")
         print(f"  Avg Travel Time Spent: {data['avg_travel_time_spent']['mean']:.3f} ± {data['avg_travel_time_spent']['std']:.3f} seconds")
+        print(f"  Total Trips: {data['total_trips']['mean']:.3f} ± {data['total_trips']['std']:.3f}")
+        print(f"  Served Trips Rate: {data['served_trips_rate']['mean']:.3%} ± {data['served_trips_rate']['std']:.3%}")
         
         # Print local agent metrics if available
         if 'local_metrics' in data:

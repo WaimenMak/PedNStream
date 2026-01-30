@@ -1,0 +1,6 @@
+{"time":"2026-01-26T22:30:57.954024+01:00","level":"INFO","msg":"stream: starting","core version":"0.24.0"}
+{"time":"2026-01-26T22:30:58.225146+01:00","level":"INFO","msg":"stream: created new stream","id":"f3kynijm"}
+{"time":"2026-01-26T22:30:58.22523+01:00","level":"INFO","msg":"handler: started","stream_id":"f3kynijm"}
+{"time":"2026-01-26T22:30:58.225397+01:00","level":"INFO","msg":"stream: started","id":"f3kynijm"}
+{"time":"2026-01-26T22:30:58.225416+01:00","level":"INFO","msg":"writer: started","stream_id":"f3kynijm"}
+{"time":"2026-01-26T22:30:58.225435+01:00","level":"INFO","msg":"sender: started","stream_id":"f3kynijm"}

@@ -1,0 +1,24 @@
+Iteration 0:   0%|          | 0/10 [00:00<?, ?it/s]
+Traceback (most recent call last):
+  File "/Users/mmai/Devs/Crowd-Control/rl/train_rl.py", line 96, in <module>
+    return_dict, _ = train_on_policy_multi_agent(
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mmai/Devs/Crowd-Control/rl/agents/PPO_backup.py", line 815, in train_on_policy_multi_agent
+    obs, infos = env.reset(options={'randomize': False})
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mmai/Devs/Crowd-Control/rl/rl_utils.py", line 154, in reset
+    obs, infos = self.env.reset(**kwargs)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mmai/Devs/Crowd-Control/rl/pz_pednet_env.py", line 190, in reset
+    observations = self._get_observations()
+                   ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mmai/Devs/Crowd-Control/rl/pz_pednet_env.py", line 260, in _get_observations
+    observations[agent_id] = self.obs_builder.build_observation(agent_id, self.sim_step)
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mmai/Devs/Crowd-Control/rl/builders.py", line 84, in build_observation
+    return self._build_gater_observation(agent_id, time_step)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mmai/Devs/Crowd-Control/rl/builders.py", line 171, in _build_gater_observation
+    obs[start_idx:start_idx + self.features_per_link] = link_features
+    ~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ValueError: could not broadcast input array from shape (2,) into shape (6,)

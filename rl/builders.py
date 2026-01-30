@@ -42,7 +42,7 @@ class ObservationBuilder:
         self.normalize = normalize
         self.obs_mode = obs_mode
         # Validate obs_mode
-        valid_modes = ["option1", "option2", "option3", "option4"]
+        valid_modes = ["option1", "option2", "option3", "option4", "option5"]
         if obs_mode not in valid_modes:
             raise ValueError(f"obs_mode must be one of {valid_modes}, got: {obs_mode}")
         # Determine features per link based on obs_mode for gater
@@ -53,8 +53,12 @@ class ObservationBuilder:
         elif self.obs_mode == "option3":
             self.features_per_link = 5  # inoutflow, reverse inoutflow, gate width
         elif self.obs_mode == "option4":
-            self.features_per_link = None  # density, inflow, reverse outflow, gate width
-        
+            self.features_per_link = 2  # inoutflow, reverse inflow, reverse outflow, velocity gate width
+        elif self.obs_mode == "option5":
+            self.features_per_link = 7  # inoutflow, reverse inflow, reverse outflow, velocity, density, gate width
+        else:
+            raise ValueError(f"Unknown observation mode: {self.obs_mode}")
+
         # Normalization constants (will be refined based on actual features)
         self.density_norm = 6.0    # Typical jam density
         self.speed_norm = 1.5       # Typical free-flow speed
@@ -145,7 +149,24 @@ class ObservationBuilder:
                     link.back_gate_width,
                 ]
             elif self.obs_mode == "option4":
-                pass
+                link_features = [
+                    # link.inflow[time_step] if time_step < len(link.inflow) else 0.0,
+                    # link.outflow[time_step] if time_step < len(link.outflow) else 0.0,
+                    # link.reverse_link.inflow[time_step] if time_step < len(link.reverse_link.inflow) else 0.0,
+                    # link.reverse_link.outflow[time_step] if time_step < len(link.reverse_link.outflow) else 0.0,
+                    link.get_density(time_step)/link.k_jam if time_step < len(link.speed) else 0.0,
+                    link.back_gate_width,
+                ]
+            elif self.obs_mode == "option5":
+                link_features = [
+                    link.inflow[time_step] if time_step < len(link.inflow) else 0.0,
+                    link.outflow[time_step] if time_step < len(link.outflow) else 0.0,
+                    link.reverse_link.inflow[time_step] if time_step < len(link.reverse_link.inflow) else 0.0,
+                    link.reverse_link.outflow[time_step] if time_step < len(link.reverse_link.outflow) else 0.0,
+                    link.speed[time_step] if time_step < len(link.speed) else 0.0,
+                    link.get_density(time_step),
+                    link.back_gate_width,
+                ]
             
             obs[start_idx:start_idx + self.features_per_link] = link_features
         

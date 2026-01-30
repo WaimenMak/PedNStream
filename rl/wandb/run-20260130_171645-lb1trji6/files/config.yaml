@@ -1,0 +1,50 @@
+_wandb:
+    value:
+        cli_version: 0.24.0
+        e:
+            q8256gl8ypd75hrlkgogt1i8xc030meg:
+                apple:
+                    ecpuCores: 2
+                    gpuCores: 16
+                    memoryGb: 16
+                    name: Apple M1 Pro
+                    pcpuCores: 8
+                    ramTotalBytes: "17179869184"
+                    swapTotalBytes: "13958643712"
+                codePath: rl/train_rl.py
+                codePathLocal: train_rl.py
+                cpu_count: 10
+                cpu_count_logical: 10
+                disk:
+                    /:
+                        total: "494384795648"
+                        used: "429080584192"
+                email: 1327149492@qq.com
+                executable: /Users/mmai/anaconda3/envs/control/bin/python
+                git:
+                    commit: 20ac9d7580e6e9fb5dadfb6b542b829d2842c939
+                    remote: https://github.com/WaimenMak/Crowd-Control.git
+                host: TUD501229
+                memory:
+                    total: "17179869184"
+                os: macOS-15.7.3-arm64-arm-64bit
+                program: /Users/mmai/Devs/Crowd-Control/rl/train_rl.py
+                python: CPython 3.11.9
+                root: /Users/mmai/Devs/Crowd-Control/rl
+                startedAt: "2026-01-30T16:16:45.493950Z"
+                writerId: q8256gl8ypd75hrlkgogt1i8xc030meg
+        m: []
+        python_version: 3.11.9
+        t:
+            "1":
+                - 1
+                - 77
+            "2":
+                - 1
+                - 77
+            "3":
+                - 13
+            "4": 3.11.9
+            "5": 0.24.0
+            "12": 0.24.0
+            "13": darwin-arm64

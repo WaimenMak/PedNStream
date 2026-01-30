@@ -76,7 +76,7 @@ def test_reset_and_step():
         )
         
         # Test reset
-        observations, infos = env.reset(seed=42)
+        observations, infos = env.reset()
         print(f"✓ Reset successful")
         print(f"  - Observations received for {len(observations)} agents")
         print(f"  - Info keys: {list(infos[env.possible_agents[0]].keys())}")

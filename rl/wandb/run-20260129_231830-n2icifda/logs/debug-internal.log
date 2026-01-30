@@ -1,0 +1,6 @@
+{"time":"2026-01-29T23:18:31.340773+01:00","level":"INFO","msg":"stream: starting","core version":"0.24.0"}
+{"time":"2026-01-29T23:18:31.646469+01:00","level":"INFO","msg":"stream: created new stream","id":"n2icifda"}
+{"time":"2026-01-29T23:18:31.64657+01:00","level":"INFO","msg":"handler: started","stream_id":"n2icifda"}
+{"time":"2026-01-29T23:18:31.646733+01:00","level":"INFO","msg":"stream: started","id":"n2icifda"}
+{"time":"2026-01-29T23:18:31.646748+01:00","level":"INFO","msg":"writer: started","stream_id":"n2icifda"}
+{"time":"2026-01-29T23:18:31.646777+01:00","level":"INFO","msg":"sender: started","stream_id":"n2icifda"}

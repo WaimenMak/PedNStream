@@ -1,0 +1,42 @@
+{
+  "agent_configs": {
+    "gate_4": {
+      "obs_dim": 20,
+      "act_dim": 4,
+      "act_low": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "act_high": [
+        4.0,
+        4.0,
+        4.0,
+        4.0
+      ],
+      "gamma": 0.99,
+      "lmbda": 0.96,
+      "epochs": 10,
+      "clip_eps": 0.2,
+      "entropy_coef": 0.01,
+      "entropy_coef_decay": 0.995,
+      "entropy_coef_min": 0,
+      "use_delta_actions": true,
+      "max_delta": 2.5,
+      "use_stacked_obs": false,
+      "use_gat_lstm": false,
+      "lstm_hidden_size": 64,
+      "num_lstm_layers": 1
+    }
+  },
+  "metadata": {
+    "episode": 72,
+    "avg_return": -11.926250547093524,
+    "best_avg_return": -11.926250547093524,
+    "individual_returns": {
+      "gate_4": -11.926250547093524
+    }
+  },
+  "saved_at": "2026-01-22T20:08:54.009905"
+}

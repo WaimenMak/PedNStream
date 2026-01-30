@@ -1,0 +1,17 @@
+{
+  "os": "macOS-15.7.3-arm64-arm-64bit",
+  "python": "CPython 3.11.9",
+  "startedAt": "2026-01-29T13:52:33.376574Z",
+  "program": "/Users/mmai/Devs/Crowd-Control/rl/train_rl.py",
+  "codePath": "rl/train_rl.py",
+  "codePathLocal": "train_rl.py",
+  "git": {
+    "remote": "https://github.com/WaimenMak/Crowd-Control.git",
+    "commit": "a27261403a99ffdf5efbc6dced4c0ff5aa6ee4bb"
+  },
+  "email": "1327149492@qq.com",
+  "root": "/Users/mmai/Devs/Crowd-Control/rl",
+  "host": "TUD501229",
+  "executable": "/Users/mmai/anaconda3/envs/control/bin/python",
+  "writerId": "mmya5aheutulchwys4c5mhkoyf36niog"
+}

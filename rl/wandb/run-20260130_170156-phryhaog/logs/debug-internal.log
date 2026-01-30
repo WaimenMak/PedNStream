@@ -1,0 +1,11 @@
+{"time":"2026-01-30T17:01:57.154482+01:00","level":"INFO","msg":"stream: starting","core version":"0.24.0"}
+{"time":"2026-01-30T17:01:57.435276+01:00","level":"INFO","msg":"stream: created new stream","id":"phryhaog"}
+{"time":"2026-01-30T17:01:57.435402+01:00","level":"INFO","msg":"handler: started","stream_id":"phryhaog"}
+{"time":"2026-01-30T17:01:57.435828+01:00","level":"INFO","msg":"stream: started","id":"phryhaog"}
+{"time":"2026-01-30T17:01:57.436043+01:00","level":"INFO","msg":"writer: started","stream_id":"phryhaog"}
+{"time":"2026-01-30T17:01:57.436098+01:00","level":"INFO","msg":"sender: started","stream_id":"phryhaog"}
+{"time":"2026-01-30T17:10:53.776055+01:00","level":"INFO","msg":"stream: closing","id":"phryhaog"}
+{"time":"2026-01-30T17:10:54.414995+01:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2026-01-30T17:10:54.604107+01:00","level":"INFO","msg":"handler: closed","stream_id":"phryhaog"}
+{"time":"2026-01-30T17:10:54.605627+01:00","level":"INFO","msg":"sender: closed","stream_id":"phryhaog"}
+{"time":"2026-01-30T17:10:54.605692+01:00","level":"INFO","msg":"stream: closed","id":"phryhaog"}

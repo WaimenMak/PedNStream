@@ -38,10 +38,10 @@ if __name__ == "__main__":
         option3:inoutflow of the node and other side, gate widths
     """
     algo = "ppo"
-    SEED = 200
+    SEED = 100
     NORM = False
     STATE_OPTION = "option3"
-    randomize = False
+    randomize = True
     norm_ret = True
     action_gap = 1
     # set torch seed
@@ -75,7 +75,7 @@ if __name__ == "__main__":
             actor_lr=9e-5,
             critic_lr=2e-4,
             gamma=0.99,
-            lmbda=0.95,
+            lmbda=0.96,
             entropy_coef=0.01,
             kl_tolerance=0.01,
             use_delta_actions=True,
@@ -88,13 +88,16 @@ if __name__ == "__main__":
             stack_size=0,
             hidden_size=64,
             kernel_size=4,
-            use_param_noise=False
+            use_param_noise=False,
+            use_action_noise=True,
+            total_updates=80,
+            param_noise_std_min=0
         ) for agent_id in env.possible_agents}
 
         # agents, config_data = load_all_agents(save_dir=f"best_ppo_agents_butterfly", device="cpu")
         # Train PPO agents
         return_dict, _ = train_on_policy_multi_agent(
-            env, agents, num_episodes=100, delta_actions=True,
+            env, agents, num_episodes=200, delta_actions=True,
             randomize=randomize,
             agents_saved_dir=f"ppo_agents_{dataset}",
             num_val_episodes=5,

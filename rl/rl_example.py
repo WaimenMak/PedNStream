@@ -28,7 +28,6 @@ def test_environment():
         print(f"Created PedNet environment with dataset: {dataset}")
         
         # Reset environment
-        # observations, infos = env.reset(seed=42, options={'randomize': True})
         print(f"Environment reset. Found {len(env.agents)} agents:")
         
         # Run a few simulation steps with random actions
@@ -36,7 +35,7 @@ def test_environment():
         for episode in range(2):
             print(f"Episode {episode + 1}...")
             if episode > 0:
-                env.reset(seed=42, options={'randomize': True})
+                env.reset(options={'randomize': True})
             for step in range(env.simulation_steps):
                 # Generate random actions for all agents
                 actions = {}

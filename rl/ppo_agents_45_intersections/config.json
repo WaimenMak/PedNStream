@@ -16,7 +16,7 @@
         4.0
       ],
       "gamma": 0.99,
-      "lmbda": 0.95,
+      "lmbda": 0.96,
       "epochs": 10,
       "clip_eps": 0.2,
       "entropy_coef": 0.01,
@@ -24,19 +24,19 @@
       "entropy_coef_min": 0,
       "use_delta_actions": true,
       "max_delta": 2.5,
-      "use_stacked_obs": true,
-      "stack_size": 10,
-      "hidden_size": 64,
-      "kernel_size": 4
+      "use_stacked_obs": false,
+      "use_gat_lstm": false,
+      "lstm_hidden_size": 64,
+      "num_lstm_layers": 1
     }
   },
   "metadata": {
-    "episode": 2,
-    "avg_return": -13.682520122384705,
-    "best_avg_return": -13.682520122384705,
+    "episode": 124,
+    "avg_return": -1.9721276706368451,
+    "best_avg_return": -1.9721276706368451,
     "individual_returns": {
-      "gate_24": -13.682520122384705
+      "gate_24": -1.9721276706368451
     }
   },
-  "saved_at": "2026-01-09T20:26:08.338899"
+  "saved_at": "2026-01-16T16:42:59.106267"
 }

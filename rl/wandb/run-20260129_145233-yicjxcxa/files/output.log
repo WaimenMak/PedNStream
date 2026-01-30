@@ -1,0 +1,18 @@
+Iteration 0:   0%|          | 0/5 [00:00<?, ?it/s]
+Traceback (most recent call last):
+  File "/Users/mmai/Devs/Crowd-Control/rl/train_rl.py", line 88, in <module>
+    return_dict, _ = train_on_policy_multi_agent(
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mmai/Devs/Crowd-Control/rl/agents/PPO_backup.py", line 856, in train_on_policy_multi_agent
+    next_obs, rewards, terms, truncs, infos = env.step(absolute_actions)
+                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mmai/Devs/Crowd-Control/rl/rl_utils.py", line 165, in step
+    obs, rewards, terms, truncs, infos = self.env.step(actions)
+                                         ^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mmai/Devs/Crowd-Control/rl/pz_pednet_env.py", line 231, in step
+    step_rewards = self._compute_rewards()
+                   ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mmai/Devs/Crowd-Control/rl/pz_pednet_env.py", line 410, in _compute_rewards
+    + action_diverse_reward.item()
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'float' object has no attribute 'item'

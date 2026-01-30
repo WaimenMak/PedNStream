@@ -1,0 +1,37 @@
+{
+  "os": "macOS-15.7.3-arm64-arm-64bit",
+  "python": "CPython 3.11.9",
+  "startedAt": "2026-01-29T14:37:36.515845Z",
+  "program": "/Users/mmai/Devs/Crowd-Control/rl/train_rl.py",
+  "codePath": "rl/train_rl.py",
+  "codePathLocal": "train_rl.py",
+  "git": {
+    "remote": "https://github.com/WaimenMak/Crowd-Control.git",
+    "commit": "a27261403a99ffdf5efbc6dced4c0ff5aa6ee4bb"
+  },
+  "email": "1327149492@qq.com",
+  "root": "/Users/mmai/Devs/Crowd-Control/rl",
+  "host": "TUD501229",
+  "executable": "/Users/mmai/anaconda3/envs/control/bin/python",
+  "cpu_count": 10,
+  "cpu_count_logical": 10,
+  "disk": {
+    "/": {
+      "total": "494384795648",
+      "used": "423828860928"
+    }
+  },
+  "memory": {
+    "total": "17179869184"
+  },
+  "apple": {
+    "name": "Apple M1 Pro",
+    "ecpuCores": 2,
+    "pcpuCores": 8,
+    "gpuCores": 16,
+    "memoryGb": 16,
+    "swapTotalBytes": "11811160064",
+    "ramTotalBytes": "17179869184"
+  },
+  "writerId": "6sm9igdwd29002l334d0mmh9zivqhsod"
+}

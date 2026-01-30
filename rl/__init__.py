@@ -14,24 +14,13 @@ RL agents to control pedestrian traffic flow through:
 """
 
 from .pz_pednet_env import PedNetParallelEnv
-from .rl_utils import (
-    RunningNormalizeWrapper,
-    RunningMeanStd,
-    save_all_agents,
-    load_all_agents,
-    load_normalization_stats,
-    evaluate_agents,
-    compute_gae,
-)
+
+# Note: rl_utils imports are not included here to avoid circular imports.
+# rl_utils imports from rl.agents (e.g., optimization_based, PPO, SAC),
+# which would create a circular dependency if imported here.
+# Users should import directly: from rl.rl_utils import compute_gae, etc.
 
 __all__ = [
     'PedNetParallelEnv',
-    'RunningNormalizeWrapper',
-    'RunningMeanStd',
-    'save_all_agents',
-    'load_all_agents',
-    'load_normalization_stats',
-    'evaluate_agents',
-    'compute_gae',
 ]
 

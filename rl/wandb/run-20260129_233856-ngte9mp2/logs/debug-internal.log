@@ -1,0 +1,6 @@
+{"time":"2026-01-29T23:38:57.08803+01:00","level":"INFO","msg":"stream: starting","core version":"0.24.0"}
+{"time":"2026-01-29T23:38:57.364416+01:00","level":"INFO","msg":"stream: created new stream","id":"ngte9mp2"}
+{"time":"2026-01-29T23:38:57.36449+01:00","level":"INFO","msg":"handler: started","stream_id":"ngte9mp2"}
+{"time":"2026-01-29T23:38:57.364819+01:00","level":"INFO","msg":"writer: started","stream_id":"ngte9mp2"}
+{"time":"2026-01-29T23:38:57.364828+01:00","level":"INFO","msg":"stream: started","id":"ngte9mp2"}
+{"time":"2026-01-29T23:38:57.364894+01:00","level":"INFO","msg":"sender: started","stream_id":"ngte9mp2"}

@@ -969,8 +969,10 @@ class PPOAgent:
                  lstm_hidden_size=64, num_lstm_layers=1,
                  use_stacked_obs=False, stack_size=4, hidden_size=64, kernel_size=3,
                  use_gat_lstm=False, gat_hidden_size=64, gat_num_heads=4,
-                 use_param_noise=False, param_noise_std=0.1, param_noise_decay=0.995,
-                 param_noise_std_min=0.01):
+                 use_param_noise=False, param_noise_std=0.1,
+                 param_noise_std_min=0.01,
+                 use_action_noise=True, action_noise_std=0.1,
+                 action_noise_std_min=0.01, total_updates=500):
         """
         Initialize PPO agent with LSTM, stacked observation, or GAT-LSTM networks.
 
@@ -1003,8 +1005,11 @@ class PPOAgent:
             gat_num_heads: Number of attention heads in GAT (only used if use_gat_lstm=True)
             use_param_noise: If True, apply parameter noise to actor for exploration
             param_noise_std: Initial standard deviation for parameter noise
-            param_noise_decay: Decay factor for param_noise_std per episode (default 0.995)
             param_noise_std_min: Minimum param_noise_std (default 0.01)
+            use_action_noise: If True, apply action noise for exploration (default True)
+            action_noise_std: Initial standard deviation for action noise (default 0.1)
+            action_noise_std_min: Minimum action_noise_std (default 0.01)
+            total_updates: Expected total number of updates for linear noise decay (default 500)
         """
         self.obs_dim = obs_dim
         self.act_dim = act_dim
@@ -1098,14 +1103,20 @@ class PPOAgent:
         self.critic_optimizer = torch.optim.Adam(self.value_net.parameters(), lr=critic_lr)
         self.device = device
 
-        # Parameter noise settings for exploration
+        # Parameter noise settings for exploration (linear decay based on update step)
         self.use_param_noise = use_param_noise
         self.param_noise_std_initial = param_noise_std
         self.param_noise_std = param_noise_std
-        self.param_noise_decay = param_noise_decay
         self.param_noise_std_min = param_noise_std_min
         self._param_noise_applied = False  # Track if noise is currently applied
         self._original_actor_params = None  # Store original params when noise is applied
+
+        # Action noise settings for exploration (linear decay based on update step)
+        self.use_action_noise = use_action_noise
+        self.action_noise_std_initial = action_noise_std
+        self.action_noise_std = action_noise_std
+        self.action_noise_std_min = action_noise_std_min
+        self.total_updates = total_updates
 
     def reset_buffer(self):
         """Clear rollout buffer, reset LSTM hidden states, and apply parameter noise for new episode."""
@@ -1150,11 +1161,24 @@ class PPOAgent:
         self._param_noise_applied = False
 
     def _decay_param_noise_std(self):
-        """Apply decay to parameter noise standard deviation."""
-        self.param_noise_std = max(
-            self.param_noise_std_min,
-            self.param_noise_std * self.param_noise_decay
-        )
+        """Apply linear decay to parameter noise based on update step.
+        
+        Noise decays linearly from initial value to min value over total_updates.
+        At update_count == total_updates, noise reaches param_noise_std_min.
+        """
+        progress = min(self.update_count / self.total_updates, 1.0)
+        self.param_noise_std = self.param_noise_std_initial + \
+            (self.param_noise_std_min - self.param_noise_std_initial) * progress
+
+    def _decay_action_noise_std(self):
+        """Apply linear decay to action noise based on update step.
+        
+        Noise decays linearly from initial value to min value over total_updates.
+        At update_count == total_updates, noise reaches action_noise_std_min.
+        """
+        progress = min(self.update_count / self.total_updates, 1.0)
+        self.action_noise_std = self.action_noise_std_initial + \
+            (self.action_noise_std_min - self.action_noise_std_initial) * progress
 
     def store_transition(self, state, action, next_state, reward, done):
         """Store transition in buffer."""
@@ -1205,6 +1229,11 @@ class PPOAgent:
             # Sample from distribution for exploration during training
             action_dist = torch.distributions.Normal(mu, sigma)
             action = action_dist.sample()
+            
+            # Add action noise for additional exploration (only during training)
+            if self.use_action_noise:
+                action_noise = torch.randn_like(action) * self.action_noise_std
+                action = action + action_noise
 
         if self.use_delta_actions:
             # Agent outputs delta in [-max_delta, +max_delta]
@@ -1354,6 +1383,10 @@ class PPOAgent:
         # Decay parameter noise std after update
         if self.use_param_noise:
             self._decay_param_noise_std()
+        
+        # Decay action noise std after update
+        if self.use_action_noise:
+            self._decay_action_noise_std()
 
     def _decay_entropy_coef(self):
         """Apply exponential decay to entropy coefficient."""
@@ -1383,8 +1416,11 @@ class PPOAgent:
             'use_gat_lstm': self.use_gat_lstm,
             'use_param_noise': self.use_param_noise,
             'param_noise_std': self.param_noise_std_initial,
-            'param_noise_decay': self.param_noise_decay,
             'param_noise_std_min': self.param_noise_std_min,
+            'use_action_noise': self.use_action_noise,
+            'action_noise_std': self.action_noise_std_initial,
+            'action_noise_std_min': self.action_noise_std_min,
+            'total_updates': self.total_updates,
         }
 
         if self.use_gat_lstm:
@@ -1423,6 +1459,7 @@ class PPOAgent:
             'update_count': self.update_count,
             'current_entropy_coef': self.entropy_coef,
             'current_param_noise_std': self.param_noise_std if self.use_param_noise else None,
+            'current_action_noise_std': self.action_noise_std if self.use_action_noise else None,
         }, path)
 
     def load(self, path: str):
@@ -1441,3 +1478,6 @@ class PPOAgent:
         # Restore param noise state if available
         if 'current_param_noise_std' in checkpoint and checkpoint['current_param_noise_std'] is not None:
             self.param_noise_std = checkpoint['current_param_noise_std']
+        # Restore action noise state if available
+        if 'current_action_noise_std' in checkpoint and checkpoint['current_action_noise_std'] is not None:
+            self.action_noise_std = checkpoint['current_action_noise_std']

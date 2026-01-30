@@ -1,0 +1,11 @@
+{"time":"2026-01-30T22:27:42.179338+01:00","level":"INFO","msg":"stream: starting","core version":"0.24.0"}
+{"time":"2026-01-30T22:27:42.466732+01:00","level":"INFO","msg":"stream: created new stream","id":"akkuoyex"}
+{"time":"2026-01-30T22:27:42.466827+01:00","level":"INFO","msg":"handler: started","stream_id":"akkuoyex"}
+{"time":"2026-01-30T22:27:42.466982+01:00","level":"INFO","msg":"stream: started","id":"akkuoyex"}
+{"time":"2026-01-30T22:27:42.467002+01:00","level":"INFO","msg":"writer: started","stream_id":"akkuoyex"}
+{"time":"2026-01-30T22:27:42.467061+01:00","level":"INFO","msg":"sender: started","stream_id":"akkuoyex"}
+{"time":"2026-01-30T22:36:40.551135+01:00","level":"INFO","msg":"stream: closing","id":"akkuoyex"}
+{"time":"2026-01-30T22:36:41.157673+01:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2026-01-30T22:36:41.344081+01:00","level":"INFO","msg":"handler: closed","stream_id":"akkuoyex"}
+{"time":"2026-01-30T22:36:41.344786+01:00","level":"INFO","msg":"sender: closed","stream_id":"akkuoyex"}
+{"time":"2026-01-30T22:36:41.344851+01:00","level":"INFO","msg":"stream: closed","id":"akkuoyex"}

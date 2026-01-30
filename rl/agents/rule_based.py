@@ -177,7 +177,7 @@ if __name__ == "__main__":
     from rl.pz_pednet_env import PedNetParallelEnv
     from rl.rl_utils import RunningNormalizeWrapper
     # dataset = "one_intersection_v0"
-    dataset = "butterfly_scC"
+    dataset = "butterfly_scB"
     # dataset = "small_network"
     env = PedNetParallelEnv(dataset, obs_mode="option2", action_gap=1, render_mode="animate", verbose=True)
     env = RunningNormalizeWrapper(env, norm_obs=False, norm_reward=True)
@@ -204,12 +204,12 @@ if __name__ == "__main__":
         #     elif agent_id in rule_based_separator_agents:
         #         actions[agent_id] = rule_based_separator_agents[agent_id].take_action(observations[agent_id])
         actions = {}
-        for agent_id in env.agents:
-            action_space = env.action_space(agent_id)
-            if action_space.shape == (1,):
-                actions[agent_id] = action_space.low
-            else:
-                actions[agent_id] = action_space.sample()
+        # for agent_id in env.agents:
+        #     action_space = env.action_space(agent_id)
+        #     if action_space.shape == (1,):
+        #         actions[agent_id] = action_space.low
+        #     else:
+        #         actions[agent_id] = action_space.sample()
             # print(actions[agent_id])
             # if agent_id == "gate_24":
             #     print(f"Step {step}: Agent {agent_id} action: {actions[agent_id]}")

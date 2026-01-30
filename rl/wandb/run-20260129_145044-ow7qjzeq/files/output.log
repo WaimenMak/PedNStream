@@ -1,5 +1,0 @@
-Iteration 0:   0%|          | 0/5 [00:48<?, ?it/s]
-Traceback (most recent call last):
-  File "/Users/mmai/Devs/Crowd-Control/rl/agents/PPO_backup.py", line 882, in train_on_policy_multi_agent
-    episode_returns[agent_id] += rewards[agent_id]
-TypeError: Concatenation operation is not implemented for NumPy arrays, use np.concatenate() instead. Please do not rely on this error; it may not be given on all Python implementations.

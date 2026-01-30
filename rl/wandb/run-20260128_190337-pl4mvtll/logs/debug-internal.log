@@ -1,6 +1,0 @@
-{"time":"2026-01-28T19:03:38.172736+01:00","level":"INFO","msg":"stream: starting","core version":"0.24.0"}
-{"time":"2026-01-28T19:03:38.457731+01:00","level":"INFO","msg":"stream: created new stream","id":"pl4mvtll"}
-{"time":"2026-01-28T19:03:38.457807+01:00","level":"INFO","msg":"handler: started","stream_id":"pl4mvtll"}
-{"time":"2026-01-28T19:03:38.458+01:00","level":"INFO","msg":"writer: started","stream_id":"pl4mvtll"}
-{"time":"2026-01-28T19:03:38.458011+01:00","level":"INFO","msg":"stream: started","id":"pl4mvtll"}
-{"time":"2026-01-28T19:03:38.458077+01:00","level":"INFO","msg":"sender: started","stream_id":"pl4mvtll"}

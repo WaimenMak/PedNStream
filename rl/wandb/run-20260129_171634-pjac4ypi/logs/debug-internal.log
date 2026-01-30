@@ -1,6 +1,0 @@
-{"time":"2026-01-29T17:16:34.536778+01:00","level":"INFO","msg":"stream: starting","core version":"0.24.0"}
-{"time":"2026-01-29T17:16:34.837248+01:00","level":"INFO","msg":"stream: created new stream","id":"pjac4ypi"}
-{"time":"2026-01-29T17:16:34.837338+01:00","level":"INFO","msg":"handler: started","stream_id":"pjac4ypi"}
-{"time":"2026-01-29T17:16:34.837854+01:00","level":"INFO","msg":"stream: started","id":"pjac4ypi"}
-{"time":"2026-01-29T17:16:34.837943+01:00","level":"INFO","msg":"sender: started","stream_id":"pjac4ypi"}
-{"time":"2026-01-29T17:16:34.837959+01:00","level":"INFO","msg":"writer: started","stream_id":"pjac4ypi"}

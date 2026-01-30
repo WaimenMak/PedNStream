@@ -1,6 +1,0 @@
-{"time":"2026-01-29T15:43:22.363677+01:00","level":"INFO","msg":"stream: starting","core version":"0.24.0"}
-{"time":"2026-01-29T15:43:22.66158+01:00","level":"INFO","msg":"stream: created new stream","id":"c0atvian"}
-{"time":"2026-01-29T15:43:22.661674+01:00","level":"INFO","msg":"handler: started","stream_id":"c0atvian"}
-{"time":"2026-01-29T15:43:22.662476+01:00","level":"INFO","msg":"stream: started","id":"c0atvian"}
-{"time":"2026-01-29T15:43:22.662674+01:00","level":"INFO","msg":"writer: started","stream_id":"c0atvian"}
-{"time":"2026-01-29T15:43:22.662872+01:00","level":"INFO","msg":"sender: started","stream_id":"c0atvian"}

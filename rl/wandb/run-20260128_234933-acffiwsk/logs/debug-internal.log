@@ -1,6 +1,0 @@
-{"time":"2026-01-28T23:49:33.485333+01:00","level":"INFO","msg":"stream: starting","core version":"0.24.0"}
-{"time":"2026-01-28T23:49:33.792588+01:00","level":"INFO","msg":"stream: created new stream","id":"acffiwsk"}
-{"time":"2026-01-28T23:49:33.792712+01:00","level":"INFO","msg":"handler: started","stream_id":"acffiwsk"}
-{"time":"2026-01-28T23:49:33.792981+01:00","level":"INFO","msg":"writer: started","stream_id":"acffiwsk"}
-{"time":"2026-01-28T23:49:33.792983+01:00","level":"INFO","msg":"stream: started","id":"acffiwsk"}
-{"time":"2026-01-28T23:49:33.793027+01:00","level":"INFO","msg":"sender: started","stream_id":"acffiwsk"}

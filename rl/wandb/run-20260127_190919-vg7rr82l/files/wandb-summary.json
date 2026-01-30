@@ -1,1 +1,0 @@
-{"episode_steps":600,"_wandb":{"runtime":393},"_runtime":393,"avg_normalized_return":-8.250665919989784,"_step":99,"_timestamp":1.769537559396082e+09,"episode":100,"total_normalized_return":-8.250665919989784,"agent_gate_2_normalized_return":-8.250665919989784,"avg_true_return":-7599.3798828125,"total_true_return":-7599.3798828125,"agent_gate_2_true_return":-7599.3798828125}

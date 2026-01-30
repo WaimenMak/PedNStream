@@ -1,6 +1,0 @@
-{"time":"2026-01-26T13:51:37.149326+01:00","level":"INFO","msg":"stream: starting","core version":"0.24.0"}
-{"time":"2026-01-26T13:51:37.795938+01:00","level":"INFO","msg":"stream: created new stream","id":"d95gujdb"}
-{"time":"2026-01-26T13:51:37.796055+01:00","level":"INFO","msg":"handler: started","stream_id":"d95gujdb"}
-{"time":"2026-01-26T13:51:37.796272+01:00","level":"INFO","msg":"stream: started","id":"d95gujdb"}
-{"time":"2026-01-26T13:51:37.796292+01:00","level":"INFO","msg":"writer: started","stream_id":"d95gujdb"}
-{"time":"2026-01-26T13:51:37.796321+01:00","level":"INFO","msg":"sender: started","stream_id":"d95gujdb"}

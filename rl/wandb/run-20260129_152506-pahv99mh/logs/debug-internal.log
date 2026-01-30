@@ -1,6 +1,0 @@
-{"time":"2026-01-29T15:25:07.211258+01:00","level":"INFO","msg":"stream: starting","core version":"0.24.0"}
-{"time":"2026-01-29T15:25:07.490916+01:00","level":"INFO","msg":"stream: created new stream","id":"pahv99mh"}
-{"time":"2026-01-29T15:25:07.491001+01:00","level":"INFO","msg":"handler: started","stream_id":"pahv99mh"}
-{"time":"2026-01-29T15:25:07.491758+01:00","level":"INFO","msg":"stream: started","id":"pahv99mh"}
-{"time":"2026-01-29T15:25:07.491786+01:00","level":"INFO","msg":"sender: started","stream_id":"pahv99mh"}
-{"time":"2026-01-29T15:25:07.49182+01:00","level":"INFO","msg":"writer: started","stream_id":"pahv99mh"}

@@ -1,6 +1,0 @@
-{"time":"2026-01-29T23:12:05.549043+01:00","level":"INFO","msg":"stream: starting","core version":"0.24.0"}
-{"time":"2026-01-29T23:12:05.813015+01:00","level":"INFO","msg":"stream: created new stream","id":"ywbrd1a1"}
-{"time":"2026-01-29T23:12:05.813096+01:00","level":"INFO","msg":"handler: started","stream_id":"ywbrd1a1"}
-{"time":"2026-01-29T23:12:05.813259+01:00","level":"INFO","msg":"stream: started","id":"ywbrd1a1"}
-{"time":"2026-01-29T23:12:05.813273+01:00","level":"INFO","msg":"writer: started","stream_id":"ywbrd1a1"}
-{"time":"2026-01-29T23:12:05.813298+01:00","level":"INFO","msg":"sender: started","stream_id":"ywbrd1a1"}

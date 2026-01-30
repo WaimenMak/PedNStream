@@ -72,8 +72,7 @@ if __name__ == "__main__":
         # Train PPO agents
         return_dict, _ = train_on_policy_multi_agent(
             env, agents, num_episodes=100, delta_actions=True,
-            randomize=False,
-            seed=None,
+            randomize=randomize,
             agents_saved_dir=f"ppo_agents_{dataset}",
         )
     elif algo == "sac":

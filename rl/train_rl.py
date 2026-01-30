@@ -74,6 +74,9 @@ if __name__ == "__main__":
             env, agents, num_episodes=100, delta_actions=True,
             randomize=randomize,
             agents_saved_dir=f"ppo_agents_{dataset}",
+            num_val_episodes=5,
+            val_freq=10,
+            use_wandb=True
         )
     elif algo == "sac":
         agents = {agent_id: SACAgent(

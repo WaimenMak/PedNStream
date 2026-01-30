@@ -153,7 +153,7 @@ def train_off_policy_multi_agent(
         with tqdm(total=int(num_episodes/10), desc='Iteration %d' % i) as pbar:
             for i_episode in range(int(num_episodes/10)):
                 episode_returns = {agent_id: 0.0 for agent_id in agents.keys()}
-                obs, infos = env.reset(seed=seed, options={'randomize': randomize})
+                obs, infos = env.reset(options={'randomize': randomize})
                 # initialize state history queue
                 state_stack = {}
                 for agent_id in agents.keys():

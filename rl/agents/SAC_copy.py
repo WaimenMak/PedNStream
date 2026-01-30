@@ -9,9 +9,14 @@ import torch.nn.functional as F
 from torch.distributions import Normal
 import numpy as np
 import torch.nn as nn
-from rl.rl_utils import ReplayBuffer, save_with_best_return
+from rl.rl_utils import ReplayBuffer, save_with_best_return, validate_and_save_best
 from tqdm import tqdm
 import collections
+try:
+    import wandb
+    WANDB_AVAILABLE = True
+except ImportError:
+    WANDB_AVAILABLE = False
 
 
 class LSTMPolicyNetContinuous(torch.nn.Module):
@@ -158,12 +163,33 @@ def train_off_policy_multi_agent(
     batch_size=64,
     stack_size=4,
     randomize=False,
-    seed=None,
-    agents_saved_dir=None
+    agents_saved_dir=None,
+    use_wandb: bool = True,
+    val_freq: int = 10,
+    num_val_episodes: int = 3
 ):
     """
     Train SAC agents off-policy.
+    
+    Args:
+        env: PettingZoo ParallelEnv
+        agents: Dict mapping agent_id -> SACAgent
+        num_episodes: Total number of episodes to train
+        delta_actions: If True, agents output delta actions
+        minimal_size: Minimum replay buffer size before training
+        batch_size: Batch size for training
+        stack_size: Size of stacked observations
+        randomize: If True, randomize environment at reset
+        agents_saved_dir: Directory to save agent checkpoints
+        use_wandb: If True, log metrics to wandb (default: True)
+        val_freq: Validation frequency - run validation every N episodes (default: 10)
+        num_val_episodes: Number of validation episodes to run (default: 3)
     """
+    # Initialize wandb if available and not already initialized
+    if use_wandb and WANDB_AVAILABLE:
+        if wandb.run is None:
+            wandb.init(project="crowd-control-rl", name="sac-training")
+    
     # Initialize return tracking for each agent
     return_dict = {agent_id: [] for agent_id in agents.keys()}
     global_episode = 0  # Track global episode count for saving
@@ -179,7 +205,7 @@ def train_off_policy_multi_agent(
             for i_episode in range(int(num_episodes/10)):
                 episode_returns = {agent_id: 0.0 for agent_id in agents.keys()}
                 episode_true_returns = {agent_id: 0.0 for agent_id in agents.keys()}  # Track true (un-normalized) rewards
-                obs, infos = env.reset(seed=seed, options={'randomize': randomize})
+                obs, infos = env.reset(options={'randomize': randomize})
                 # initialize state history queue
                 state_stack = {}
                 for agent_id in agents.keys():
@@ -237,8 +263,34 @@ def train_off_policy_multi_agent(
 
 
                 global_episode += 1
-                if agents_saved_dir and  global_episode > num_episodes/2:
-                    best_avg_return = save_with_best_return(agents, agents_saved_dir, episode_returns=episode_true_returns, best_avg_return=best_avg_return, global_episode=global_episode)
+                
+                # Log rewards to wandb after each episode
+                if use_wandb and WANDB_AVAILABLE and wandb.run is not None:
+                    log_dict = {
+                        'episode': global_episode,
+                        'avg_normalized_return': np.mean(list(episode_returns.values())),
+                        'avg_true_return': np.mean(list(episode_true_returns.values())),
+                        'total_normalized_return': sum(episode_returns.values()),
+                        'total_true_return': sum(episode_true_returns.values()),
+                        'episode_steps': step
+                    }
+                    # Log per-agent rewards
+                    for agent_id in agents.keys():
+                        log_dict[f'agent_{agent_id}_normalized_return'] = episode_returns[agent_id]
+                        log_dict[f'agent_{agent_id}_true_return'] = episode_true_returns[agent_id]
+                    wandb.log(log_dict)
+                
+                # Run validation and save best model (after half of training, every val_freq episodes)
+                if agents_saved_dir and global_episode > num_episodes/2 and global_episode % val_freq == 0:
+                    best_avg_return = validate_and_save_best(
+                        env, agents, agents_saved_dir,
+                        delta_actions=delta_actions,
+                        num_val_episodes=num_val_episodes,
+                        randomize=randomize,
+                        best_avg_return=best_avg_return,
+                        global_episode=global_episode,
+                        use_wandb=use_wandb and WANDB_AVAILABLE
+                    )
                 # Update progress bar with both normalized and true returns
                 if (i_episode+1) % 10 == 0:
                     avg_return = np.mean([np.mean(return_dict[aid][-10:]) for aid in agents.keys()])

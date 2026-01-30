@@ -245,7 +245,7 @@ def train_on_policy_multi_agent(env, agents, delta_actions=False, num_episodes=5
                 # if i_episode % 10 == 0:
                 #     obs, infos = env.reset(seed=42)
                 # else:
-                obs, infos = env.reset(seed=seed, options={'randomize': randomize})
+                obs, infos = env.reset(options={'randomize': randomize})
                 
                 # Initialize state history queues for stacked observations
                 state_stack = {}

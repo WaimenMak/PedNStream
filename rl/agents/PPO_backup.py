@@ -9,13 +9,18 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 from tqdm import tqdm
-from rl.rl_utils import compute_gae, save_with_best_return, layer_init
+from rl.rl_utils import compute_gae, save_with_best_return, validate_and_save_best, layer_init
 import math
 import os
 import collections
 from .SAC import MLPEncoder, StackedEncoder
 from torch_geometric.nn import DenseGATConv
 from torch_geometric.utils import to_dense_adj
+try:
+    import wandb
+    WANDB_AVAILABLE = True
+except ImportError:
+    WANDB_AVAILABLE = False
 
 class LSTMPolicyNetwork(nn.Module):
     """Stateful LSTM-based policy network that maintains hidden state across timesteps."""
@@ -439,6 +444,7 @@ class UDLSTMPolicyNetwork(nn.Module):
         )
         
         # Link-specific feature extractor
+        # self.link_model = nn.Linear(hidden_size, hidden_size)
         self.link_model = nn.Linear(hidden_size, hidden_size)
         
         # Upstream/Downstream aggregation model
@@ -447,6 +453,7 @@ class UDLSTMPolicyNetwork(nn.Module):
 
         # Shared latent layer for action coordination
         self.shared_latent_layer = nn.Linear(hidden_size * act_dim, hidden_size * act_dim)
+        # self.shared_latent_layer = nn.Linear((hidden_size+1) * act_dim, hidden_size * act_dim)
 
         # Per-link action heads (output 1 action per link)
         self.mean_head = nn.Linear(hidden_size, 1)
@@ -490,6 +497,9 @@ class UDLSTMPolicyNetwork(nn.Module):
         
         # Process through UD model
         ud_features = self.ud_model(combined_features)  # (seq_len, num_links, hidden_size)
+        # get gate width features
+        # gate_widths = x.reshape(seq_len, self.act_dim, self.features_per_link)[:,:,-1].unsqueeze(2) # (seq_len, num_links, 1)
+        # ud_features = torch.cat([ud_features, gate_widths], dim=2)  # (seq_len, num_links, hidden_size + 1)
 
         # Flatten features for shared latent layer
         shared_features = ud_features.view(seq_len, -1)  # (seq_len, num_links * hidden_size)
@@ -527,7 +537,7 @@ class UDLSTMValueNetwork(nn.Module):
         self.link_model = nn.Linear(hidden_size, hidden_size)
         self.ud_model = nn.Linear(2*hidden_size, hidden_size)
         self.value_head = nn.Linear(hidden_size, 1)
-        # self.value_head = nn.Linear(hidden_size + gate_hidden_size, 1)
+        # self.value_head = nn.Linear(hidden_size + 1, 1)
 
     def forward(self, x, hidden=None):
         """
@@ -570,9 +580,13 @@ class UDLSTMValueNetwork(nn.Module):
         
         # Process through UD model
         ud_features = self.ud_model(combined_features)  # (seq_len, num_links, hidden_size)
-        
+        # get gate width features
+        # gate_widths = x.reshape(seq_len, self.num_links, self.features_per_link)[:,:,-1].unsqueeze(2) # (seq_len, num_links, 1)
+        # ud_features = torch.cat([ud_features, gate_widths], dim=2)  # (seq_len, num_links, hidden_size + 1)
+
         # Aggregate across links (e.g., mean pooling for global value)
-        global_features = ud_features.mean(dim=1)  # (seq_len, hidden_size)
+        # global_features = ud_features.mean(dim=1)  # (seq_len, hidden_size)
+        global_features = ud_features.mean(dim=1) # (seq_len, hidden_size + 1)
         
         # Compute value
         value = self.value_head(F.elu(global_features))  # (seq_len, 1)
@@ -613,6 +627,9 @@ class AttentionPolicy(nn.Module):
         )
         # --- IMPROVEMENT END ---
 
+        # Layer normalization on coordinated features (per link, per timestep)
+        # self.layer_norm = nn.LayerNorm(hidden_size)
+
         # Per-link action heads (Shared weights, applied per link)
         self.mean_head = nn.Linear(hidden_size, 1)
         self.std_head = nn.Linear(hidden_size, 1)
@@ -651,6 +668,8 @@ class AttentionPolicy(nn.Module):
         
         # Residual connection (optional but recommended)
         coordinated_features = link_features + attn_out
+        # Apply layer normalization for stability
+        # coordinated_features = self.layer_norm(coordinated_features)
         
         # 5. Final Heads
         # The 'coordinated_features' now contains info from self + all other links
@@ -686,6 +705,9 @@ class AttentionValueNetwork(nn.Module):
             batch_first=True
         )
         
+        # Layer normalization on coordinated features
+        # self.layer_norm = nn.LayerNorm(hidden_size)
+
         # 4. Global Value Head
         # Takes the aggregated system state and outputs 1 value
         self.value_head = nn.Linear(hidden_size, 1)
@@ -722,6 +744,8 @@ class AttentionValueNetwork(nn.Module):
         
         # Residual Connection (Important for gradient flow)
         coordinated_features = link_features + attn_out # (seq_len, num_links, hidden_size)
+        # Apply layer normalization
+        # coordinated_features = self.layer_norm(coordinated_features)
 
         # --- Phase 3: Global Aggregation ---
         # Now that every link vector contains info about the global state (thanks to attention),
@@ -736,8 +760,9 @@ class AttentionValueNetwork(nn.Module):
         return value, hidden_out
 
 def train_on_policy_multi_agent(env, agents, delta_actions=False, num_episodes=50,
-                                randomize=False, seed=None,
-                                agents_saved_dir: str = None):
+                                randomize=False,
+                                agents_saved_dir: str = None, use_wandb: bool = True,
+                                val_freq: int = 10, num_val_episodes: int = 3):
     """
     Train multiple on-policy agents (PPO) in a multi-agent environment.
 
@@ -747,12 +772,19 @@ def train_on_policy_multi_agent(env, agents, delta_actions=False, num_episodes=5
         delta_actions: If True, agents output delta actions
         num_episodes: Total number of episodes to train
         randomize: If True, randomize environment at reset
-        save_freq: Save simulation results every N episodes (0 = disabled)
-        save_dir: Base directory for saving simulation results
+        agents_saved_dir: Directory to save agent checkpoints
+        use_wandb: If True, log metrics to wandb (default: True)
+        val_freq: Validation frequency - run validation every N episodes (default: 10)
+        num_val_episodes: Number of validation episodes to run (default: 3)
 
     Returns:
         return_dict: Dict mapping agent_id -> list of episode returns
     """
+    # Initialize wandb if available and not already initialized
+    if use_wandb and WANDB_AVAILABLE:
+        if wandb.run is None:
+            wandb.init(project="crowd-control-rl", name="ppo-training")
+    
     # Initialize return tracking for each agent
     return_dict = {agent_id: [] for agent_id in agents.keys()}
     global_episode = 0  # Track global episode count for saving
@@ -779,10 +811,10 @@ def train_on_policy_multi_agent(env, agents, delta_actions=False, num_episodes=5
                     agent.reset_buffer()
 
                 # Reset environment
-                # if i_episode % 10 == 0:
-                #     obs, infos = env.reset(seed=42)
-                # else:
-                obs, infos = env.reset(seed=seed, options={'randomize': randomize})
+                if i_episode == 0:
+                    obs, infos = env.reset(options={'randomize': False})
+                else:
+                    obs, infos = env.reset(options={'randomize': randomize})
 
                 # Initialize state history queues for stacked observations
                 state_stack = {}
@@ -899,11 +931,12 @@ def train_on_policy_multi_agent(env, agents, delta_actions=False, num_episodes=5
                         env, agents, agents_saved_dir,
                         delta_actions=delta_actions,
                         num_val_episodes=num_val_episodes,
-                        randomize=True,
+                        randomize=True, # always randomize during validation
                         best_avg_return=best_avg_return,
                         global_episode=global_episode,
                         use_wandb=use_wandb and WANDB_AVAILABLE
                     )
+                    # best_avg_return = save_with_best_return(agents, agents_saved_dir, episode_returns=episode_returns, best_avg_return=best_avg_return, global_episode=global_episode)
                 # Update progress bar with both normalized and true returns
                 if (i_episode+1) % 10 == 0:
                     avg_return = np.mean([np.mean(return_dict[aid][-10:]) for aid in agents.keys()])
@@ -935,7 +968,9 @@ class PPOAgent:
                  use_delta_actions=False, max_delta=2.5,
                  lstm_hidden_size=64, num_lstm_layers=1,
                  use_stacked_obs=False, stack_size=4, hidden_size=64, kernel_size=3,
-                 use_gat_lstm=False, gat_hidden_size=64, gat_num_heads=4):
+                 use_gat_lstm=False, gat_hidden_size=64, gat_num_heads=4,
+                 use_param_noise=False, param_noise_std=0.1, param_noise_decay=0.995,
+                 param_noise_std_min=0.01):
         """
         Initialize PPO agent with LSTM, stacked observation, or GAT-LSTM networks.
 
@@ -966,6 +1001,10 @@ class PPOAgent:
             features_per_link: Features per link for GAT-LSTM (required if use_gat_lstm=True)
             gat_hidden_size: Hidden size for GAT layer (only used if use_gat_lstm=True)
             gat_num_heads: Number of attention heads in GAT (only used if use_gat_lstm=True)
+            use_param_noise: If True, apply parameter noise to actor for exploration
+            param_noise_std: Initial standard deviation for parameter noise
+            param_noise_decay: Decay factor for param_noise_std per episode (default 0.995)
+            param_noise_std_min: Minimum param_noise_std (default 0.01)
         """
         self.obs_dim = obs_dim
         self.act_dim = act_dim
@@ -1043,29 +1082,79 @@ class PPOAgent:
             self.actor_hidden = None
             self.critic_hidden = None
             # Create LSTM networks
-            self.actor = UDLSTMPolicyNetwork(obs_dim, act_dim, hidden_size=lstm_hidden_size,
-                                          num_layers=num_lstm_layers)
-            self.value_net = UDLSTMValueNetwork(obs_dim, act_dim, hidden_size=lstm_hidden_size,
-                                             num_layers=num_lstm_layers)
+            # self.actor = UDLSTMPolicyNetwork(obs_dim, act_dim, hidden_size=lstm_hidden_size,
+            #                               num_layers=num_lstm_layers)
+            # self.value_net = UDLSTMValueNetwork(obs_dim, act_dim, hidden_size=lstm_hidden_size,
+            #                                  num_layers=num_lstm_layers)
             # self.actor = LSTMPolicyNetwork(obs_dim, act_dim, hidden_size=lstm_hidden_size,
             #                               num_layers=num_lstm_layers)
             # self.value_net = LSTMValueNetwork(obs_dim, act_dim, hidden_size=lstm_hidden_size,
             #                                num_layers=num_lstm_layers)
-            # self.actor = AttentionPolicy(obs_dim, act_dim, hidden_size=lstm_hidden_size,
-            #                               num_layers=num_lstm_layers)
-            # self.value_net = AttentionValueNetwork(obs_dim, act_dim, hidden_size=lstm_hidden_size,
-            #                                        num_layers=num_lstm_layers)
+            self.actor = AttentionPolicy(obs_dim, act_dim, hidden_size=lstm_hidden_size,
+                                          num_layers=num_lstm_layers)
+            self.value_net = AttentionValueNetwork(obs_dim, act_dim, hidden_size=lstm_hidden_size,
+                                                   num_layers=num_lstm_layers)
         self.actor_optimizer = torch.optim.Adam(self.actor.parameters(), lr=actor_lr)
         self.critic_optimizer = torch.optim.Adam(self.value_net.parameters(), lr=critic_lr)
         self.device = device
 
+        # Parameter noise settings for exploration
+        self.use_param_noise = use_param_noise
+        self.param_noise_std_initial = param_noise_std
+        self.param_noise_std = param_noise_std
+        self.param_noise_decay = param_noise_decay
+        self.param_noise_std_min = param_noise_std_min
+        self._param_noise_applied = False  # Track if noise is currently applied
+        self._original_actor_params = None  # Store original params when noise is applied
+
     def reset_buffer(self):
-        """Clear rollout buffer and reset LSTM hidden states (if using LSTM or GAT-LSTM)."""
+        """Clear rollout buffer, reset LSTM hidden states, and apply parameter noise for new episode."""
         self.transition_dict = {'states': [], 'actions': [], 'next_states': [], 'rewards': [], 'dones': []}
         # Reset LSTM hidden states (only if using LSTM or GAT-LSTM, will be initialized in first forward pass)
         if not self.use_stacked_obs:
             self.actor_hidden = None
             self.critic_hidden = None
+        
+        # Apply parameter noise at the start of each episode
+        if self.use_param_noise:
+            self._apply_param_noise()
+
+    def _apply_param_noise(self):
+        """Apply Gaussian noise to actor network parameters for exploration."""
+        # First restore original params if noise was previously applied
+        if self._param_noise_applied:
+            self._restore_actor_params()
+        
+        # Store original parameters
+        self._original_actor_params = {
+            name: param.data.clone() for name, param in self.actor.named_parameters()
+        }
+        
+        # Add noise to each parameter
+        with torch.no_grad():
+            for name, param in self.actor.named_parameters():
+                if param.requires_grad:
+                    noise = torch.randn_like(param) * self.param_noise_std
+                    param.data.add_(noise)
+        
+        self._param_noise_applied = True
+
+    def _restore_actor_params(self):
+        """Restore original actor parameters (remove noise)."""
+        if self._original_actor_params is not None:
+            with torch.no_grad():
+                for name, param in self.actor.named_parameters():
+                    if name in self._original_actor_params:
+                        param.data.copy_(self._original_actor_params[name])
+            self._original_actor_params = None
+        self._param_noise_applied = False
+
+    def _decay_param_noise_std(self):
+        """Apply decay to parameter noise standard deviation."""
+        self.param_noise_std = max(
+            self.param_noise_std_min,
+            self.param_noise_std * self.param_noise_decay
+        )
 
     def store_transition(self, state, action, next_state, reward, done):
         """Store transition in buffer."""
@@ -1128,6 +1217,10 @@ class PPOAgent:
 
     def update(self):
         """Update policy and value networks using collected trajectory."""
+        # Restore original actor parameters before update (remove noise)
+        if self.use_param_noise and self._param_noise_applied:
+            self._restore_actor_params()
+        
         # Convert trajectory to tensors
         # For stacked obs: states will be (T, stack_size, obs_dim)
         # For LSTM: states will be (1, T, obs_dim)
@@ -1249,126 +1342,6 @@ class PPOAgent:
             self.actor_optimizer.step()
             self.critic_optimizer.step()
 
-        # # --- Configuration ---
-        # bptt_batch_size = 128  # Size of the truncated chunk
-        # # ---------------------
-        #
-        # # Convert trajectory to tensors
-        # states = torch.tensor(np.array(self.transition_dict['states']),
-        #                       dtype=torch.float).to(self.device)  # (T, obs_dim)
-        # actions = torch.tensor(np.array(self.transition_dict['actions'])).view(-1, self.act_dim).to(
-        #     self.device)  # (T, act_dim)
-        # rewards = torch.tensor(np.array(self.transition_dict['rewards']),
-        #                        dtype=torch.float).view(-1, 1).to(self.device)  # (T, 1)
-        # next_states = torch.tensor(np.array(self.transition_dict['next_states']),
-        #                            dtype=torch.float).to(self.device)  # (T, obs_dim)
-        # dones = torch.tensor(np.array(self.transition_dict['dones']),
-        #                      dtype=torch.float).view(-1, 1).to(self.device)  # (T, 1)
-        #
-        # # Add batch dimension for LSTM: (1, T, obs_dim)
-        # states_seq = states.unsqueeze(0)
-        # next_states_seq = next_states.unsqueeze(0)
-        #
-        # # Get total sequence length
-        # T_total = states_seq.size(1)
-        #
-        # # --- 1. PRE-COMPUTATION (Full Sequence / No Grad) ---
-        # # It is safe to process the whole sequence here because we don't backprop
-        # with torch.no_grad():
-        #     # Process entire sequences through value network
-        #     next_values, _ = self.value_net.forward_all_steps(next_states_seq)
-        #     next_values = next_values.squeeze(0)
-        #
-        #     current_values, _ = self.value_net.forward_all_steps(states_seq)
-        #     current_values = current_values.squeeze(0)
-        #
-        #     td_target = rewards + self.gamma * next_values * (1 - dones)
-        #     td_delta = td_target - current_values
-        #
-        #     advantage = compute_gae(self.gamma, self.lmbda, td_delta.cpu()).to(self.device)
-        #     advantage = (advantage - advantage.mean()) / (advantage.std() + 1e-8)
-        #
-        #     # Get old log probs
-        #     mu, std, _ = self.actor(states_seq)
-        #     mu = mu.squeeze(0)
-        #     std = std.squeeze(0)
-        #     action_dist = torch.distributions.Normal(mu, std)
-        #     old_log_probs = action_dist.log_prob(actions)
-        #
-        # # --- 2. PPO UPDATE WITH TBPTT ---
-        # for _ in range(self.epochs):
-        #
-        #     # Initialize hidden states to None (or zeros) at the start of the trajectory
-        #     # NOTE: Assuming your actor/critic forward() accepts optional hidden states
-        #     actor_hidden = None
-        #     critic_hidden = None
-        #
-        #     # Loop through the sequence in chunks
-        #     for t in range(0, T_total, bptt_batch_size):
-        #
-        #         # A. Get indices for this chunk
-        #         end_t = min(t + bptt_batch_size, T_total)
-        #
-        #         # B. Slice the Tensors for this chunk
-        #         # We keep the batch dim (1) for the model input: (1, chunk_len, dim)
-        #         states_chunk = states_seq[:, t:end_t, :]
-        #
-        #         # Flattened targets for loss calculation
-        #         actions_chunk = actions[t:end_t]
-        #         old_log_probs_chunk = old_log_probs[t:end_t]
-        #         advantage_chunk = advantage[t:end_t]
-        #         td_target_chunk = td_target[t:end_t]
-        #
-        #         # C. DETACH HIDDEN STATES
-        #         # This is the Truncated BPTT step.
-        #         # We keep the *values* of the memory, but cut the *gradient* history.
-        #         if actor_hidden is not None:
-        #             # LSTM hidden state is a tuple (h, c)
-        #             actor_hidden = (actor_hidden[0].detach(), actor_hidden[1].detach())
-        #
-        #         if critic_hidden is not None:
-        #             critic_hidden = (critic_hidden[0].detach(), critic_hidden[1].detach())
-        #
-        #         # D. Forward Pass (Actor)
-        #         # Ensure your actor returns the new hidden state
-        #         mu, std, actor_hidden = self.actor(states_chunk, actor_hidden)
-        #         mu = mu.squeeze(0)
-        #         std = std.squeeze(0)
-        #
-        #         action_dist = torch.distributions.Normal(mu, std)
-        #         log_probs = action_dist.log_prob(actions_chunk)
-        #
-        #         # E. PPO Loss Calculation (Same as before)
-        #         log_ratio = (log_probs - old_log_probs_chunk).clamp(-20, 20)
-        #         ratio = torch.exp(log_ratio)
-        #
-        #         surr1 = ratio * advantage_chunk
-        #         surr2 = torch.clamp(ratio, 1 - self.clip_eps, 1 + self.clip_eps) * advantage_chunk
-        #         actor_loss = torch.mean(-torch.min(surr1, surr2))
-        #
-        #         # F. Forward Pass (Critic)
-        #         # Ensure your value_net returns the new hidden state
-        #         current_values, critic_hidden = self.value_net.forward_all_steps(states_chunk, critic_hidden)
-        #         current_values = current_values.squeeze(0)
-        #
-        #         critic_loss = torch.mean(F.mse_loss(current_values, td_target_chunk))
-        #
-        #         # G. Update
-        #         self.actor_optimizer.zero_grad()
-        #         self.critic_optimizer.zero_grad()
-        #
-        #         actor_loss.backward()
-        #         critic_loss.backward()
-        #
-        #         if not hasattr(self, "critic_loss_history"):
-        #             self.critic_loss_history = []
-        #         self.critic_loss_history.append(critic_loss.item())
-        #
-        #         torch.nn.utils.clip_grad_norm_(self.actor.parameters(), max_norm=0.5)
-        #         torch.nn.utils.clip_grad_norm_(self.value_net.parameters(), max_norm=0.5)
-        #
-        #         self.actor_optimizer.step()
-        #         self.critic_optimizer.step()
         #     KL early stopping
             with torch.no_grad():
                 approx_kl = (log_probs - old_log_probs).mean()
@@ -1377,6 +1350,10 @@ class PPOAgent:
 
         # Decay entropy coefficient after update
         self._decay_entropy_coef()
+        
+        # Decay parameter noise std after update
+        if self.use_param_noise:
+            self._decay_param_noise_std()
 
     def _decay_entropy_coef(self):
         """Apply exponential decay to entropy coefficient."""
@@ -1404,6 +1381,10 @@ class PPOAgent:
             'max_delta': self.max_delta,
             'use_stacked_obs': self.use_stacked_obs,
             'use_gat_lstm': self.use_gat_lstm,
+            'use_param_noise': self.use_param_noise,
+            'param_noise_std': self.param_noise_std_initial,
+            'param_noise_decay': self.param_noise_decay,
+            'param_noise_std_min': self.param_noise_std_min,
         }
 
         if self.use_gat_lstm:
@@ -1429,6 +1410,10 @@ class PPOAgent:
 
     def save(self, path: str):
         """Save agent model parameters and training state."""
+        # Ensure we save original (non-noisy) parameters
+        if self.use_param_noise and self._param_noise_applied:
+            self._restore_actor_params()
+        
         torch.save({
             'actor_state_dict': self.actor.state_dict(),
             'critic_state_dict': self.value_net.state_dict(),
@@ -1437,6 +1422,7 @@ class PPOAgent:
             'config': self.get_config(),
             'update_count': self.update_count,
             'current_entropy_coef': self.entropy_coef,
+            'current_param_noise_std': self.param_noise_std if self.use_param_noise else None,
         }, path)
 
     def load(self, path: str):
@@ -1452,3 +1438,6 @@ class PPOAgent:
             self.update_count = checkpoint['update_count']
         if 'current_entropy_coef' in checkpoint:
             self.entropy_coef = checkpoint['current_entropy_coef']
+        # Restore param noise state if available
+        if 'current_param_noise_std' in checkpoint and checkpoint['current_param_noise_std'] is not None:
+            self.param_noise_std = checkpoint['current_param_noise_std']

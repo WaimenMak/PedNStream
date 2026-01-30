@@ -1,0 +1,117 @@
+# Netwrok
+network:
+  origin_nodes: [0, 1]
+  destination_nodes: [6]
+  adjacency_matrix: [ 
+    [0, 0, 1, 0, 0, 0, 0, 0, 0], # 0: Top Left
+    [0, 0, 1, 0, 0, 0, 0, 0, 0], # 1: Bottom Left
+    [1, 1, 0, 1, 1, 1, 0, 0, 0], # 2: Orange Hub
+    [0, 0, 1, 0, 0, 0, 1, 0, 0], # 3: Top Mid
+    [0, 0, 1, 0, 0, 0, 1, 0, 0], # 4: Center Mid
+    [0, 0, 1, 0, 0, 0, 1, 0, 0], # 5: Bottom Mid
+    [0, 0, 0, 1, 1, 1, 0, 1, 1], # 6: Right Hub
+    [0, 0, 0, 0, 0, 0, 1, 0, 0], # 7: Top Right
+    [0, 0, 0, 0, 0, 0, 1, 0, 0]  # 8: Bottom Right
+  ]
+
+
+
+# Simulation Parameters
+simulation:
+  simulation_steps: 600
+  unit_time: 15
+  assign_flows_type: "classic"
+  path_finder:
+    k_paths: 5
+    temp: 5 # temperature parameter for softmax, lower the sharper the distribution
+    alpha: 6 # distance weight
+    beta: 2 # congestion weight
+    omega: 4 # capacity weight
+    std_dev: 0.05 # standard deviation for stochastic path choice
+
+# Default Link Parameters
+default_link:
+  length: 60
+  width: 5
+  free_flow_speed: 1.1
+  k_critical: 2
+  k_jam: 6
+  gamma: 0.01
+  speed_noise_std: 0
+  fd_type: "yperman"
+  activity_probability: 0.1
+  bi_factor: 1
+
+
+# Link-specific Parameters (optional)
+# scenario A: one 2 one
+links:
+ "2_5":
+  width: 0.01
+ "2_3":
+   width: 0.01
+ "0_2":
+   width: 6
+ "4_6":
+   length: 90
+   front_gate_width: 3.5
+
+
+controllers:
+   enabled: true  # Set to true to enable controller-based path expansion
+   nodes: [2]  # List of node IDs that act as controllers
+
+# Demand Configuration
+demand:
+  origin_0:
+   pattern: "sudden_demand"
+   peak_lambda: 70
+   base_lambda: 40
+
+  origin_1:
+   pattern: "gaussian_peaks"
+   peak_lambda: 20
+   base_lambda: 10
+
+#  origin_26:
+#   pattern: "gaussian_peaks"
+#   peak_lambda: 20
+#   base_lambda: 10
+
+#  origin_29:
+#    pattern: "sudden_demand"
+#    peak_lambda: 40
+#    base_lambda: 20
+##
+#  origin_8:
+#    pattern: "constant"
+#    value: 30
+
+#od_flows:
+# "22_26": 10
+# "26_22": 15
+# "40_30": 15
+# "8_18": 5
+# "8_30": 10
+##  "30_33": 25
+##  "30_48": 5
+##  "30_0": 5
+# "18_30": 25
+# "18_40": 1
+# "18_6": 1
+#  "18_24": 5
+#  "48_30": 25
+#  "48_18": 25
+#  "48_0": 1
+#  "0_30": 25
+#  "0_18": 25
+#  "0_48": 1
+#  "44_18": 15
+#  "44_30": 15
+#  "44_0": 5
+#  "44_48": 1
+#  "33_18": 20
+#  "33_30": 20
+#  "30_8": 5
+#  "18_8": 0
+

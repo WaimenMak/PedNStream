@@ -13,6 +13,7 @@ Provides multi-agent RL environment with two controller types:
 """
 
 import numpy as np
+import random
 from typing import Dict, Any, Optional, List, Tuple
 from pettingzoo import ParallelEnv
 import gymnasium as gym
@@ -31,6 +32,8 @@ from handlers.output_handler import OutputHandler
 from matplotlib.animation import PillowWriter
 import os
 
+import torch
+
 
 class PedNetParallelEnv(ParallelEnv):
     """
@@ -44,7 +47,8 @@ class PedNetParallelEnv(ParallelEnv):
     metadata = {"render_modes": ["human", "animate"], "name": "pednet_v0"}
     
     def __init__(self, dataset: str, normalize_obs: bool = False, obs_mode: str = "option1",
-                 render_mode: Optional[str] = None, verbose: bool = False, action_gap: int = 1):
+                 render_mode: Optional[str] = None, verbose: bool = False, action_gap: int = 1,
+                 seed: Optional[int] = None):
         """
         Initialize the PedNet environment.
         
@@ -55,12 +59,19 @@ class PedNetParallelEnv(ParallelEnv):
             render_mode: Rendering mode ("human", "animate", or None)
             verbose: Whether to enable logging output. Default False for RL training.
             action_gap: Number of steps between applying actions. Default 1.
+            seed: Random seed for reproducibility. Set once at construction time.
         """
         super().__init__()
         
         # Store render mode (required by PettingZoo API)
         self.render_mode = render_mode
         self.verbose = verbose
+        
+        # Set random seed for reproducibility (set once at construction)
+        self._seed = seed
+        if seed is not None:
+            np.random.seed(seed)
+            random.seed(seed)
         
         # Initialize components (will be set in reset)
         self.env_generator = NetworkEnvGenerator()
@@ -93,11 +104,22 @@ class PedNetParallelEnv(ParallelEnv):
         
         # Initialize cumulative rewards
         self._cumulative_rewards = {agent: 0.0 for agent in self.possible_agents}
+        # Track previous totals for delta-based rewards (per agent)
+        self._prev_delay = {agent: 0.0 for agent in self.possible_agents}
+        self._prev_throughput = {agent: 0.0 for agent in self.possible_agents}
         # every action_gap steps, apply the actions
         self._action_gap = action_gap
+        self.last_actions = None
+        self.current_actions = None
 
         # Initialize visualizer
         self.visualizer = None
+    
+    def seed(self, seed: int) -> None:
+        """Set the random seed for reproducibility."""
+        self._seed = seed
+        np.random.seed(seed)
+        random.seed(seed)
 
     @property
     def agents(self) -> List[str]:
@@ -123,7 +145,7 @@ class PedNetParallelEnv(ParallelEnv):
         Reset the environment and return initial observations.
         
         Args:
-            seed: Random seed for reproducibility
+            seed: Ignored. For API compatibility only. Set seed in __init__ instead.
             options: Optional dictionary with reset options. Supported keys:
                 - 'randomize' (bool): Whether to randomize the network at reset (default: False)
         Returns:
@@ -140,7 +162,7 @@ class PedNetParallelEnv(ParallelEnv):
         # Always re-create network to clear state
         if randomize:
             # Use stored seed for randomization (set at construction time)
-            self.network = self.env_generator.randomize_network(self.dataset, self._seed, verbose=self.verbose)
+            self.network = self.env_generator.randomize_network(self.dataset, seed=None, verbose=self.verbose)
         else:
             # Deterministic reset using default configuration
             self.network = self.env_generator.create_network(self.dataset, verbose=self.verbose)
@@ -161,6 +183,8 @@ class PedNetParallelEnv(ParallelEnv):
         # self.timestep = 0
         self.sim_step = 1  # Network simulation starts at t=1
         self._cumulative_rewards = {agent: 0.0 for agent in self.possible_agents}
+        self._prev_delay = {agent: 0.0 for agent in self.possible_agents}
+        self._prev_throughput = {agent: 0.0 for agent in self.possible_agents}
         
         # Build initial observations
         observations = self._get_observations()
@@ -236,175 +260,290 @@ class PedNetParallelEnv(ParallelEnv):
             observations[agent_id] = self.obs_builder.build_observation(agent_id, self.sim_step)
         return observations
 
-    # def _compute_rewards(self) -> Dict[str, float]:
-    #     """
-    #     Hybrid Reward: Maximize Intersection Throughput - Minimize Upstream Congestion.
-        
-    #     R_t = (Throughput) - beta * (Congestion_Penalty)
-        
-    #     1. Throughput Term (Service Rate):
-    #        Sum of INFLOWs into the OUTGOING links.
-    #        This measures the rate at which pedestrians are successfully passing the gate/intersection.
-           
-    #     2. Congestion Term (Queue Management):
-    #        Average squared normalized density on INCOMING links.
-    #        This penalizes queue buildup upstream, preventing the "gridlock" trap.
-    #     """
-    #     rewards = {}
-    #     # beta: Weight for balancing throughput vs congestion.
-    #     # Throughput is approx 0-5. Density^2 is 0-1.
-    #     # We scale penalty by 10 to make congestion avoidance a strong priority.
-    #     beta = 1 
-    #     penalty_scale = 10.0
-        
-    #     for agent_id in self.possible_agents:
-    #         agent_type = self.agent_manager.get_agent_type(agent_id)
-    #         reward = 0.0
-            
-    #         if agent_type == 'gate':
-    #             node = self.agent_manager.get_gater_node(agent_id)
-                
-    #             # 1. Throughput: Sum of Inflow to Outgoing Links
-    #             # This is the flow immediately leaving the intersection
-    #             throughput_term = 0.0
-    #             out_links = [l for l in node.outgoing_links 
-    #                          if not (hasattr(l, 'virtual_outgoing_link') and l == l.virtual_outgoing_link)]
-                
-    #             for link in out_links:
-    #                 # We use raw flow (people per step) as the reward signal
-    #                 throughput_term += link.inflow[self.sim_step]
-                
-    #             # 2. Congestion: Penalty on Incoming Links (Upstream Queues)
-    #             # We focus on incoming links because that's where queues form if the gate is closed
-    #             congestion_penalty = 0.0
-    #             in_links = [l for l in node.incoming_links 
-    #                         if not (hasattr(l, 'virtual_incoming_link') and l == l.virtual_incoming_link)]
-                
-    #             for link in in_links:
-    #                 # Normalized density (0 to 1)
-    #                 norm_dens = link.get_density(self.sim_step) / (link.k_jam + 1e-6)
-    #                 congestion_penalty += norm_dens ** 2
-                
-    #             if in_links:
-    #                 congestion_penalty /= len(in_links)
-                
-    #             # Final Reward
-    #             reward = throughput_term - (beta * congestion_penalty * penalty_scale)
-                
-    #         elif agent_type == 'sep':
-    #             # Separator: Maximize corridor flow, minimize corridor density
-    #             f_link, r_link = self.agent_manager.get_separator_links(agent_id)
-                
-    #             # For corridors, we reward flow in both directions
-    #             # Using inflow here too for immediate feedback
-    #             throughput_term = (f_link.inflow[self.sim_step] + r_link.inflow[self.sim_step])
-                
-    #             congestion_penalty = 0.0
-    #             for link in [f_link, r_link]:
-    #                 norm_dens = link.get_density(self.sim_step) / (link.k_jam + 1e-6)
-    #                 congestion_penalty += norm_dens ** 2
-    #             congestion_penalty /= 2
-                
-    #             reward = throughput_term - (beta * congestion_penalty * penalty_scale)
-
-    #         rewards[agent_id] = reward
-            
-    #     return rewards
-
     def _compute_rewards(self) -> Dict[str, float]:
         """
-        Compute rewards for all agents based on intersection density minimization.
-        
-        Reward Function:
-        R_t = - sum_{l in L_in U L_out} (density_l / k_jam_l)^2
-        
-        This encourages the agent to balance density across the intersection,
-        preventing both upstream queuing and downstream congestion.
+        Compute rewards for all agents based on *changes* in throughput and delay,
+        plus a density-based shaping term (for gaters).
+    
+        Per-step quantities for a gater agent a:
+            - Throughput_t = Σ_out links link_flow_ℓ(t)
+            - Delay_t      = Σ_in∪out links N_ℓ(t) * max(0, T_ℓ(t) - T_ℓ^free)
+    
+        We use deltas:
+            ΔThroughput_t = Throughput_t - Throughput_{t-1}
+            ΔDelay_t      = Delay_t      - Delay_{t-1}
+    
+        Reward:
+            R_t = α * ΔThroughput_t - β * ΔDelay_t
+                + density_reward - balance * penalty
         """
-        rewards = {}
-        threshold_density = 3.5
+        rewards: Dict[str, float] = {}
+    
+        # Tunable weights
+        alpha_throughput = 0.1  # change in throughput term (start at 0 if you only trust delay)
+        beta_delay = 1.0        # change in delay term
+        balance = 1.0            # weight for density-variance penalty
+    
         for agent_id in self.possible_agents:
             agent_type = self.agent_manager.get_agent_type(agent_id)
+    
+            total_delay = 0.0
+            total_throughput = 1
+            density_reward = 0.0
             penalty = 0.0
-            
-            if agent_type == 'gate':
-                # Get node and its connected links
+    
+            if agent_type == "gate":
+                # Node and controlled outgoing links
                 node = self.agent_manager.get_gater_node(agent_id)
-                
-                # Collect densities from all connected links (incoming and outgoing)
+                out_links = self.agent_manager.get_gater_outgoing_links(agent_id)
+    
+                # --- Outgoing links: delay + throughput ---
+                for link in out_links:
+                    # N_ell(t)
+                    if self.sim_step < len(link.num_pedestrians):
+                        N_ell = link.num_pedestrians[self.sim_step]
+                    else:
+                        N_ell = 0.0
+    
+                    # T_ell(t)
+                    if self.sim_step < len(link.travel_time):
+                        T_ell = link.travel_time[self.sim_step]
+                    else:
+                        T_ell = link.travel_time[0]
+    
+                    # T_ell^free
+                    T_ell_free = link.length / link.free_flow_speed
+    
+                    # Delay in person-seconds
+                    # delay = N_ell * max(0.0, T_ell - T_ell_free)
+                    delay = T_ell
+                    total_delay += delay
+    
+                    # Throughput proxy: link_flow(t)
+                    if self.sim_step < len(link.outflow):
+                        flow = link.link_flow[self.sim_step]
+                    else:
+                        flow = 0.0
+                    total_throughput += flow
+    
+                # --- Incoming links: density shaping + extra delay ---
                 all_densities = []
-                
-                # Collect all real (non-virtual) incoming links
                 for link in node.incoming_links:
-                    if hasattr(link, 'virtual_incoming_link') and link == link.virtual_incoming_link:
+                    # Skip virtual incoming links
+                    if hasattr(link, "virtual_incoming_link") and link == link.virtual_incoming_link:
                         continue
-                    # For regular bidirectional Links, get_density() returns combined density
-                    # For Separators or unidirectional links, use directional density
-                    from src.LTM.link import Separator
-                    if isinstance(link, Separator):
-                        # Separator: use directional density (independent lanes)
-                        norm_reverse_link_density = link.reverse_link.density[self.sim_step] / (link.reverse_link.k_jam + 1e-6)
-                        norm_forward_link_density = link.density[self.sim_step] / (link.k_jam + 1e-6)
-                        normalized_density = (norm_reverse_link_density + norm_forward_link_density) / 2
-                    else:
-                        # Regular Link: use get_density() to get combined bidirectional density once
-                        density = link.get_density(self.sim_step)
-                        # high penalty for high density
-                        if density > threshold_density:
-                            penalty += 100 * (density - threshold_density)
-                        normalized_density = density / (link.k_jam + 1e-6)
-                        # normalized_density = link.get_density(self.sim_step)
-
-                    penalty += normalized_density
+    
+                    density = link.get_density(self.sim_step)
+    
+                    # Your existing density_reward: if density increases above k_critical
+                    if self.sim_step > 5:
+                        last_density = link.get_density(self.sim_step - 1)
+                        if density - last_density < 0 and density > link.k_critical:
+                            density_reward += 10.0
+    
+                    normalized_density = density / (link.k_jam + 1e-6)
                     all_densities.append(normalized_density)
-                
-                # Collect all real (non-virtual) outgoing links
-                for link in node.outgoing_links:
-                    if hasattr(link, 'virtual_outgoing_link') and link == link.virtual_outgoing_link:
-                        continue
-                    from src.LTM.link import Separator
-                    if isinstance(link, Separator):
-                        norm_reverse_link_density = link.reverse_link.density[self.sim_step] / (link.reverse_link.k_jam + 1e-6)
-                        norm_forward_link_density = link.density[self.sim_step] / (link.k_jam + 1e-6)
-                        normalized_density = (norm_reverse_link_density + norm_forward_link_density) / 2
+    
+                    # Also add delay from incoming links
+                    if self.sim_step < len(link.num_pedestrians):
+                        N_ell = link.num_pedestrians[self.sim_step]
                     else:
-                        density = link.get_density(self.sim_step)
-                        normalized_density = density / (link.k_jam + 1e-6)
-                    
-                    all_densities.append(normalized_density)
-                
-                # average the penalty of all incoming links
-                penalty /= len(node.incoming_links)
-                
-                # Add variance penalty to discourage blocking behavior
-                # High variance = unbalanced load (e.g., one link blocked, others empty)
-                # Low variance = balanced load (desired)
-                penalty = 0
-                variance_penalty_weight = 10  # Tunable hyperparameter
+                        N_ell = 0.0
+    
+                    if self.sim_step < len(link.travel_time):
+                        T_ell = link.travel_time[self.sim_step]
+                    else:
+                        T_ell = link.travel_time[0]
+    
+                    T_ell_free = link.length / link.free_flow_speed
+                    # delay = N_ell * max(0.0, T_ell - T_ell_free)
+                    delay = T_ell
+                    total_delay += delay
+    
+                    # throughput
+                    if self.sim_step < len(link.outflow):
+                        flow = link.link_flow[self.sim_step]
+                    else:
+                        flow = 0.0
+                    total_throughput += flow
+    
+                # Optional variance penalty over densities around the node
+                variance_penalty_weight = 10.0
                 if len(all_densities) > 1:
                     avg_density = np.mean(all_densities)
-                    # if avg_density > 0.5:
-                    diff = np.mean(np.abs(np.array(all_densities) - avg_density))
-                    # diff = np.max(np.abs(np.array(all_densities) - avg_density))
-                    penalty += variance_penalty_weight * diff
-
-                    
-            
-            elif agent_type == 'sep':
-                # For separator, consider both directions of the bidirectional corridor
-                forward_link, reverse_link = self.agent_manager.get_separator_links(agent_id)
-                
-                for link in [forward_link, reverse_link]:
-                    normalized_density = link.density[self.sim_step] / (link.k_jam + 1e-6)
-                    penalty += normalized_density
-                # average the penalty of all links
-                penalty /= 2
-            
-            # Reward is negative penalty (minimize congestion)
-            rewards[agent_id] = -penalty
-            # print(f"Agent {agent_id} reward: {rewards[agent_id]:.3f}")
-        
+                    # diff = np.mean(np.abs(np.array(all_densities) - avg_density))
+                    diff = np.max(np.abs(np.array(all_densities) - avg_density))
+                    penalty = variance_penalty_weight * diff
+    
+            # Keep original scale (person-seconds) for now
+            delay_scaled = total_delay # convert to person-hours
+    
+            # --- Delta terms using stored previous totals ---
+            prev_delay = self._prev_delay.get(agent_id, 0.0)
+            prev_throughput = self._prev_throughput.get(agent_id, 0.0)
+    
+            if self.sim_step > 5 :
+                delta_delay = delay_scaled - prev_delay
+                delta_throughput = total_throughput - prev_throughput
+            else:
+                delta_delay = 0.0
+                delta_throughput = 0.0
+    
+            # Action smoothness: penalty if action changes while density < critical
+            action_diverse_reward = 0.0
+            action_diverse_weight = 5.0  # Tunable weight
+            all_below_critical = True
+            for link in node.incoming_links:
+    
+                if link.get_density(self.sim_step) >= link.k_critical:
+                    all_below_critical = False
+                    break
+    
+            if not all_below_critical:
+                try:
+                    with torch.no_grad():
+                        action_diff = abs(self.current_actions[agent_id] - self.last_actions[agent_id])
+                        action_diverse_reward = action_diverse_weight * sum(action_diff)
+                        action_diverse_reward = action_diverse_reward.item()
+                except Exception:
+                    action_diverse_reward = 0.0
+    
+            density_penalty = np.sum(all_densities)/len(all_densities)
+            reward = (
+                # alpha_throughput * delta_throughput
+                # - beta_delay * delta_delay
+                - beta_delay * delay_scaled
+                # - balance * penalty
+                # + density_reward
+                # + action_diverse_reward
+                # - density_penalty
+            )
+    
+            # Update stored totals
+            self._prev_delay[agent_id] = delay_scaled
+            self._prev_throughput[agent_id] = total_throughput
+    
+            rewards[agent_id] = reward
+    
         return rewards
+
+    # def _compute_rewards(self) -> Dict[str, float]:
+    #     """
+    #     Compute rewards for all agents based on throughput maximization and delay minimization.
+
+    #     Reward Function:
+    #     R_t = α * Throughput - β * Delay
+    #     where:
+    #     - Throughput = Σ_{ℓ in L_controlled} outflow_ℓ(t) (people per time step)
+    #     - Delay = Σ_{ℓ in L_controlled} delay_ℓ(t) / 3600 (person-hours)
+    #     - delay_ℓ(t) = N_ℓ(t) * (T_ℓ(t) - T_ℓ^free) in seconds
+
+    #     This encourages agents to maximize flow while minimizing delay.
+    #     """
+    #     rewards = {}
+        
+    #     # Weight parameters (tunable)
+    #     alpha_throughput = 0  # Weight for throughput term
+    #     beta_delay = 1        # Weight for delay term (in person-hours)
+    #     balance = 0
+
+    #     for agent_id in self.possible_agents:
+    #         agent_type = self.agent_manager.get_agent_type(agent_id)
+    #         total_delay = 0.0
+    #         total_throughput = 0.0
+    #         density_reward = 0.0
+    #         if agent_type == 'gate':
+    #             # Get node and its controlled outgoing links
+    #             node = self.agent_manager.get_gater_node(agent_id)
+    #             out_links = self.agent_manager.get_gater_outgoing_links(agent_id)
+
+    #             # Compute delay and throughput for all outgoing links
+    #             for link in out_links:
+    #                 # Get current number of pedestrians
+    #                 N_ell = link.num_pedestrians[self.sim_step] if self.sim_step < len(link.num_pedestrians) else 0.0
+    #                 # N_ell = 1
+
+    #                 # Get current travel time T_ℓ(t) (in seconds)
+    #                 T_ell = link.travel_time[self.sim_step] if self.sim_step < len(link.travel_time) else link.travel_time[0]
+
+    #                 # Get free-flow travel time T_ℓ^free (in seconds)
+    #                 T_ell_free = link.length / link.free_flow_speed
+
+    #                 # Compute delay: delay_ℓ(t) = N_ℓ(t) * (T_ℓ(t) - T_ell^free) in person-seconds
+    #                 delay = N_ell * max(0, T_ell - T_ell_free)
+    #                 total_delay += delay
+                    
+    #                 # Get throughput: outflow at current time step (people per time step)
+    #                 flow = link.link_flow[self.sim_step] if self.sim_step < len(link.outflow) else 0.0
+    #                 total_throughput += flow
+
+    #             # Also consider incoming links (they affect the intersection)
+    #             all_densities = []
+    #             for link in node.incoming_links:
+    #                 if hasattr(link, 'virtual_incoming_link') and link == link.virtual_incoming_link:
+    #                     continue
+
+    #                 density = link.get_density(self.sim_step)
+    #                 if self.sim_step > 5:
+    #                     last_density = link.get_density(self.sim_step - 1)
+    #                     if density - last_density > 0 and density > link.k_critical:
+    #                         density_reward += 10
+                        
+    #                 normalized_density = density / (link.k_jam + 1e-6)
+    #                 all_densities.append(normalized_density)
+
+    #                 # Get current number of pedestrians
+    #                 N_ell = link.num_pedestrians[self.sim_step] if self.sim_step < len(link.num_pedestrians) else 0.0
+    #                 # N_ell = 1
+
+    #                 # Get current travel time (in seconds)
+    #                 T_ell = link.travel_time[self.sim_step] if self.sim_step < len(link.travel_time) else link.travel_time[0]
+
+    #                 # Get free-flow travel time (in seconds)
+    #                 T_ell_free = link.length / link.free_flow_speed
+
+    #                 # Compute delay (in person-seconds)
+    #                 delay = N_ell * max(0, T_ell - T_ell_free)
+    #                 total_delay += delay
+
+
+    #             variance_penalty_weight = 1  # Tunable hyperparameter
+    #             if len(all_densities) > 1:
+    #                 avg_density = np.mean(all_densities)
+    #                 # if avg_density > 0.5:
+    #                 diff = np.mean(np.abs(np.array(all_densities) - avg_density))
+    #                 # diff = np.max(np.abs(np.array(all_densities) - avg_density))
+    #                 penalty = variance_penalty_weight * diff
+
+            # elif agent_type == 'sep':
+            #     # For separator, consider both forward and reverse links
+            #     forward_link, reverse_link = self.agent_manager.get_separator_links(agent_id)
+            #
+            #     for link in [forward_link, reverse_link]:
+            #         # Get current number of pedestrians
+            #         N_ell = link.num_pedestrians[self.sim_step] if self.sim_step < len(link.num_pedestrians) else 0.0
+            #
+            #         # Get current travel time (in seconds)
+            #         T_ell = link.travel_time[self.sim_step] if self.sim_step < len(link.travel_time) else link.travel_time[0]
+            #
+            #         # Get free-flow travel time (in seconds)
+            #         T_ell_free = link.length / link.free_flow_speed
+            #
+            #         # Compute delay (in person-seconds)
+            #         delay = N_ell * max(0, T_ell - T_ell_free)
+            #         total_delay += delay
+            #
+            #         # Get throughput: outflow at current time step
+            #         outflow = link.flow[self.sim_step] if self.sim_step < len(link.outflow) else 0.0
+            #         total_throughput += outflow
+
+            # Convert delay from person-seconds to person-hours (divide by 3600)
+        #     delay_hours = total_delay
+            
+        #     # Combined reward: R_t = α * Throughput - β * Delay
+        #     rewards[agent_id] = alpha_throughput * total_throughput - beta_delay * delay_hours - balance * penalty + density_reward
+
+        # return rewards
 
     def _check_terminations(self) -> Dict[str, bool]:
         """

@@ -33,7 +33,7 @@ class RuleBasedGaterAgent(BaseAgent):
         self.threshold_density = threshold_density
         self.features_per_link = 4  # density, inflow, reverse_outflow, current_width
 
-    def take_action(self, obs: np.ndarray) -> np.ndarray:
+    def take_action(self, obs: np.ndarray, deterministic: bool = False) -> np.ndarray:
         """
         Calculates actions based on basic rules.
 
@@ -46,21 +46,21 @@ class RuleBasedGaterAgent(BaseAgent):
             np.ndarray: An array of target gate widths for each outgoing link.
         """
         # First, calculate average downstream density across all outgoing links
-        # downstream_densities = []
-        # for i in range(len(self.outgoing_links)):
-        #     start_idx = i * self.features_per_link
-        #     link_obs = obs[start_idx: start_idx + self.features_per_link]
-        #     # The observation vector is structured as:
-        #     # [inflow, reverse_outflow, density, current_width]
-        #     density = link_obs[2]  # density
-        #     downstream_densities.append(density)
-        #
-        # avg_downstream_density = np.mean(downstream_densities) if downstream_densities else 0.0
-        #
-        # # If average downstream density is not higher than threshold, open all gates to max width
-        # if avg_downstream_density <= 2:
-        #     actions = [link.width for link in self.outgoing_links]
-        #     return np.array(actions, dtype=np.float32)
+        downstream_densities = []
+        for i in range(len(self.outgoing_links)):
+            start_idx = i * self.features_per_link
+            link_obs = obs[start_idx: start_idx + self.features_per_link]
+            # The observation vector is structured as:
+            # [inflow, reverse_outflow, density, current_width]
+            density = link_obs[2]  # density
+            downstream_densities.append(density)
+
+        avg_downstream_density = np.mean(downstream_densities) if downstream_densities else 0.0
+
+        # If average downstream density is not higher than threshold, open all gates to max width
+        if avg_downstream_density <= 2:
+            actions = [link.width for link in self.outgoing_links]
+            return np.array(actions, dtype=np.float32)
         
         # Otherwise, apply per-link logic
         actions = []
@@ -82,7 +82,7 @@ class RuleBasedGaterAgent(BaseAgent):
             #     new_target_width = self.outgoing_links[i].width
             if density > self.threshold_density:
                 new_target_width = current_width + change_in_width
-            elif density > self.threshold_density:
+            elif density < self.threshold_density:
                 new_target_width = current_width - change_in_width
             else:
                 # Keep gate open to max width (action space high bound)
@@ -146,7 +146,7 @@ class RuleBasedSeparatorAgent(BaseAgent):
         # Return moving average
         return float(np.mean(buffer))
 
-    def take_action(self, obs: np.ndarray) -> np.ndarray:
+    def take_action(self, obs: np.ndarray, deterministic: bool = False) -> np.ndarray:
         """
         Calculates actions based on the inflows of the link and reversed link.
         
@@ -175,9 +175,12 @@ class RuleBasedSeparatorAgent(BaseAgent):
 
 if __name__ == "__main__":
     from rl.pz_pednet_env import PedNetParallelEnv
-    dataset = "45_intersections"
+    from rl.rl_utils import RunningNormalizeWrapper
+    # dataset = "one_intersection_v0"
+    dataset = "butterfly_scC"
     # dataset = "small_network"
     env = PedNetParallelEnv(dataset, obs_mode="option2", action_gap=1, render_mode="animate", verbose=True)
+    env = RunningNormalizeWrapper(env, norm_obs=False, norm_reward=True)
 
     #create a rule-based agents
     rule_based_gater_agents = {}
@@ -188,27 +191,46 @@ if __name__ == "__main__":
         rule_based_separator_agents[agent_id] = RuleBasedSeparatorAgent(env.agent_manager.get_separator_links(agent_id)[0].width, use_smoothing=True, buffer_size=5)
 
     episode_rewards = {agent_id: 0.0 for agent_id in env.agents}
-    observations, infos = env.reset(seed=3, options={"randomize": False})
-    # observations, infos = env.reset(seed=42, options={"randomize": True})
-    # observations, infos = env.reset(seed=43, options={"randomize": True})
+    observations, infos = env.reset(options={"randomize": False})
+    # observations, infos = env.reset(options={"randomize": True})
     # for step in range(env.simulation_steps):
     done = False
+    rewards_list = []
     while not done:
+        # actions = {}
+        # for agent_id in env.agents:
+        #     if agent_id in rule_based_gater_agents:
+        #         actions[agent_id] = rule_based_gater_agents[agent_id].take_action(observations[agent_id])
+        #     elif agent_id in rule_based_separator_agents:
+        #         actions[agent_id] = rule_based_separator_agents[agent_id].take_action(observations[agent_id])
         actions = {}
         for agent_id in env.agents:
-            if agent_id in rule_based_gater_agents:
-                actions[agent_id] = rule_based_gater_agents[agent_id].take_action(observations[agent_id])
-            elif agent_id in rule_based_separator_agents:
-                actions[agent_id] = rule_based_separator_agents[agent_id].take_action(observations[agent_id])
+            action_space = env.action_space(agent_id)
+            if action_space.shape == (1,):
+                actions[agent_id] = action_space.low
+            else:
+                actions[agent_id] = action_space.sample()
             # print(actions[agent_id])
             # if agent_id == "gate_24":
             #     print(f"Step {step}: Agent {agent_id} action: {actions[agent_id]}")
         #         pass
         observations, rewards, terminations, truncations, infos = env.step(actions)
+        rewards_list.append(rewards.items())
         done = any(terminations.values()) or any(truncations.values())
         for agent_id in env.agents:
             episode_rewards[agent_id] += rewards[agent_id]
 
+    # plot rewards over time
+    import matplotlib.pyplot as plt
+    rewards_array = np.array([[reward for _, reward in step_rewards] for step_rewards in
+                                rewards_list])
+    for agent_idx, agent_id in enumerate(env.agents):
+        plt.plot(rewards_array[:, agent_idx], label=f"Agent {agent_id}")
+    plt.xlabel("Time Step")
+    plt.ylabel("Reward")
+    plt.title("Agent Rewards Over Time")
+    plt.legend()
+    plt.show()
     # final rewards
     for agent_id in env.possible_agents:
         print(f"Agent {agent_id} final reward: {episode_rewards[agent_id]}")

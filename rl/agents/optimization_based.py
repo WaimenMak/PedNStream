@@ -755,7 +755,7 @@ class DecentralizedOptimizationAgent(OptimizationBasedAgent):
             # Calculate Variance (Minimizing spatial unevenness)
             N_next = N_next.reshape(2, -1).sum(axis=0)
             obj = np.var(N_next)
-            # return np.sum(N_next)
+            # obj = np.sum(N_next)
             # obj = np.max(N_next)
             return obj
         
@@ -799,15 +799,16 @@ if __name__ == "__main__":
     from rl.pz_pednet_env import PedNetParallelEnv
     
     # Test with small network
-    dataset = "small_network"
+    # dataset = "small_network"
     # dataset = "two_coordinators"
-    # dataset = "45_intersections"
+    # dataset = "one_intersection_v0"
+    dataset = "butterfly_scB"
     env = PedNetParallelEnv(dataset, obs_mode="option2", action_gap=1,
                            render_mode="animate", verbose=True)
     
     # Create optimization-based agent (choose centralized or decentralized)
     use_centralized = False  # Set to True for centralized optimization
-    observations, infos = env.reset(seed=42, options={"randomize": False})
+    observations, infos = env.reset(options={"randomize": True})
     if use_centralized:
         print("Using Centralized Optimization Agent")
         # opt_agent = CentralizedOptimizationAgent(

@@ -19,8 +19,8 @@ import random
 
 # Avoid circular imports: only import agent classes for type checking
 if TYPE_CHECKING:
-    from rl.agents.PPO import PPOAgent
-    from rl.agents.SAC import SACAgent
+    # from rl.agents.PPO_org import PPOAgent
+    # from rl.agents.SAC import SACAgent
     from rl.agents.rule_based import RuleBasedGaterAgent
     from rl.agents.optimization_based import DecentralizedOptimizationAgent
 
@@ -482,11 +482,12 @@ def validate_and_save_best(env, agents, save_dir: str, delta_actions: bool = Fal
         best_avg_return = avg_val_return
         
         metadata = {
-            'episode': global_episode,
+            'episode': int(global_episode),
             'val_avg_return': float(avg_val_return),
-            'val_episode_returns': val_result['episode_returns'],
+            # Ensure all values are native Python floats for JSON serialization
+            'val_episode_returns': [float(r) for r in val_result['episode_returns']],
             'val_agent_returns': {aid: float(r) for aid, r in val_result['agent_returns'].items()},
-            'num_val_episodes': num_val_episodes
+            'num_val_episodes': int(num_val_episodes)
         }
         save_all_agents(agents, save_dir, metadata=metadata)
         print(f"[Validation] New best avg return: {best_avg_return:.3f} at episode {global_episode} "
@@ -1512,7 +1513,7 @@ def compute_network_congestion_metric(simulation_dir=None):
 def _evaluate_single_run(env, agents, delta_actions: bool, deterministic: bool, no_control: bool, randomize: bool):
     """Run a single evaluation episode. Internal helper function."""
     # Lazy import to avoid circular dependency (import only when function is called)
-    from rl.agents.PPO import PPOAgent
+    from rl.agents.PPO_org import PPOAgent
     from rl.agents.SAC import SACAgent
     from rl.agents.rule_based import RuleBasedGaterAgent
     from rl.agents.optimization_based import DecentralizedOptimizationAgent
@@ -1561,15 +1562,13 @@ def _evaluate_single_run(env, agents, delta_actions: bool, deterministic: bool, 
                 
                 # Check if agent has deterministic option (PPOAgent)
                 if hasattr(agent, 'take_action'):
-                    # if isinstance(agent, PPOAgent) or isinstance(agent, SACAgent):
-                    #     action = agent.take_action(agent_state, deterministic=deterministic)
                     if isinstance(agent, DecentralizedOptimizationAgent):
                         # Agent doesn't support deterministic kwarg
                         # action = agent.take_action(agent_state, time_step=env.sim_step-1)
                         action = agent.take_action(agent_state, time_step=env.sim_step-1)
                         # step += 1
                     else:
-                        action = agent.take_action(agent_state)
+                        action = agent.take_action(agent_state, deterministic=deterministic)
                 else:
                     action = agent.act(agent_state)
                 
@@ -1679,6 +1678,13 @@ def evaluate_agents(env, agents, delta_actions: bool = False, deterministic: boo
         all_runs.append(result)
         total_rewards.append(result['total_reward'])
         avg_rewards.append(result['avg_reward'])
+
+        # After each run, show the average reward across agents for the whole episode
+        if verbose:
+            if num_runs > 1:
+                print(f"Avg agent reward (episode): {result['avg_reward']:.3f} | Total reward: {result['total_reward']:.3f}")
+            else:
+                print(f"Avg agent reward (episode): {result['avg_reward']:.3f} | Total reward: {result['total_reward']:.3f}")
         
         # Collect individual agent rewards
         for agent_id in agents.keys():

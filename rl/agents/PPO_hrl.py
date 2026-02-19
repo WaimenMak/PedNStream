@@ -585,6 +585,13 @@ class PPOAgentHRL:
             duration_idx = np.random.choice(top_k_indices.detach().cpu().numpy(), size=1, p=top_k_probs_normalized.detach().cpu().numpy())[0]
             duration = int(duration_idx) + 1
             print(duration)
+
+            # New: temperature-scaled sampling over full duration distribution for
+            # mostly-stable but slightly stochastic durations at inference.
+            # tau = max(getattr(self, "duration_temperature_eval", 0.7), 1e-3)
+            # dur_probs_eval = F.softmax(dur_logits / tau, dim=-1).detach().squeeze(0)
+            # dur_dist = torch.distributions.Categorical(dur_probs_eval)
+            # duration = int(dur_dist.sample().item()) + 1  # 1-indexed
         else:
             dur_dist = torch.distributions.Categorical(dur_probs)
             duration = int(dur_dist.sample().item()) + 1  # 1-indexed

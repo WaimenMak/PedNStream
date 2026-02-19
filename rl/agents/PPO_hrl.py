@@ -373,6 +373,8 @@ class PPOAgentHRL:
         self.duration_entropy_coef_initial = duration_entropy_coef
         self.duration_entropy_coef_min = duration_entropy_coef_min
         self.value_fusion = value_fusion
+        # Temperature used only for duration sampling at inference (deterministic=True)
+        self.duration_temperature_eval = 0.7
 
         # Entropy coefficient with exponential decay
         self.entropy_coef_initial = entropy_coef

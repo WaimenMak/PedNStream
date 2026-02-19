@@ -96,8 +96,8 @@ class Link(BaseLink):
 
         # For efficient moving average calculation
         self.avg_travel_time_window = round(100 / self.unit_time)
-        self.avg_travel_time = np.zeros(simulation_steps + 1, dtype=np.float32)
-        self.avg_travel_time[:self.avg_travel_time_window] = self.travel_time[0] # initialize the first window
+        self.avg_travel_time = np.ones(simulation_steps + 1, dtype=np.float32) * self.travel_time[0]
+        # self.avg_travel_time[:self.avg_travel_time_window] = self.travel_time[0] # initialize the first window
 
         # Additional dynamic attributes
         self.num_pedestrians = np.zeros(simulation_steps + 1, dtype=np.float32)
@@ -280,8 +280,8 @@ class Link(BaseLink):
         else:   
             # if time_step - tau + 1 < 0: # congestion stage
             ''' for the normal stage or the congestion stage '''
-            idx = max(0, time_step + 1 - tau)
-            # idx = min(max(0, time_step + 1 - tau), len(self.cumulative_inflow) - 1)
+            # idx = max(0, time_step + 1 - tau)
+            idx = min(max(0, time_step + 1 - tau), len(self.cumulative_inflow) - 1)
             # sending_flow_boundary = max(0, self.cumulative_inflow[idx] - self.cumulative_outflow[time_step])
             # if density > self.k_critical:  # congestion stage
             #     sending_flow_boundary = self.num_pedestrians[time_step]

@@ -575,6 +575,7 @@ class PPOAgentHRL:
         # --- Discrete duration ---
         dur_probs = F.softmax(dur_logits, dim=-1).squeeze(0)  # (max_duration,)
         if deterministic:
+            # Original top-k sampling for duration (kept for reference):
             # duration = int(dur_probs.argmax().item()) + 1  # 1-indexed
             # sample top k
             top_k = 2

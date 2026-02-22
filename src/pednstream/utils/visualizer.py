@@ -78,7 +78,8 @@ class NetworkVisualizer:
         :param edge_property: Property to visualize ('density', 'flow', or 'speed')
         """
         # Create figure and axis
-        fig, ax = plt.subplots(figsize=figsize)
+        fig, ax = plt.subplots(figsize=figsize, facecolor='lightgrey')
+        ax.set_facecolor('lightgrey')
         # fix the size of the figure
                 # Calculate fixed axis limits once
         x_coords = [coord[0] for coord in self.pos.values()]
@@ -444,7 +445,7 @@ class NetworkVisualizer:
                 end_time = self.network.simulation_steps
         
         # Create initial figure
-        fig, ax = plt.subplots(figsize=figsize)
+        fig, ax = plt.subplots(figsize=figsize, facecolor='lightgrey')
         # G = nx.DiGraph()
 
         # Initialize the position if not already set
@@ -485,29 +486,42 @@ class NetworkVisualizer:
         def update(frame):
             fig.clear()
             ax = fig.add_subplot(111)
+            ax.set_facecolor('lightgrey')
             
             # Update edge values
             edge_labels = {}  # Dictionary to store edge labels
             if self.from_saved:
                 for link_id, link_info in self.link_data.items():
                     u, v = link_id.split('-')
-                    if edge_property == 'density':
-                        value = link_info['density'][frame]
-                    elif edge_property == 'flow':
-                        value = link_info['link_flow'][frame]
-                    elif edge_property == 'speed':
-                        value = link_info['speed'][frame]
+                    try:
+                        if edge_property == 'density':
+                            value = link_info['density'][frame]
+                        elif edge_property == 'flow':
+                            value = link_info['link_flow'][frame]
+                        elif edge_property == 'speed':
+                            value = link_info['speed'][frame]
+                        else:
+                            value = 0
+                    except (KeyError, IndexError):
+                        value = 0
+                        
                     self.G[u][v]['value'] = value
                     if tag:  # Only create labels if tag is True
                         edge_labels[(u, v)] = f'{value:.2f}'
             else:
                 for (u, v), link in self.network.links.items():
-                    if edge_property == 'density':
-                        value = link.density[frame]
-                    elif edge_property == 'flow':
-                        value = link.link_flow[frame]
-                    elif edge_property == 'speed':
-                        value = link.speed[frame]
+                    try:
+                        if edge_property == 'density':
+                            value = link.density[frame]
+                        elif edge_property == 'flow':
+                            value = link.link_flow[frame]
+                        elif edge_property == 'speed':
+                            value = link.speed[frame]
+                        else:
+                            value = 0
+                    except (KeyError, IndexError, AttributeError):
+                        value = 0
+                        
                     self.G[u][v]['value'] = value
                     if tag:  # Only create labels if tag is True
                         edge_labels[(u, v)] = f'{value:.2f}'
@@ -759,7 +773,8 @@ class NetworkVisualizer:
         y_max += y_padding
 
         # Figure and axes
-        fig, ax = plt.subplots(figsize=figsize)
+        fig, ax = plt.subplots(figsize=figsize, facecolor='lightgrey')
+        ax.set_facecolor('lightgrey')
 
         # Draw base nodes (origins red, destinations pink, others lightblue)
         origin_nodes = set(str(n) for n in getattr(self.network, 'origin_nodes', []))
@@ -866,7 +881,10 @@ class NetworkVisualizer:
             if link_ids is None:
                 link_ids = list(self.link_data.keys())[:3]
             
-            fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(12, 10))
+            fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(12, 10), facecolor='lightgrey')
+            ax1.set_facecolor('lightgrey')
+            ax2.set_facecolor('lightgrey')
+            ax3.set_facecolor('lightgrey')
             
             for link_id in link_ids:
                 link_info = self.link_data[link_id]
@@ -893,7 +911,10 @@ class NetworkVisualizer:
             if link_ids is None:
                 link_ids = list(self.network.links.keys())[:3]
             
-            fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(12, 10))
+            fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(12, 10), facecolor='lightgrey')
+            ax1.set_facecolor('lightgrey')
+            ax2.set_facecolor('lightgrey')
+            ax3.set_facecolor('lightgrey')
             
             for link_id in link_ids:
                 link = self.network.links[link_id]

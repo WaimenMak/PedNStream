@@ -319,6 +319,204 @@ class DurationAttentionValueNetwork(nn.Module):
 
 
 # =============================================================================
+# Duration-Augmented UD (Upstream/Downstream) Networks
+# =============================================================================
+
+class UDDurationPolicyNetwork(nn.Module):
+    """
+    LSTM-based policy network with upstream/downstream link aggregation
+    and duration head for temporal abstraction.
+
+    Each link's action is informed by:
+    1. Its own temporal features (from shared LSTM)
+    2. Aggregated features from all other links (upstream/downstream context)
+
+    Two output heads:
+      1. Action head (continuous): outputs (mean, std) for delta widths
+      2. Duration head (discrete): outputs logits over {1, ..., max_duration}
+    """
+
+    def __init__(self, obs_dim, act_dim, hidden_size=64, num_layers=1,
+                 min_std=1e-3, max_std=2.0, max_duration=5):
+        super().__init__()
+        self.obs_dim = obs_dim
+        self.act_dim = act_dim
+        self.features_per_link = obs_dim // act_dim
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
+        self.min_std = min_std
+        self.max_std = max_std
+        self.max_duration = max_duration
+
+        # Shared LSTM for processing each link's temporal data
+        self.lstm = nn.LSTM(
+            input_size=self.features_per_link,
+            hidden_size=hidden_size,
+            num_layers=num_layers,
+            batch_first=True
+        )
+
+        # Link-specific feature extractor
+        self.link_model = nn.Linear(hidden_size, hidden_size)
+
+        # Upstream/Downstream aggregation model
+        # Input: [link_features, other_links_sum] -> hidden_size
+        self.ud_model = nn.Linear(2 * hidden_size, hidden_size)
+
+        # Shared latent layer for action coordination
+        self.shared_latent_layer = nn.Linear(hidden_size * act_dim, hidden_size * act_dim)
+
+        # ---- Action head (per-link, continuous) ----
+        self.mean_head = nn.Linear(hidden_size, 1)
+        self.std_head = nn.Linear(hidden_size, 1)
+
+        # ---- Duration head (global, discrete) ----
+        # Aggregate link features → global feature → duration logits
+        self.duration_fc = nn.Sequential(
+            nn.Linear(hidden_size + act_dim, hidden_size // 2),
+            nn.ReLU(),
+            nn.Linear(hidden_size // 2, max_duration)
+        )
+
+    def forward(self, x, hidden=None):
+        """
+        Forward pass with upstream/downstream aggregation.
+
+        Args:
+            x: (1, seq_len, obs_dim) or (seq_len, obs_dim)
+            hidden: Optional tuple (h, c) of hidden states
+
+        Returns:
+            mean:       (seq_len, act_dim) — action means
+            std:        (seq_len, act_dim) — action stds
+            dur_logits: (seq_len, max_duration) — duration class logits
+            hidden:     updated LSTM hidden state
+        """
+        if x.dim() == 3:
+            x = x.squeeze(0)
+        seq_len = x.shape[0]
+
+        # Reshape input: (seq_len, num_links * features) -> (num_links, seq_len, features)
+        x_lstm_input = x.view(seq_len, self.act_dim, self.features_per_link).transpose(0, 1)
+
+        # LSTM forward (shared weights across all links)
+        lstm_out, hidden_out = self.lstm(x_lstm_input, hidden)  # (num_links, seq_len, hidden_size)
+        lstm_features = lstm_out.transpose(0, 1)  # (seq_len, num_links, hidden_size)
+
+        # Extract link-specific features
+        link_features = self.link_model(lstm_features)  # (seq_len, num_links, hidden_size)
+
+        # Compute sum of all link features
+        all_links_sum = link_features.sum(dim=1)  # (seq_len, hidden_size)
+
+        # For each link, get "other links" features by subtracting its own
+        other_links_features = all_links_sum.unsqueeze(1) - link_features  # (seq_len, num_links, hidden_size)
+
+        # Concatenate each link's features with aggregated other links' features
+        combined_features = torch.cat([link_features, other_links_features], dim=2)  # (seq_len, num_links, 2*hidden_size)
+
+        # Process through UD model
+        ud_features = self.ud_model(combined_features)  # (seq_len, num_links, hidden_size)
+
+        # Flatten features for shared latent layer
+        shared_features = ud_features.view(seq_len, -1)  # (seq_len, num_links * hidden_size)
+        shared_latent = self.shared_latent_layer(shared_features)  # (seq_len, num_links * hidden_size)
+        shared_latent = shared_latent.view(seq_len, self.act_dim, self.hidden_size)  # (seq_len, num_links, hidden_size)
+
+        # shared_latent = ud_features
+        # Action head (per-link)
+        mean = self.mean_head(F.relu(shared_latent)).squeeze(-1)  # (seq_len, act_dim)
+        std = F.softplus(self.std_head(F.relu(shared_latent))).squeeze(-1).clamp(self.min_std, self.max_std)
+
+        # Duration head (global): mean-pool over links → logits
+        global_feat = shared_latent.mean(dim=1)  # (seq_len, hidden_size)
+        dur_logits = self.duration_fc(torch.cat([global_feat, mean], dim=-1))  # (seq_len, max_duration)
+
+        return mean, std, dur_logits, hidden_out
+
+
+class UDDurationValueNetwork(nn.Module):
+    """
+    LSTM-based value network with upstream/downstream link aggregation
+    for HRL with duration-augmented actions.
+
+    Uses the same UD aggregation as UDDurationPolicyNetwork for consistency.
+    """
+
+    def __init__(self, obs_dim, act_dim, hidden_size=64, num_layers=1):
+        super().__init__()
+        self.obs_dim = obs_dim
+        self.act_dim = act_dim
+        self.num_links = act_dim
+        self.features_per_link = obs_dim // act_dim
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
+
+        # Shared LSTM
+        self.lstm = nn.LSTM(
+            input_size=self.features_per_link,
+            hidden_size=hidden_size,
+            num_layers=num_layers,
+            batch_first=True
+        )
+
+        # Link feature extractor
+        self.link_model = nn.Linear(hidden_size, hidden_size)
+
+        # UD aggregation
+        self.ud_model = nn.Linear(2 * hidden_size, hidden_size)
+
+        # Global value head
+        self.value_head = nn.Linear(hidden_size, 1)
+
+    def forward(self, x, hidden=None):
+        """
+        Forward pass with upstream/downstream aggregation.
+
+        Args:
+            x: (1, seq_len, obs_dim) or (seq_len, obs_dim)
+            hidden: Optional tuple (h, c) of hidden states
+
+        Returns:
+            value:  (seq_len, 1)
+            hidden: updated (h, c)
+        """
+        if x.dim() == 3:
+            x = x.squeeze(0)
+        seq_len = x.shape[0]
+
+        # Reshape input
+        x_lstm_input = x.view(seq_len, self.num_links, self.features_per_link).transpose(0, 1)
+
+        # LSTM forward
+        lstm_out, hidden_out = self.lstm(x_lstm_input, hidden)
+        lstm_features = lstm_out.transpose(0, 1)  # (seq_len, num_links, hidden_size)
+
+        # Extract link-specific features
+        link_features = self.link_model(lstm_features)  # (seq_len, num_links, hidden_size)
+
+        # Compute sum of all link features
+        all_links_sum = link_features.sum(dim=1)  # (seq_len, hidden_size)
+
+        # For each link, subtract its own features to get "other links" sum
+        other_links_features = all_links_sum.unsqueeze(1) - link_features  # (seq_len, num_links, hidden_size)
+
+        # Concatenate each link's features with aggregated other links' features
+        combined_features = torch.cat([link_features, other_links_features], dim=2)  # (seq_len, num_links, 2*hidden_size)
+
+        # Process through UD model
+        ud_features = self.ud_model(combined_features)  # (seq_len, num_links, hidden_size)
+
+        # Aggregate across links (mean pooling for global value)
+        global_features = ud_features.mean(dim=1)  # (seq_len, hidden_size)
+
+        # Compute value
+        value = self.value_head(F.elu(global_features))  # (seq_len, 1)
+
+        return value, hidden_out
+
+
+# =============================================================================
 # HRL PPO Agent
 # =============================================================================
 

@@ -319,7 +319,7 @@ class PedNetParallelEnv(ParallelEnv):
 
                 w1 = 2.0  # throughput
                 w2 = 1.0  # delay
-                w3 = 0.0  # fairness
+                w3 = 0.01  # fairness
                 agent_rewards = w1*flow_term + w2*tt_term + w3*diff_term
                 # print(f"Agent {agent_id} reward components: flow={flow_term:.3f}, tt={tt_term:.3f}, diff={diff_term:.3f}, total={agent_rewards:.3f}")
                 rewards[agent_id] = agent_rewards

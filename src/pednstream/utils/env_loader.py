@@ -231,7 +231,7 @@ class NetworkEnvGenerator:
         original_demand_config = self._original_config['params'].get('demand', {})
         demand_params = {}
         
-        available_patterns = ['gaussian_peaks', 'constant', 'sudden_demand', 'multi_peaks']
+        available_patterns = ['gaussian_peaks', 'constant', 'sudden_demand', 'multi_peaks', 'single_peak']
         
         # Default values if not specified in config
         default_base_lambda = 10.0
@@ -258,7 +258,7 @@ class NetworkEnvGenerator:
             # Randomize pattern (use existing as more likely choice)
             existing_pattern = origin_config.get('pattern', None)
             if existing_pattern and np.random.random() < 0.5:
-                # 70% chance to keep existing pattern
+                # 50% chance to keep existing pattern
                 pattern = existing_pattern
             else:
                 pattern = np.random.choice(available_patterns)
@@ -283,6 +283,10 @@ class NetworkEnvGenerator:
                 'base_lambda': float(base_lambda),
                 'peak_lambda': float(peak_lambda),
             }
+            
+            # For single_peak pattern, randomize peak_position (0.1-0.9)
+            if pattern == 'single_peak':
+                demand_params[origin_key]['peak_position'] = float(np.random.uniform(0.1, 0.9))
         
         # Optionally shuffle demand profiles across origins for extra diversity
         demand_params = self._shuffle_demand_among_origins(demand_params, shuffle_prob=0.5)

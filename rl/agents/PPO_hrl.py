@@ -572,7 +572,7 @@ class PPOAgentHRL:
         self.duration_entropy_coef_min = duration_entropy_coef_min
         self.value_fusion = value_fusion
         # Temperature used only for duration sampling at inference (deterministic=True)
-        self.duration_temperature_eval = 0.7
+        # self.duration_temperature_eval = 0.7
 
         # Entropy coefficient with exponential decay
         self.entropy_coef_initial = entropy_coef
@@ -788,7 +788,7 @@ class PPOAgentHRL:
                 p=top_k_probs_normalized.detach().cpu().numpy(),
             )[0]
             duration = int(duration_idx) + 1
-            print(duration)
+            # print(duration)
 
             # New: temperature-scaled sampling over full duration distribution for
             # mostly-stable but slightly stochastic durations at inference.

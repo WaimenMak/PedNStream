@@ -45,7 +45,7 @@ if __name__ == "__main__":
     SEED = 77
     NORM = False   # running mean-std normalization for observations
     builder_norm_obs = False  # normalize observations in the environment builder
-    STATE_OPTION = "option3"
+    STATE_OPTION = "option4"
     randomize = True
     norm_ret = True
     action_gap = 1
@@ -64,7 +64,7 @@ if __name__ == "__main__":
     # dataset = "two_coordinators"
     # dataset = "one_intersection_v0"
     # dataset = "small_network"
-    dataset = "butterfly_scB"
+    dataset = "butterfly_scF"
 
     # Create environment with normalization wrapper
     base_env = PedNetParallelEnv(
@@ -208,7 +208,7 @@ if __name__ == "__main__":
             use_param_noise=False,
             use_action_noise=False,
             num_episodes=300,
-            tm_window=50,
+            tm_window=20,
             max_duration=7,
             duration_entropy_coef=0.05,
             duration_entropy_coef_min=0.001,

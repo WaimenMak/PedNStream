@@ -10,6 +10,7 @@ class DemandConfig:
     base_lambda: float = 5.0
     seed: int = 42
     pattern: str = 'gaussian_peaks'
+    peak_position: float = 0.5  # Position of peak in simulation (0.0-1.0)
 
 class ODManager:
     """Manages Origin-Destination flows and operations"""
@@ -71,6 +72,7 @@ class DemandGenerator:
             'constant': self.generate_constant,
             'sudden_demand': self.generate_sudden_demand,
             'multi_peaks': self.generate_multi_peaks,
+            'single_peak': self.generate_single_peak,
         }
 
     def register_pattern(self, pattern_name: str, pattern_func: Callable):
@@ -93,7 +95,8 @@ class DemandGenerator:
                 peak_lambda=origin_config.get('peak_lambda', 10.0),
                 base_lambda=origin_config.get('base_lambda', 5.0),
                 seed=self.seed,  # use the seed from the simulation params
-                pattern=origin_config.get('pattern', 'gaussian_peaks')
+                pattern=origin_config.get('pattern', 'gaussian_peaks'),
+                peak_position=origin_config.get('peak_position', 0.5)
             )
         except KeyError:
             self.logger.info(f"No demand configuration found for origin {origin_id}, using defaults")
@@ -159,6 +162,40 @@ class DemandGenerator:
         for pos, mult, width in zip(positions, multipliers, widths):
             peak = config.peak_lambda * mult * np.exp(-(self.time - pos)**2 / (2 * width**2))
             lambda_t += peak
+        
+        # Only reseed if seed is explicitly provided, otherwise use current random state
+        if self.seed is not None:
+            np.random.seed(self.seed)
+        return np.random.poisson(lam=lambda_t)
+
+    def generate_single_peak(self, origin_id: int, params=None) -> np.ndarray:
+        """
+        Generate demand pattern with a single peak at a configurable position.
+        
+        Uses config.peak_position (0.0-1.0) to determine where the peak occurs
+        in the simulation timeline. This allows different origins to have peaks
+        at different times, creating staggered demand patterns.
+        
+        Configuration in YAML:
+        demand:
+          origin_0:
+            pattern: 'single_peak'
+            base_lambda: 5.0
+            peak_lambda: 15.0
+            peak_position: 0.3  # Peak at 30% of simulation time
+        """
+        config = self._get_demand_config(origin_id)
+        t = self.simulation_steps
+        
+        # Calculate center step based on peak_position (0.0-1.0)
+        center_step = t * config.peak_position
+        
+        # Sigma controls the width of the peak (simulation_steps / 10)
+        sigma = t / 10
+        
+        # Generate single Gaussian peak
+        peak = config.peak_lambda * np.exp(-(self.time - center_step)**2 / (2 * sigma**2))
+        lambda_t = config.base_lambda + peak
         
         # Only reseed if seed is explicitly provided, otherwise use current random state
         if self.seed is not None:

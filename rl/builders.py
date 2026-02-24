@@ -160,7 +160,7 @@ class ObservationBuilder:
                     link.outflow[time_step] if time_step < len(link.outflow) else 0.0,
                     link.reverse_link.inflow[time_step] if time_step < len(link.reverse_link.inflow) else 0.0,
                     link.reverse_link.outflow[time_step] if time_step < len(link.reverse_link.outflow) else 0.0,
-                    link.get_density(time_step)/link.k_jam if time_step < len(link.speed) else 0.0,
+                    link.get_density(time_step) if time_step < len(link.density) else 0.0,
                     link.back_gate_width,
                 ]
             elif self.obs_mode == "option5":

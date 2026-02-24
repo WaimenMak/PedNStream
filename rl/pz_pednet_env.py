@@ -16,7 +16,7 @@ import numpy as np
 import random
 from typing import Dict, Any, Optional, List, Tuple
 from pettingzoo import ParallelEnv
-import gymnasium as gym
+
 from gymnasium import spaces
 import functools
 
@@ -31,6 +31,7 @@ from .builders import ObservationBuilder, ActionApplier
 import matplotlib.pyplot as plt
 import matplotlib
 from handlers.output_handler import OutputHandler
+# from pednstream.utils import OutputHandler
 from matplotlib.animation import PillowWriter
 import os
 
@@ -226,8 +227,6 @@ class PedNetParallelEnv(ParallelEnv):
         
         for _ in range(self._action_gap): # every action_gap steps, apply the actions
             # Advance the simulation by one step
-            if self.sim_step == 601:
-                pass
             self.network.network_loading(self.sim_step)
             
             # Build new observations
@@ -309,10 +308,10 @@ class PedNetParallelEnv(ParallelEnv):
                 # Fairness
                 diff_term = 0.0
                 if len(all_densities) > 1 and np.max(all_densities) > 0.6:
-                    # avg_density = np.mean(all_densities)
-                    # diff_term = -np.mean(np.abs(np.array(all_densities) - avg_density))
+                    avg_density = np.mean(all_densities)
+                    diff_term = -np.mean(np.abs(np.array(all_densities) - avg_density))
                     # penalty for norm density larger than 0.6
-                    diff_term = -np.sum(np.maximum(np.array(all_densities) - 0.6, 0))
+                    # diff_term = -np.sum(np.maximum(np.array(all_densities) - 0.6, 0))
                     # diff = np.var(all_densities)
                     # penalty = variance_penalty_weight * diff
                     # link_rewards -= penalty

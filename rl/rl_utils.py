@@ -757,6 +757,7 @@ def load_all_agents(save_dir: str, device: str = "cpu", agent_class=None):
         'PPOAgent_dyna': 'rl.agents.PPO_dyna',
         'POMEAgent': 'rl.agents.POME',
         'PPOAgentHRL': 'rl.agents.PPO_hrl',
+        'MAPPOAgentHRL': 'rl.marl.MAPPO_hrl',
         'SACAgent': 'rl.agents.SAC_copy',
     }
     
@@ -795,7 +796,7 @@ def load_all_agents(save_dir: str, device: str = "cpu", agent_class=None):
                 raise ValueError(f"Cannot load agent type: {agent_type}")
         
         # Create agent instance based on config
-        if agent_type in ['PPOAgent', 'PPOAgent_dyna', 'POMEAgent', 'PPOAgentHRL']:
+        if agent_type in ['PPOAgent', 'PPOAgent_dyna', 'POMEAgent', 'PPOAgentHRL', 'MAPPOAgentHRL']:
             # PPO-style agents: create using config parameters
             # Build kwargs from config, filtering out None values
             agent_kwargs = {
@@ -830,6 +831,13 @@ def load_all_agents(save_dir: str, device: str = "cpu", agent_class=None):
             for param in optional_params:
                 if param in config:
                     agent_kwargs[param] = config[param]
+            
+            if agent_type == 'MAPPOAgentHRL':
+                # Handle global_obs_dim dynamically for older checkpoints that didn't save it
+                if 'global_obs_dim' in config:
+                    agent_kwargs['global_obs_dim'] = config['global_obs_dim']
+                else:
+                    agent_kwargs['global_obs_dim'] = sum([c['obs_dim'] for c in config_data['agent_configs'].values()])
             
             # Create agent
             agent = agent_class_to_use(**agent_kwargs)

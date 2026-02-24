@@ -537,7 +537,7 @@ if __name__ == "__main__":
     SEED = 77
     NORM = False
     builder_norm_obs = False
-    STATE_OPTION = "option3"
+    STATE_OPTION = "option4" # only option 3 or option 4. option 3 is flow, option 4 include density
     randomize = True
     norm_ret = True
     action_gap = 1
@@ -550,15 +550,15 @@ if __name__ == "__main__":
 
     # Curriculum settings
     SCENARIO_SEQUENCE = [
-        "butterfly_scA",
         "butterfly_scB",
+        # "butterfly_scA",
         "butterfly_scC",
-        # "butterfly_scD",
-        # "butterfly_scE",
+        "butterfly_scD",
+        "butterfly_scE",
     ]
-    NUM_EPISODES = 1000           # total episodes across all scenarios
+    NUM_EPISODES = 600           # total episodes across all scenarios
     NUM_TRAJ_PER_UPDATE = 10     # ≥ 2 per scenario for balanced batches
-    VAL_FREQ = 5                 # validate every N updates
+    VAL_FREQ = 10                 # validate every N updates
     NUM_VAL_EPISODES = 5
     SCENARIO_SAMPLING = "round_robin"  # or "random"
 
@@ -605,7 +605,7 @@ if __name__ == "__main__":
         use_delta_actions=True,
         max_delta=2.5,
         lstm_hidden_size=64,
-        num_lstm_layers=1,
+        num_lstm_layers=2,
         num_heads=2,
         use_param_noise=False,
         use_action_noise=False,
@@ -613,7 +613,7 @@ if __name__ == "__main__":
         tm_window=50,
         max_duration=7,
         duration_entropy_coef=0.05,
-        duration_entropy_coef_min=0.05,
+        duration_entropy_coef_min=0.005,
         value_fusion='mean',
     )
     del ref_env
@@ -634,7 +634,7 @@ if __name__ == "__main__":
         val_freq=VAL_FREQ,
         num_val_episodes=NUM_VAL_EPISODES,
         save_dir=save_dir,
-        use_wandb=False,
+        use_wandb=True,
         scenario_sampling=SCENARIO_SAMPLING,
         debug_save_dir="curriculum_debug",
         debug_save_episodes=[10, 100, 200, 300, 400],
@@ -655,7 +655,7 @@ if __name__ == "__main__":
     print("=" * 60)
 
     EVAL_SEED = 42
-    NUM_EVAL_RUNS = 2
+    NUM_EVAL_RUNS = 5
     EVAL_ALGO_LABEL = "curriculum_eval"  # label for saved outputs
 
     # Evaluate on ALL scenarios (including ones not trained on, to test generalisation)
@@ -691,3 +691,285 @@ if __name__ == "__main__":
         print(f"    → visualize: visualize_run('{sc}', '{EVAL_ALGO_LABEL}', run_id=1)")
 
     print("=" * 60)
+def train_hrl_curriculum_incremental(
+    agent,
+    scenario_sequence: list,
+    env_factory,
+    total_episodes: int = 1000,
+    num_trajectories_per_update: int = 10,
+    delta_actions: bool = True,
+    randomize: bool = True,
+    val_freq: int = 10,
+    num_val_episodes: int = 5,
+    save_dir: str = None,
+    use_wandb: bool = True,
+    reward_rescaling: bool = True,
+    rescale_warmup: int = 5,
+    threshold_return: float = -500.0,
+    min_episodes_per_stage: int = 100,
+):
+    """
+    Incremental Mix-In Curriculum.
+    Starts by training ONLY on scenario 1. Once validation score on scenario 1
+    exceeds threshold, expands the pool to [scenario 1, scenario 2]. And so on,
+    until all scenarios are mixed in.
+    """
+    import numpy as np
+    from tqdm import tqdm
+    from rl.rl_utils import save_all_agents, validate_agents
+    from rl.train_curriculum import ScenarioRewardScaler
+    try:
+        import wandb
+        WANDB_AVAILABLE = True
+    except ImportError:
+        WANDB_AVAILABLE = False
+        
+    if use_wandb and WANDB_AVAILABLE and wandb.run is not None:
+        wandb.log({"curriculum_type": "incremental_mixin"})
+        
+    # --- Cache environments (one per scenario) ---
+    envs = {}
+    scenario_agent_ids = {}
+    for sc in scenario_sequence:
+        envs[sc] = env_factory(sc)
+        scenario_agent_ids[sc] = envs[sc].possible_agents[0]
+        
+    print(f"Cached {len(envs)} scenario environments:")
+    for sc, aid in scenario_agent_ids.items():
+        print(f"  {sc} -> agent_id: {aid}")
+        
+    # Per-scenario reward scaler
+    reward_scaler = ScenarioRewardScaler(
+        scenario_sequence, target_std=1.0, warmup_episodes=rescale_warmup
+    )
+    
+    # State tracking
+    stage_idx = 0
+    active_scenarios = [scenario_sequence[stage_idx]]
+    episodes_in_current_stage = 0
+    
+    global_episode = 0
+    global_update = 0
+    best_avg_return = float('-inf')
+    all_returns = []
+    
+    print(f"\n{'=' * 60}")
+    print(f"Incremental Stage {stage_idx + 1}/{len(scenario_sequence)}")
+    print(f"Active scenarios: {active_scenarios}")
+    print(f"{'=' * 60}")
+    
+    agent.init_batch_buffer()
+    batch_scenario_tags = []
+    
+    if hasattr(agent, "total_updates"):
+        effective_updates = max(
+            1,
+            int(total_episodes / float(max(1, num_trajectories_per_update)) * 0.8),
+        )
+        agent.total_updates = effective_updates
+        
+    def _reset_batch_tracking():
+        return {
+            'returns': [],
+            'true_returns': [],
+            'policy_mu': [],
+            'policy_sigma': [],
+            'duration_probs': [],
+            'sampled_durations': [],
+            'scenarios': [],
+        }
+        
+    batch_track = _reset_batch_tracking()
+    
+    scenario_idx_counter = 0
+
+    with tqdm(total=total_episodes, desc="Training") as pbar:
+        while global_episode < total_episodes:
+            # --- Pick scenario from active pool (round robin) ---
+            sc = active_scenarios[scenario_idx_counter % len(active_scenarios)]
+            scenario_idx_counter += 1
+            
+            env = envs[sc]
+            agent_id = scenario_agent_ids[sc]
+            batch_track['scenarios'].append(sc)
+            
+            agent.reset_buffer()
+            if global_episode == 0:
+                obs, infos = env.reset(options={'randomize': False})
+            else:
+                obs, infos = env.reset(options={'randomize': randomize})
+                
+            episode_return = 0.0
+            episode_true_return = 0.0
+            done = False
+            step = 0
+            
+            while not done:
+                agent_state = obs[agent_id]
+                action, duration, mu, sigma, dur_probs = agent.take_action(
+                    agent_state, return_distribution=True
+                )
+                batch_track['policy_mu'].append(np.atleast_1d(mu))
+                batch_track['policy_sigma'].append(np.atleast_1d(sigma))
+                batch_track['duration_probs'].append(dur_probs)
+                batch_track['sampled_durations'].append(duration)
+                
+                if delta_actions:
+                    absolute_action = (
+                        obs[agent_id].reshape(agent.act_dim, -1)[:, -1] + action
+                    )
+                    absolute_action = np.clip(
+                        absolute_action, agent.act_low, agent.act_high
+                    )
+                else:
+                    absolute_action = action
+                    
+                cumul_reward = 0.0
+                cumul_true_reward = 0.0
+                start_obs = obs[agent_id].copy()
+                
+                for k_step in range(duration):
+                    if done:
+                        break
+                    
+                    next_obs, rewards, terms, truncs, infos = env.step(
+                        {agent_id: absolute_action}
+                    )
+                    
+                    gamma = agent.gamma
+                    cumul_reward += rewards[agent_id] * (gamma ** k_step)
+                    if agent_id in infos and 'true_reward' in infos[agent_id]:
+                        cumul_true_reward += infos[agent_id]['true_reward']
+                    else:
+                        cumul_true_reward += rewards[agent_id]
+                        
+                    obs = next_obs
+                    step += 1
+                    done = any(terms.values()) or any(truncs.values())
+                    
+                agent.store_transition(
+                    state=start_obs,
+                    action=action,
+                    next_state=obs[agent_id],
+                    reward=cumul_reward,
+                    done=done,
+                    duration=duration,
+                    true_reward=cumul_true_reward,
+                )
+                episode_return += cumul_reward
+                episode_true_return += cumul_true_reward
+                
+            agent.store_trajectory()
+            batch_scenario_tags.append(sc)
+            reward_scaler.add_return(sc, episode_return)
+            
+            all_returns.append(episode_return)
+            batch_track['returns'].append(episode_return)
+            batch_track['true_returns'].append(episode_true_return)
+            
+            global_episode += 1
+            episodes_in_current_stage += 1
+            pbar.update(1)
+            
+            # --- Batch Update ---
+            if agent.get_batch_size() >= num_trajectories_per_update:
+                if reward_rescaling:
+                    reward_scaler.rescale_batch_buffer(
+                        agent.batch_buffer, batch_scenario_tags
+                    )
+                    
+                if hasattr(env, 'ret_rms') and env.ret_rms is not None:
+                    try:
+                        agent.set_reward_normalizer_var(float(env.ret_rms.var))
+                    except Exception:
+                        pass
+                        
+                agent.update_batch()
+                global_update += 1
+                batch_scenario_tags = []
+                
+                # --- WandB Logging ---
+                if use_wandb and WANDB_AVAILABLE and wandb.run is not None:
+                    log_dict = {
+                        'update': global_update,
+                        'episode': global_episode,
+                        'stage': stage_idx,
+                        'batch_avg_normalized_return': np.mean(batch_track['returns']),
+                        'batch_avg_true_return': np.mean(batch_track['true_returns']),
+                        'batch_scenarios': ', '.join(batch_track['scenarios']),
+                    }
+                    if reward_rescaling:
+                        scaler_stats = reward_scaler.stats_summary()
+                        for sc_name, sc_stats in scaler_stats.items():
+                            short = sc_name.split('_')[-1]
+                            log_dict[f'reward_scale_{short}'] = sc_stats['scale']
+                            log_dict[f'return_mean_{short}'] = sc_stats['mean']
+                    wandb.log(log_dict)
+                    
+                # --- Validation & Curriculum Stage Advancement ---
+                if global_update % val_freq == 0:
+                    val_returns = []
+                    # Validate on ALL scenarios, both active and strictly unseen
+                    for val_sc in scenario_sequence:
+                        val_env = envs[val_sc]
+                        val_aid = scenario_agent_ids[val_sc]
+                        val_result = validate_agents(
+                            val_env, {val_aid: agent},
+                            delta_actions=delta_actions,
+                            num_episodes=num_val_episodes,
+                            randomize=True,
+                        )
+                        val_returns.append(val_result['avg_return'])
+                        
+                        if use_wandb and WANDB_AVAILABLE and wandb.run is not None:
+                            wandb.log({
+                                f'val_{val_sc}_return': val_result['avg_return'],
+                                'val_update': global_update,
+                            })
+                            
+                    avg_val_return = np.mean(val_returns)
+                    if use_wandb and WANDB_AVAILABLE and wandb.run is not None:
+                        wandb.log({
+                            'val_avg_all_scenarios': avg_val_return,
+                            'val_update': global_update,
+                        })
+                        
+                    # Save best generalist agent over the whole progression
+                    if save_dir and avg_val_return > best_avg_return:
+                        best_avg_return = avg_val_return
+                        canonical_aid = scenario_agent_ids[scenario_sequence[0]]
+                        save_all_agents(
+                            {canonical_aid: agent}, save_dir,
+                            metadata={
+                                'episode': int(global_episode),
+                                'update': int(global_update),
+                                'stage': stage_idx,
+                                'val_avg_all_scenarios': float(avg_val_return),
+                            },
+                        )
+
+                    # --- stage advancement logic ---
+                    # Check if we should advance to the next stage by measuring performance 
+                    # specifically on the latest scenario added to the active pool
+                    if stage_idx < len(scenario_sequence) - 1:
+                        target_scenario = scenario_sequence[stage_idx]
+                        target_scenario_val = val_returns[stage_idx]
+                        
+                        if (episodes_in_current_stage >= min_episodes_per_stage and 
+                            target_scenario_val >= threshold_return):
+                            stage_idx += 1
+                            active_scenarios.append(scenario_sequence[stage_idx])
+                            episodes_in_current_stage = 0
+                            print(f"\n\n{'=' * 60}")
+                            print(f"Target scenario '{target_scenario}' reached val threshold: {target_scenario_val:.2f} >= {threshold_return}")
+                            print(f"Advancing to Stage {stage_idx + 1}/{len(scenario_sequence)}")
+                            print(f"New Active Scenario Pool: {active_scenarios}")
+                            print(f"{'=' * 60}\n")
+                            if use_wandb and WANDB_AVAILABLE and wandb.run is not None:
+                                wandb.log({"curriculum_stage": stage_idx, "update": global_update})
+                            
+                            
+                batch_track = _reset_batch_tracking()
+
+    final_return = all_returns[-1] if all_returns else 0.0
+    return all_returns, final_return

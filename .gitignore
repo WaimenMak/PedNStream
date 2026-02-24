@@ -28,5 +28,5 @@ docs/_build
 /rl/analysis/parse_summaries.py
 
 # ignore all checkpoints and all wandb logs
-/wandb
-/checkpoints
+**/wandb/
+**/checkpoints/

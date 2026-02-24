@@ -23,3 +23,10 @@ Tables.xlsx
 
 #Sphinx build files
 docs/_build
+/rl/analysis/checkpoints/
+/rl/analysis/wandb/
+/rl/analysis/parse_summaries.py
+
+# ignore all checkpoints and all wandb logs
+/wandb
+/checkpoints

@@ -377,7 +377,9 @@ class MAPPOAgentHRL:
                  max_duration=5,
                  duration_entropy_coef=0.05,
                  duration_entropy_coef_min=0.001,
-                 value_fusion='gated'):
+                 value_fusion='gated',
+                 shared_critic=None,
+                 shared_critic_optimizer=None):
         """
         MAPPO agent with temporal abstraction (duration-augmented actions) and centralized critic.
 
@@ -388,6 +390,11 @@ class MAPPOAgentHRL:
             act_low, act_high: Action bounds.
             num_agents: Total number of agents (for centralized critic tokenization).
             num_links_per_agent: Number of controlled links per agent (assumes uniform).
+            shared_critic: Optional shared DurationAttentionValueNetwork instance.
+                If provided, all agents share this critic (standard MAPPO).
+                If None, each agent creates its own critic (legacy behavior).
+            shared_critic_optimizer: Optional shared optimizer for the critic.
+                Must be provided if shared_critic is provided.
             ...
         Additional HRL args:
             max_duration: Maximum number of env steps the agent can commit to (default 5).
@@ -444,8 +451,9 @@ class MAPPOAgentHRL:
         # Derive feat_per_link from local obs structure
         # Local obs is structured as (num_links_per_agent * feat_per_link)
         feat_per_link = obs_dim // num_links_per_agent
+        self.feat_per_link = feat_per_link
 
-        # Create networks
+        # Create actor network (always per-agent / decentralized)
         self.actor = DurationAttentionPolicy(
             obs_dim, act_dim,
             hidden_size=lstm_hidden_size,
@@ -454,19 +462,28 @@ class MAPPOAgentHRL:
             max_duration=max_duration,
             num_heads=num_heads
         )
-        self.value_net = DurationAttentionValueNetwork(
-            global_obs_dim=global_obs_dim,
-            num_agents=num_agents,
-            num_links_per_agent=num_links_per_agent,
-            feat_per_link=feat_per_link,
-            hidden_size=lstm_hidden_size,
-            num_layers=num_lstm_layers,
-            num_heads=num_heads,
-            fusion=value_fusion
-        )
+
+        # Critic network: shared or per-agent
+        self._owns_critic = (shared_critic is None)
+        if shared_critic is not None:
+            # Use shared critic (standard MAPPO)
+            self.value_net = shared_critic
+            self.critic_optimizer = shared_critic_optimizer
+        else:
+            # Create own critic (legacy behavior)
+            self.value_net = DurationAttentionValueNetwork(
+                global_obs_dim=global_obs_dim,
+                num_agents=num_agents,
+                num_links_per_agent=num_links_per_agent,
+                feat_per_link=feat_per_link,
+                hidden_size=lstm_hidden_size,
+                num_layers=num_lstm_layers,
+                num_heads=num_heads,
+                fusion=value_fusion
+            )
+            self.critic_optimizer = torch.optim.Adam(self.value_net.parameters(), lr=critic_lr)
 
         self.actor_optimizer = torch.optim.Adam(self.actor.parameters(), lr=actor_lr)
-        self.critic_optimizer = torch.optim.Adam(self.value_net.parameters(), lr=critic_lr)
         self.device = device
 
         # Param noise (adaptive, targets mean_head only)
@@ -485,7 +502,7 @@ class MAPPOAgentHRL:
         self.action_noise_std_min = action_noise_std_min
         self.total_updates = num_episodes * 1
 
-        # LR scheduler
+        # LR scheduler (only for actor if critic is shared)
         self.use_lr_decay = use_lr_decay
         self.lr_warmup_frac = lr_warmup_frac
         self.lr_min_ratio = lr_min_ratio
@@ -669,25 +686,114 @@ class MAPPOAgentHRL:
     # ------------------------------------------------------------------
     # PPO update
     # ------------------------------------------------------------------
-    def update_batch(self):
-        """PPO update with TBPTT over macro-transitions.
+    def update_actor_only(self, trajectory_data, total_timesteps):
+        """Update only the actor network (used when critic is shared).
+        
+        Args:
+            trajectory_data: List of preprocessed trajectory dicts with advantages/targets.
+            total_timesteps: Total timesteps across all trajectories for weighting.
+        """
+        for epoch in range(self.epochs):
+            self.actor_optimizer.zero_grad()
+            epoch_kl_exceeded = False
 
-        Each macro-transition stores (s, a, k, R_cum, s', done).
-        The TD target uses γ^k for discounting:
-            target_i = R_cum_i + γ^{k_i} * V(s'_i) * (1 - done_i)
+            for data in trajectory_data:
+                states_seq = data['states_seq']
+                actions = data['actions']
+                advantage = data['advantage']
+                old_action_lp = data['old_action_log_probs']
+                old_dur_lp = data['old_dur_log_probs']
+                dur_indices = data['dur_indices']
+                T_traj = data['T']
+                traj_weight = float(T_traj) / float(total_timesteps)
+
+                actor_hidden = None
+
+                for t in range(0, T_traj, self.tm_window):
+                    end_t = min(t + self.tm_window, T_traj)
+                    chunk_len = end_t - t
+                    chunk_weight = float(chunk_len) / float(T_traj) * traj_weight
+
+                    # Slices
+                    s_chunk = states_seq[:, t:end_t, :]
+                    a_chunk = actions[t:end_t]
+                    old_alp_chunk = old_action_lp[t:end_t]
+                    old_dlp_chunk = old_dur_lp[t:end_t]
+                    adv_chunk = advantage[t:end_t]
+                    dur_chunk = dur_indices[t:end_t]
+
+                    # Detach hidden
+                    if actor_hidden is not None:
+                        actor_hidden = (actor_hidden[0].detach(), actor_hidden[1].detach())
+
+                    # ---- Actor forward ----
+                    mu, std, dur_logits, actor_hidden = self.actor(s_chunk, actor_hidden)
+                    mu = mu.squeeze(0)
+                    std = std.squeeze(0)
+
+                    # Action distribution
+                    act_dist = torch.distributions.Normal(mu, std)
+                    act_entropy = act_dist.entropy().mean()
+                    act_lp = act_dist.log_prob(a_chunk)
+
+                    # Duration distribution
+                    dur_probs = F.softmax(dur_logits.squeeze(0), dim=-1)
+                    dur_dist = torch.distributions.Categorical(dur_probs)
+                    dur_entropy = dur_dist.entropy().mean()
+                    dur_lp = dur_dist.log_prob(dur_chunk).unsqueeze(-1)
+
+                    # Action head ratio & clipped surrogate
+                    act_log_ratio = (act_lp - old_alp_chunk).clamp(-20, 20)
+                    act_log_ratio_mean = act_log_ratio.mean(dim=-1, keepdim=True)
+                    act_ratio = torch.exp(act_log_ratio_mean)
+                    act_surr1 = act_ratio * adv_chunk
+                    act_surr2 = torch.clamp(act_ratio, 1 - self.clip_eps,
+                                            1 + self.clip_eps) * adv_chunk
+                    act_loss = torch.mean(-torch.min(act_surr1, act_surr2))
+
+                    # Duration head ratio & clipped surrogate
+                    dur_log_ratio = (dur_lp - old_dlp_chunk).clamp(-20, 20)
+                    dur_ratio = torch.exp(dur_log_ratio)
+                    dur_surr1 = dur_ratio * adv_chunk
+                    dur_surr2 = torch.clamp(dur_ratio, 1 - self.clip_eps,
+                                            1 + self.clip_eps) * adv_chunk
+                    dur_loss = torch.mean(-torch.min(dur_surr1, dur_surr2))
+
+                    # Combined actor loss
+                    actor_loss = (
+                        act_loss + dur_loss
+                        - self.entropy_coef * act_entropy
+                        - self.duration_entropy_coef * dur_entropy
+                    ) * chunk_weight
+
+                    actor_loss.backward()
+
+                    # KL early stopping
+                    with torch.no_grad():
+                        approx_kl = act_log_ratio.mean()
+                        if approx_kl > 1.5 * self.kl_tolerance:
+                            epoch_kl_exceeded = True
+                            break
+
+                if epoch_kl_exceeded:
+                    break
+
+            if epoch_kl_exceeded:
+                break
+
+            torch.nn.utils.clip_grad_norm_(self.actor.parameters(), max_norm=0.5)
+            self.actor_optimizer.step()
+
+    def precompute_trajectory_data(self):
+        """Precompute TD targets and advantages for all trajectories in batch buffer.
+        
+        Returns:
+            trajectory_data: List of dicts with preprocessed data for each trajectory.
+            all_advantages: List of advantage tensors (for global normalization).
         """
         if not hasattr(self, 'batch_buffer') or len(self.batch_buffer) == 0:
-            print("Warning: No trajectories in batch buffer. Skipping update.")
-            return
+            return [], []
 
-        if self.use_param_noise and self._param_noise_applied:
-            self._adapt_param_noise_std()
-            # NOTE: restore is deferred until after old log probs are computed
-            # so that π_old matches the noisy collection policy.
-
-        num_trajectories = len(self.batch_buffer)
-
-        # --- Precompute targets (no_grad) ---
         trajectory_data = []
         all_advantages = []
 
@@ -701,32 +807,32 @@ class MAPPOAgentHRL:
                 dones = torch.tensor(traj['dones'], dtype=torch.float).view(-1, 1).to(self.device)
                 durations = torch.tensor(traj['durations'], dtype=torch.float).view(-1, 1).to(self.device)
 
-                states_seq = states.unsqueeze(0)             # (1, T, local_obs_dim)
-                global_states_seq = global_states.unsqueeze(0) # (1, T, global_obs_dim)
+                states_seq = states.unsqueeze(0)
+                global_states_seq = global_states.unsqueeze(0)
                 next_global_states_seq = next_global_states.unsqueeze(0)
                 T_traj = states_seq.size(1)
 
-                # Value estimates (using centralized critic and global states)
+                # Value estimates (using centralized critic)
                 next_values, _ = self.value_net(next_global_states_seq)
-                next_values = next_values.squeeze(0)   # (T, 1)
+                next_values = next_values.squeeze(0)
                 current_values, _ = self.value_net(global_states_seq)
                 current_values = current_values.squeeze(0)
 
-                # Old log probs for action and duration (using decentralized actor and local states)
+                # Old log probs for actor
                 mu, std, dur_logits, _ = self.actor(states_seq)
                 mu = mu.squeeze(0)
                 std = std.squeeze(0)
                 action_dist = torch.distributions.Normal(mu, std)
-                old_action_log_probs = action_dist.log_prob(actions)  # (T, act_dim)
+                old_action_log_probs = action_dist.log_prob(actions)
 
-                dur_probs = F.softmax(dur_logits.squeeze(0), dim=-1)  # (T, max_duration)
-                dur_indices = (durations - 1).long().squeeze(-1)         # 0-indexed (T,)
+                dur_probs = F.softmax(dur_logits.squeeze(0), dim=-1)
+                dur_indices = (durations - 1).long().squeeze(-1)
                 dur_dist = torch.distributions.Categorical(dur_probs)
-                old_dur_log_probs = dur_dist.log_prob(dur_indices).unsqueeze(-1)  # (T, 1)
+                old_dur_log_probs = dur_dist.log_prob(dur_indices).unsqueeze(-1)
 
-                # TD target with variable discount: γ^k
-                gamma_k = self.gamma ** durations  # (T, 1)
-                td_target = rewards + gamma_k * next_values * (1 - dones)  # (T, 1)
+                # TD target with variable discount
+                gamma_k = self.gamma ** durations
+                td_target = rewards + gamma_k * next_values * (1 - dones)
                 td_delta = td_target - current_values
 
                 advantage = compute_gae_variable_gamma(
@@ -747,11 +853,37 @@ class MAPPOAgentHRL:
                 })
                 all_advantages.append(advantage)
 
-            # Global advantage normalization
-            all_adv = torch.cat(all_advantages, dim=0)
-            g_mean, g_std = all_adv.mean(), all_adv.std() + 1e-8
-            for d in trajectory_data:
-                d['advantage'] = (d['advantage'] - g_mean) / g_std
+        return trajectory_data, all_advantages
+
+    def update_batch(self, skip_critic=False):
+        """PPO update with TBPTT over macro-transitions.
+
+        Each macro-transition stores (s, a, k, R_cum, s', done).
+        The TD target uses γ^k for discounting:
+            target_i = R_cum_i + γ^{k_i} * V(s'_i) * (1 - done_i)
+            
+        Args:
+            skip_critic: If True, only update actor (used when critic is shared and
+                updated separately). Default False for backward compatibility.
+        """
+        if not hasattr(self, 'batch_buffer') or len(self.batch_buffer) == 0:
+            print("Warning: No trajectories in batch buffer. Skipping update.")
+            return
+
+        if self.use_param_noise and self._param_noise_applied:
+            self._adapt_param_noise_std()
+
+        # --- Precompute targets (no_grad) ---
+        trajectory_data, all_advantages = self.precompute_trajectory_data()
+        
+        if not trajectory_data:
+            return
+
+        # Global advantage normalization
+        all_adv = torch.cat(all_advantages, dim=0)
+        g_mean, g_std = all_adv.mean(), all_adv.std() + 1e-8
+        for d in trajectory_data:
+            d['advantage'] = (d['advantage'] - g_mean) / g_std
 
         # Restore clean actor params now that old log probs are captured
         if self.use_param_noise and self._param_noise_applied:
@@ -759,7 +891,22 @@ class MAPPOAgentHRL:
 
         total_timesteps = sum(d['T'] for d in trajectory_data)
 
-        # --- PPO epochs ---
+        if skip_critic:
+            # Only update actor (critic is shared and updated separately)
+            self.update_actor_only(trajectory_data, total_timesteps)
+        else:
+            # Update both actor and critic (legacy behavior / per-agent critic)
+            self._update_actor_and_critic(trajectory_data, total_timesteps)
+
+        self.clear_batch_buffer()
+        self.update_count += 1
+        self._decay_entropy_coef()
+        self._step_lr_scheduler()
+        if self.use_action_noise:
+            self._decay_action_noise_std()
+
+    def _update_actor_and_critic(self, trajectory_data, total_timesteps):
+        """Update both actor and critic networks (used when critic is per-agent)."""
         for epoch in range(self.epochs):
             self.actor_optimizer.zero_grad()
             self.critic_optimizer.zero_grad()
@@ -817,14 +964,8 @@ class MAPPOAgentHRL:
                     dur_entropy = dur_dist.entropy().mean()
                     dur_lp = dur_dist.log_prob(dur_chunk).unsqueeze(-1)
 
-                    # --- Separate PPO objectives for action and duration heads ---
-                    # Each head gets its own ratio and clipped surrogate so the
-                    # duration head receives a clean gradient signal, not one
-                    # dominated by the action ratio.
-
                     # Action head ratio & clipped surrogate
                     act_log_ratio = (act_lp - old_alp_chunk).clamp(-20, 20)
-                    # Average over act_dim to get per-timestep scalar
                     act_log_ratio_mean = act_log_ratio.mean(dim=-1, keepdim=True)
                     act_ratio = torch.exp(act_log_ratio_mean)
                     act_surr1 = act_ratio * adv_chunk
@@ -840,7 +981,7 @@ class MAPPOAgentHRL:
                                             1 + self.clip_eps) * adv_chunk
                     dur_loss = torch.mean(-torch.min(dur_surr1, dur_surr2))
 
-                    # Combined actor loss = action loss + duration loss + entropy bonuses
+                    # Combined actor loss
                     actor_loss = (
                         act_loss + dur_loss
                         - self.entropy_coef * act_entropy
@@ -849,13 +990,12 @@ class MAPPOAgentHRL:
 
                     # ---- Critic forward ----
                     curr_val, critic_hidden = self.value_net(gs_chunk, critic_hidden)
-                    # curr_val = curr_val.squeeze(0)
                     critic_loss = torch.mean(F.mse_loss(curr_val, tdt_chunk)) * chunk_weight
 
                     actor_loss.backward()
                     critic_loss.backward()
 
-                    # KL early stopping (on action log probs)
+                    # KL early stopping
                     with torch.no_grad():
                         approx_kl = act_log_ratio.mean()
                         if approx_kl > 1.5 * self.kl_tolerance:
@@ -872,15 +1012,6 @@ class MAPPOAgentHRL:
             torch.nn.utils.clip_grad_norm_(self.value_net.parameters(), max_norm=0.5)
             self.actor_optimizer.step()
             self.critic_optimizer.step()
-
-        self.clear_batch_buffer()
-        self.update_count += 1
-        self._decay_entropy_coef()
-        self._step_lr_scheduler()
-        # param_noise_std is adapted in update_batch before restoring params
-        # (no separate decay call needed here)
-        if self.use_action_noise:
-            self._decay_action_noise_std()
 
     # ------------------------------------------------------------------
     # Decay helpers (same as PPO_tbptt)
@@ -1112,3 +1243,78 @@ class MAPPOAgentHRL:
                 self.actor_scheduler.load_state_dict(checkpoint['actor_scheduler_state_dict'])
             if 'critic_scheduler_state_dict' in checkpoint:
                 self.critic_scheduler.load_state_dict(checkpoint['critic_scheduler_state_dict'])
+
+
+# =============================================================================
+# Shared Critic Update Function
+# =============================================================================
+
+def update_shared_critic(agents: dict, shared_critic, shared_critic_optimizer,
+                         epochs: int = 10, tm_window: int = 50, device: str = "cpu"):
+    """Update the shared centralized critic using data from all agents.
+    
+    This function collects trajectory data from all agents and performs a single
+    critic update using the combined data. This is more sample-efficient than
+    having each agent update its own critic.
+    
+    Args:
+        agents: Dict mapping agent_id -> MAPPOAgentHRL instance.
+        shared_critic: The shared DurationAttentionValueNetwork instance.
+        shared_critic_optimizer: Optimizer for the shared critic.
+        epochs: Number of PPO epochs for critic update.
+        tm_window: Truncated BPTT window size.
+        device: Device for tensor operations.
+    
+    Returns:
+        critic_loss_avg: Average critic loss over the update.
+    """
+    # Collect all trajectory data from all agents
+    all_trajectory_data = []
+    
+    for agent_id, agent in agents.items():
+        traj_data, _ = agent.precompute_trajectory_data()
+        all_trajectory_data.extend(traj_data)
+    
+    if not all_trajectory_data:
+        return 0.0
+    
+    total_timesteps = sum(d['T'] for d in all_trajectory_data)
+    total_critic_loss = 0.0
+    num_updates = 0
+    
+    for epoch in range(epochs):
+        shared_critic_optimizer.zero_grad()
+        epoch_loss = 0.0
+        
+        for data in all_trajectory_data:
+            global_states_seq = data['global_states_seq']
+            td_target = data['td_target']
+            T_traj = data['T']
+            traj_weight = float(T_traj) / float(total_timesteps)
+            
+            critic_hidden = None
+            
+            for t in range(0, T_traj, tm_window):
+                end_t = min(t + tm_window, T_traj)
+                chunk_len = end_t - t
+                chunk_weight = float(chunk_len) / float(T_traj) * traj_weight
+                
+                gs_chunk = global_states_seq[:, t:end_t, :]
+                tdt_chunk = td_target[t:end_t]
+                
+                if critic_hidden is not None:
+                    critic_hidden = (critic_hidden[0].detach(), critic_hidden[1].detach())
+                
+                curr_val, critic_hidden = shared_critic(gs_chunk, critic_hidden)
+                critic_loss = torch.mean(F.mse_loss(curr_val, tdt_chunk)) * chunk_weight
+                
+                critic_loss.backward()
+                epoch_loss += critic_loss.item()
+        
+        torch.nn.utils.clip_grad_norm_(shared_critic.parameters(), max_norm=0.5)
+        shared_critic_optimizer.step()
+        
+        total_critic_loss += epoch_loss
+        num_updates += 1
+    
+    return total_critic_loss / max(num_updates, 1)

@@ -14,7 +14,7 @@ import numpy as np
 from tqdm import tqdm
 from rl import PedNetParallelEnv
 from rl.rl_utils import RunningNormalizeWrapper, validate_and_save_best, load_all_agents, evaluate_agents
-from rl.marl.MAPPO_hrl import MAPPOAgentHRL
+from rl.marl.MAPPO_hrl import MAPPOAgentHRL, DurationAttentionValueNetwork, update_shared_critic
 
 
 try:
@@ -28,12 +28,18 @@ def train_mappo_batch(env, agents, delta_actions=False, num_episodes=50,
                       num_trajectories_per_update=4, randomize=False,
                       agents_saved_dir=None, use_wandb=True,
                       val_freq=10, num_val_episodes=3,
-                      debug_save_dir=None, debug_save_episodes=None):
+                      debug_save_dir=None, debug_save_episodes=None,
+                      shared_critic=None, shared_critic_optimizer=None):
     """
     Train MAPPO agents with duration-augmented actions.
     
     In MAPPO, the actor is decentralized (uses local state), but the critic is centralized
-    (uses a concatenated global state). The global reward is the sum of local rewards.
+    (uses a concatenated global state) and SHARED across all agents.
+    The global reward is the sum of local rewards.
+    
+    Args:
+        shared_critic: The shared DurationAttentionValueNetwork instance.
+        shared_critic_optimizer: Optimizer for the shared critic.
     """
     if use_wandb and WANDB_AVAILABLE:
         if wandb.run is None:
@@ -45,6 +51,9 @@ def train_mappo_batch(env, agents, delta_actions=False, num_episodes=50,
     best_avg_return = float('-inf')
 
     debug_episodes = tuple(debug_save_episodes) if debug_save_episodes else None
+
+    # Check if using shared critic
+    use_shared_critic = (shared_critic is not None and shared_critic_optimizer is not None)
 
     # Initialize batch buffers
     for agent in agents.values():
@@ -227,13 +236,27 @@ def train_mappo_batch(env, agents, delta_actions=False, num_episodes=50,
                 # Check batch update
                 first_agent = next(iter(agents.values()))
                 if first_agent.get_batch_size() >= num_trajectories_per_update:
-                    for agent_id, agent in agents.items():
-                        if hasattr(env, 'ret_rms') and env.ret_rms is not None:
-                            try:
-                                agent.set_reward_normalizer_var(float(env.ret_rms.var))
-                            except:
-                                pass
-                        agent.update_batch()
+                    if use_shared_critic:
+                        # MAPPO with shared critic:
+                        # 1. Update shared critic using data from ALL agents
+                        update_shared_critic(
+                            agents, shared_critic, shared_critic_optimizer,
+                            epochs=first_agent.epochs,
+                            tm_window=first_agent.tm_window,
+                            device=first_agent.device
+                        )
+                        # 2. Update each agent's actor only (skip critic)
+                        for agent_id, agent in agents.items():
+                            agent.update_batch(skip_critic=True)
+                    else:
+                        # Legacy: each agent updates its own actor and critic
+                        for agent_id, agent in agents.items():
+                            if hasattr(env, 'ret_rms') and env.ret_rms is not None:
+                                try:
+                                    agent.set_reward_normalizer_var(float(env.ret_rms.var))
+                                except:
+                                    pass
+                            agent.update_batch(skip_critic=False)
 
                     global_update += 1
 
@@ -344,7 +367,7 @@ if __name__ == "__main__":
     # Enable deterministic behavior for reproducibility
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
-    dataset = "butterfly_scC"
+    dataset = "butterfly_scG"
     print("=" * 60)
     print(f"Fine-tuning {algo} Agents on PedNet Environment ({dataset})")
     print("=" * 60)
@@ -366,6 +389,30 @@ if __name__ == "__main__":
     first_agent_act_dim = env.action_space(agent_keys[0]).shape[0]
     num_links_per_agent = first_agent_act_dim // 2
     
+    # Derive feat_per_link from first agent's observation space
+    first_agent_obs_dim = env.observation_space(agent_keys[0]).shape[0]
+    feat_per_link = first_agent_obs_dim // num_links_per_agent
+    
+    # Hyperparameters
+    lstm_hidden_size = 64
+    num_lstm_layers = 1
+    num_heads = 2
+    critic_lr = 2e-4
+    value_fusion = 'mean'
+    
+    # Create SHARED centralized critic (standard MAPPO)
+    shared_critic = DurationAttentionValueNetwork(
+        global_obs_dim=global_obs_dim,
+        num_agents=num_agents,
+        num_links_per_agent=num_links_per_agent,
+        feat_per_link=feat_per_link,
+        hidden_size=lstm_hidden_size,
+        num_layers=num_lstm_layers,
+        num_heads=num_heads,
+        fusion=value_fusion
+    )
+    shared_critic_optimizer = torch.optim.Adam(shared_critic.parameters(), lr=critic_lr)
+    
     for agent_id in agent_keys:
         agents[agent_id] = MAPPOAgentHRL(
             obs_dim=env.observation_space(agent_id).shape[0],
@@ -376,7 +423,7 @@ if __name__ == "__main__":
             num_agents=num_agents,
             num_links_per_agent=num_links_per_agent,
             actor_lr=1e-4,
-            critic_lr=2e-4,
+            critic_lr=critic_lr,
             use_lr_decay=False,
             gamma=0.99,
             lmbda=0.96,
@@ -384,9 +431,9 @@ if __name__ == "__main__":
             kl_tolerance=0.02,
             use_delta_actions=True,
             max_delta=2.5,
-            lstm_hidden_size=64,
-            num_lstm_layers=1,
-            num_heads=2,
+            lstm_hidden_size=lstm_hidden_size,
+            num_lstm_layers=num_lstm_layers,
+            num_heads=num_heads,
             use_param_noise=False,
             use_action_noise=False,
             num_episodes=200,
@@ -394,7 +441,9 @@ if __name__ == "__main__":
             max_duration=7,
             duration_entropy_coef=0.05,
             duration_entropy_coef_min=0.001,
-            value_fusion='mean',
+            value_fusion=value_fusion,
+            shared_critic=shared_critic,
+            shared_critic_optimizer=shared_critic_optimizer,
         )
 
     if USE_PRETRAINED:
@@ -427,7 +476,9 @@ if __name__ == "__main__":
         randomize=randomize, agents_saved_dir=project_root / f"rl/checkpoints/mappo_hrl_{dataset}",
         num_val_episodes=10, val_freq=10, use_wandb=True,
         debug_save_dir=f"rl_training/{dataset}/mappo_hrl_debug",
-        debug_save_episodes=[5, 50, 100, 200, 400]
+        debug_save_episodes=[5, 50, 100, 200, 400],
+        shared_critic=shared_critic,
+        shared_critic_optimizer=shared_critic_optimizer,
     )
     # Evaluation phase
     SEED = 42

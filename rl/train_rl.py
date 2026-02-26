@@ -218,7 +218,7 @@ if __name__ == "__main__":
         return_dict, _ = train_hrl_multi_agent_batch(
             env, agents, num_episodes=300, num_trajectories_per_update=2, delta_actions=True,
             randomize=randomize, agents_saved_dir=f"./checkpoints/ppo_hrl_agents_{dataset}",
-            num_val_episodes=10, val_freq=10, use_wandb=False,
+            num_val_episodes=10, val_freq=10, use_wandb=True,
             debug_save_dir=f"rl_training/{dataset}/ppo_hrl_debug",
             debug_save_episodes=[5, 50, 100, 150, 200]
         )

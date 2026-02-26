@@ -24,6 +24,35 @@ if TYPE_CHECKING:
     from rl.agents.rule_based import RuleBasedGaterAgent
     from rl.agents.optimization_based import DecentralizedOptimizationAgent
 
+
+def extract_current_gate_widths(obs: np.ndarray, act_dim: int) -> np.ndarray:
+    """
+    Extract current gate widths from a gater agent's observation.
+    
+    The observation has layout: [link_0_features..., link_1_features..., ...]
+    where each link's features end with [..., back_gate_width, rev_front_gate_width].
+    
+    The action layout is: [back_gate_0, rev_front_gate_0, back_gate_1, rev_front_gate_1, ...]
+    
+    Args:
+        obs: Flat observation array of shape (num_links * features_per_link,)
+        act_dim: Action dimension = num_links * 2
+    
+    Returns:
+        Array of shape (act_dim,) with interleaved [back_0, rev_front_0, back_1, rev_front_1, ...]
+    """
+    num_links = act_dim // 2
+    obs_reshaped = obs.reshape(num_links, -1)
+    
+    # In builders.py, the last two features are exactly [back_gate_width, rev_front_gate_width]
+    gate_1 = obs_reshaped[:, -2]
+    gate_2 = obs_reshaped[:, -1]
+    
+    current_gates = np.empty(act_dim)
+    current_gates[0::2] = gate_1        # Even indices: back_gate
+    current_gates[1::2] = gate_2   # Odd indices: rev_front_gate
+    return current_gates
+
 def layer_init(layer, std=np.sqrt(2), bias_const=0.0):
     """
     PPO 标准初始化技巧：
@@ -413,7 +442,7 @@ def validate_agents(env, agents, delta_actions: bool = False, num_episodes: int 
                         # For other agents, this might be incorrect if they are fully normalized.
                         
                         # Assuming last feature is the value to control
-                        current_val = obs[agent_id].reshape(agent.act_dim, -1)[:, -1]
+                        current_val = extract_current_gate_widths(obs[agent_id], agent.act_dim)
                         absolute_action = current_val + action
                         absolute_action = np.clip(
                             absolute_action,
@@ -838,6 +867,19 @@ def load_all_agents(save_dir: str, device: str = "cpu", agent_class=None):
                     agent_kwargs['global_obs_dim'] = config['global_obs_dim']
                 else:
                     agent_kwargs['global_obs_dim'] = sum([c['obs_dim'] for c in config_data['agent_configs'].values()])
+                
+                # Handle num_agents and num_links_per_agent for centralized critic
+                if 'num_agents' in config:
+                    agent_kwargs['num_agents'] = config['num_agents']
+                else:
+                    # Infer from number of agent configs
+                    agent_kwargs['num_agents'] = len(config_data['agent_configs'])
+                
+                if 'num_links_per_agent' in config:
+                    agent_kwargs['num_links_per_agent'] = config['num_links_per_agent']
+                else:
+                    # Infer from act_dim (each link has 2 actions: front + back gate)
+                    agent_kwargs['num_links_per_agent'] = config['act_dim'] // 2
             
             # Create agent
             agent = agent_class_to_use(**agent_kwargs)
@@ -1737,7 +1779,7 @@ def _evaluate_single_run(env, agents, delta_actions: bool, deterministic: bool, 
                     
                     # Also compute absolute action for environment step
                     # Current width is in observation
-                    current_width = obs[agent_id].reshape(env.action_space(agent_id).high, -1)[:, -1]
+                    current_width = extract_current_gate_widths(obs[agent_id], env.action_space(agent_id).shape[0])
                     absolute_action = current_width + actions[agent_id]
                     # absolute_action = np.clip(absolute_action, agent.act_low, agent.act_high)
                     absolute_actions[agent_id] = absolute_action
@@ -1768,7 +1810,7 @@ def _evaluate_single_run(env, agents, delta_actions: bool, deterministic: bool, 
                 
                 if delta_actions and hasattr(agent, 'act_low'):
                     # Convert delta to absolute action
-                    absolute_action = obs[agent_id].reshape(agent.act_dim, -1)[:, -1] + action
+                    absolute_action = extract_current_gate_widths(obs[agent_id], agent.act_dim) + action
                     absolute_action = np.clip(absolute_action, agent.act_low, agent.act_high)
                     absolute_actions[agent_id] = absolute_action
                 else:
@@ -2096,7 +2138,7 @@ def train_sequential_curriculum(
                     
                     # Convert delta to absolute action if needed
                     if delta_actions:
-                        current_gate_widths = agent_obs.reshape(agent.act_dim, -1)[:, -1]
+                        current_gate_widths = extract_current_gate_widths(agent_obs, agent.act_dim)
                         absolute_action = current_gate_widths + action
                         absolute_action = np.clip(absolute_action, agent.act_low.numpy(), agent.act_high.numpy())
                     else:

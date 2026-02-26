@@ -24,10 +24,7 @@ class NetworkEnvGenerator:
     """The input of this class is the simulation parameters, and the output is the network environment."""
 
     def __init__(self, data_dir="data"):
-        # self.simulation_params = simulation_params
-        # create the data directory 'project_root/data'
-        # __file__ is at: src/pednstream/utils/env_loader.py
-        # Go up 4 levels: utils -> pednstream -> src -> project_root
+        # TODO: managing files and directories shouldn't be a responsibility of this class
         project_root = Path(__file__).resolve().parent.parent.parent.parent
         self.data_dir = project_root / data_dir
         self.data_dir.mkdir(parents=True, exist_ok=True)

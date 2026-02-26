@@ -63,12 +63,12 @@ class RuleBasedGaterAgent(BaseAgent):
         avg_downstream_density = np.mean(downstream_densities) if downstream_densities else 0.0
 
         # If average downstream density is not higher than threshold, open all gates to max width
-        # if avg_downstream_density <= 2:
-        #     actions = np.empty(num_links * 2, dtype=np.float32)
-        #     for i, link in enumerate(self.outgoing_links):
-        #         actions[i * 2] = link.width                    # back gate: fully open
-        #         actions[i * 2 + 1] = link.reverse_link.width   # rev front gate: fully open
-        #     return actions
+        if avg_downstream_density <= 2:
+            actions = np.empty(num_links * 2, dtype=np.float32)
+            for i, link in enumerate(self.outgoing_links):
+                actions[i * 2] = link.width                    # back gate: fully open
+                actions[i * 2 + 1] = link.reverse_link.width   # rev front gate: fully open
+            return actions
 
         # Otherwise, apply per-link logic (only adjusting back gate)
         actions = np.empty(num_links * 2, dtype=np.float32)
@@ -89,11 +89,11 @@ class RuleBasedGaterAgent(BaseAgent):
                 new_back_width = link.width
 
             # Back gate: rule-based control; Reverse string Front gate: keep fully open
-            # actions[i * 2] = new_back_width                    # back gate
-            actions[i * 2] = link.width                    # back gate: fully open
+            actions[i * 2] = new_back_width                    # back gate
+            # actions[i * 2] = link.width                    # back gate: fully open
             actions[i * 2 + 1] = link.reverse_link.width       # rev front gate
 
-        actions[3] = 1
+        # actions[3] = 1
         return actions
 
 class RuleBasedSeparatorAgent(BaseAgent):

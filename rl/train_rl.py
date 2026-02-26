@@ -64,7 +64,7 @@ if __name__ == "__main__":
     # dataset = "two_coordinators"
     # dataset = "one_intersection_v0"
     # dataset = "small_network"
-    dataset = "butterfly_scC"
+    dataset = "butterfly_scF"
 
     # Create environment with normalization wrapper
     base_env = PedNetParallelEnv(
@@ -207,7 +207,7 @@ if __name__ == "__main__":
             num_heads=2,
             use_param_noise=False,
             use_action_noise=False,
-            num_episodes=300,
+            num_episodes=200,
             tm_window=20,
             max_duration=7,
             duration_entropy_coef=0.05,
@@ -216,7 +216,7 @@ if __name__ == "__main__":
         ) for agent_id in env.possible_agents}
         # agents, config_data = load_all_agents(save_dir=f"./checkpoints/{algo}_agents_butterfly_scB", device="cpu")
         return_dict, _ = train_hrl_multi_agent_batch(
-            env, agents, num_episodes=300, num_trajectories_per_update=2, delta_actions=True,
+            env, agents, num_episodes=200, num_trajectories_per_update=2, delta_actions=True,
             randomize=randomize, agents_saved_dir=f"./checkpoints/ppo_hrl_agents_{dataset}",
             num_val_episodes=10, val_freq=10, use_wandb=True,
             debug_save_dir=f"rl_training/{dataset}/ppo_hrl_debug",

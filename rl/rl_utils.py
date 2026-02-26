@@ -1498,130 +1498,154 @@ def compute_served_trips_rate(simulation_dir=None):
 
 def compute_agent_local_metrics(simulation_dir=None, dataset=None):
     """
-    Compute local metrics for each agent based on connected links.
-    
-    For each controller (gate/separator), calculate the average density over time
-    on the links connected to that controller.
-    
+    Compute local metrics for each gater agent based on its connected links.
+
+    Metrics (mirroring the network-level evaluation):
+        - congestion_time: area-time weighted excess density above k_critical
+        - congestion_fraction: fraction of link-timesteps that are congested
+        - avg_travel_time: mean travel time across connected links
+        - avg_travel_time_spent: total person-time on connected links / total_trips
+        - total_trips: cumulative inflow of the incoming links to the node
+        - served_rate: cumulative outflow of outgoing links / total_trips
+
     Args:
         simulation_dir: Path to saved simulation directory
         dataset: Dataset name (needed to reconstruct network topology)
-        
+
     Returns:
-        dict: {
-            agent_id: {
-                'avg_density': float,  # Average density across connected links and time
-                'avg_normalized_density': float,  # Average density normalized by k_jam
-                'num_links': int,  # Number of links connected to this agent
-                'link_densities': {link_key: avg_density}  # Per-link average densities
-            }
-        }
+        dict: {agent_id: {metric_name: value, ...}}
     """
     import numpy as np
     from pathlib import Path
     import json
-    
+
     sim_path = Path(simulation_dir)
-    
-    # Load link data
+
     link_data_path = sim_path / 'link_data.json'
     if not link_data_path.exists():
         raise FileNotFoundError(f"link_data.json not found in {simulation_dir}")
-    
     with open(link_data_path, 'r') as f:
         link_data = json.load(f)
-    
-    # Load network parameters to get agent-link mapping
+
     network_params_path = sim_path / 'network_params.json'
     if not network_params_path.exists():
         raise FileNotFoundError(f"network_params.json not found in {simulation_dir}")
-    
     with open(network_params_path, 'r') as f:
         network_params = json.load(f)
-    
-    # Reconstruct agent manager to get agent-link mappings
-    # We need to recreate the network to access agent information
+    unit_time = network_params.get('unit_time', 1.0)
+
     if dataset is None:
         raise ValueError("dataset parameter is required to compute agent local metrics")
-    
+
     from pednstream.utils.env_loader import NetworkEnvGenerator
     from rl.discovery import AgentManager
-    
+
     env_generator = NetworkEnvGenerator()
     network = env_generator.create_network(dataset, verbose=False)
     agent_manager = AgentManager(network)
-    
+
     agent_metrics = {}
-    
-    # Process each agent
+
     for agent_id in agent_manager.get_all_agent_ids():
         agent_type = agent_manager.get_agent_type(agent_id)
-        
-        # Get connected links based on agent type
-        connected_links = []
-        if agent_type == 'gate':
-            # Gater: get incoming and outgoing links of the controlled node
-            node = agent_manager.get_gater_node(agent_id)
-            for link in node.incoming_links:
-                if not (hasattr(link, 'virtual_incoming_link') and link == link.virtual_incoming_link):
-                    link_key = f"{link.start_node.node_id}-{link.end_node.node_id}"
-                    connected_links.append(link_key)
-            for link in node.outgoing_links:
-                if not (hasattr(link, 'virtual_outgoing_link') and link == link.virtual_outgoing_link):
-                    link_key = f"{link.start_node.node_id}-{link.end_node.node_id}"
-                    connected_links.append(link_key)
-        
-        elif agent_type == 'sep':
-            # Separator: get forward and reverse links of the corridor
-            forward_link, reverse_link = agent_manager.get_separator_links(agent_id)
-            forward_key = f"{forward_link.start_node.node_id}-{forward_link.end_node.node_id}"
-            reverse_key = f"{reverse_link.start_node.node_id}-{reverse_link.end_node.node_id}"
-            connected_links.append(forward_key)
-            connected_links.append(reverse_key)
-        
-        # Calculate metrics for this agent's connected links
-        link_avg_densities = {}
-        link_avg_normalized_densities = {}
-        
-        for link_key in connected_links:
+        if agent_type != 'gate':
+            continue
+
+        node = agent_manager.get_gater_node(agent_id)
+
+        incoming_keys = []
+        for link in node.incoming_links:
+            if not (hasattr(node, 'virtual_incoming_link') and link == node.virtual_incoming_link):
+                incoming_keys.append(f"{link.start_node.node_id}-{link.end_node.node_id}")
+
+        outgoing_keys = []
+        for link in node.outgoing_links:
+            if not (hasattr(node, 'virtual_outgoing_link') and link == node.virtual_outgoing_link):
+                outgoing_keys.append(f"{link.start_node.node_id}-{link.end_node.node_id}")
+
+        all_keys = incoming_keys + outgoing_keys
+
+        # --- Congestion ---
+        total_congestion_time = 0.0
+        total_area_time = 0.0
+        congestion_timesteps = 0
+        total_timesteps = 0
+
+        for link_key in all_keys:
             if link_key not in link_data:
                 continue
-            
             link_info = link_data[link_key]
             density_array = link_info.get('density', [])
             params = link_info.get('parameters', {})
-            k_jam = params.get('k_jam', 1.0)
-            
-            if not density_array:
+            k_critical = params.get('k_critical', 1.0)
+            length = params.get('length', 1.0)
+            width = params.get('width', 1.0)
+            area = length * width
+
+            for density in density_array:
+                if density is None or density < 0:
+                    continue
+                area_t = area * unit_time
+                total_area_time += area_t
+                total_timesteps += 1
+                if density > k_critical:
+                    congestion_timesteps += 1
+                    total_congestion_time += (density - k_critical) * area_t
+
+        congestion_fraction = congestion_timesteps / total_timesteps if total_timesteps > 0 else 0.0
+
+        # --- Travel time ---
+        link_avg_tts = []
+        for link_key in all_keys:
+            if link_key not in link_data:
                 continue
-            
-            # Filter out invalid values
-            valid_densities = [d for d in density_array if d is not None and d >= 0]
-            
-            if valid_densities:
-                avg_density = np.mean(valid_densities)
-                avg_normalized_density = avg_density / k_jam
-                link_avg_densities[link_key] = avg_density
-                link_avg_normalized_densities[link_key] = avg_normalized_density
-        
-        # Compute agent-level metrics
-        if link_avg_densities:
-            agent_metrics[agent_id] = {
-                'avg_density': np.mean(list(link_avg_densities.values())),
-                'avg_normalized_density': np.mean(list(link_avg_normalized_densities.values())),
-                'num_links': len(link_avg_densities),
-                'link_densities': link_avg_densities,
-                'link_normalized_densities': link_avg_normalized_densities
-            }
-        else:
-            agent_metrics[agent_id] = {
-                'avg_density': 0.0,
-                'avg_normalized_density': 0.0,
-                'num_links': 0,
-                'link_densities': {},
-                'link_normalized_densities': {}
-            }
-    
+            tt_array = link_data[link_key].get('travel_time', [])
+            valid = [tt for tt in tt_array if tt is not None and tt >= 0]
+            if valid:
+                link_avg_tts.append(np.mean(valid))
+        avg_travel_time = np.mean(link_avg_tts) if link_avg_tts else 0.0
+
+        # --- Total person-time on connected links ---
+        total_person_time = 0.0
+        for link_key in all_keys:
+            if link_key not in link_data:
+                continue
+            for n_peds in link_data[link_key].get('num_pedestrians', []):
+                if n_peds is not None and n_peds >= 0:
+                    total_person_time += n_peds * unit_time
+
+        # --- Total trips (cumulative inflow of incoming links) ---
+        total_trips = 0.0
+        for link_key in incoming_keys:
+            if link_key not in link_data:
+                continue
+            cum_inflow = link_data[link_key].get('cumulative_inflow', [])
+            if cum_inflow:
+                total_trips += cum_inflow[-1]
+
+        # --- Served rate (cumulative outflow of outgoing links / total trips) ---
+        total_outflow = 0.0
+        for link_key in outgoing_keys:
+            if link_key not in link_data:
+                continue
+            cum_outflow = link_data[link_key].get('cumulative_outflow', [])
+            if cum_outflow:
+                total_outflow += cum_outflow[-1]
+
+        served_rate = total_outflow / total_trips if total_trips > 0 else 0.0
+        avg_travel_time_spent = total_person_time / total_trips if total_trips > 0 else 0.0
+
+        agent_metrics[agent_id] = {
+            'congestion_time': total_congestion_time,
+            'congestion_fraction': congestion_fraction,
+            'avg_travel_time': avg_travel_time,
+            'avg_travel_time_spent': avg_travel_time_spent,
+            'total_trips': total_trips,
+            'served_rate': served_rate,
+            'num_incoming_links': len(incoming_keys),
+            'num_outgoing_links': len(outgoing_keys),
+        }
+
     return agent_metrics
 
 

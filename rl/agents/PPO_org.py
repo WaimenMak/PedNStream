@@ -276,7 +276,8 @@ def train_on_policy_multi_agent(env, agents, delta_actions=False, num_episodes=5
                             agent_state = obs[agent_id]
                         action = agent.take_action(agent_state)
                         if delta_actions:
-                            absolute_action = obs[agent_id].reshape(agents[agent_id].act_dim, -1)[:,-1] + action
+                            from rl.rl_utils import extract_current_gate_widths
+                            absolute_action = extract_current_gate_widths(obs[agent_id], agents[agent_id].act_dim) + action
                             absolute_action = np.clip(absolute_action, agents[agent_id].act_low, agents[agent_id].act_high)
                             absolute_actions[agent_id] = absolute_action
                         else:

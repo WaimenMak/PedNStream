@@ -93,7 +93,8 @@ class DurationAttentionPolicy(nn.Module):
         super().__init__()
         self.obs_dim = obs_dim
         self.act_dim = act_dim
-        self.features_per_link = obs_dim // act_dim
+        self.num_links = act_dim // 2  # Each link has 2 actions: front + back gate
+        self.features_per_link = obs_dim // self.num_links
         self.hidden_size = hidden_size
         self.min_std = min_std
         self.max_std = max_std
@@ -115,14 +116,9 @@ class DurationAttentionPolicy(nn.Module):
         self.layer_norm = nn.LayerNorm(hidden_size)
 
         # ---- Action head (per-link, continuous) ----
-        self.mean_head = nn.Linear(hidden_size, 1)
-        # self.mean_head = nn.Sequential(
-        #     nn.Linear(hidden_size, hidden_size // 2),
-        #     nn.LayerNorm(hidden_size // 2),
-        #     nn.ReLU(),
-        #     nn.Linear(hidden_size // 2, 1),
-        # )
-        self.std_head = nn.Linear(hidden_size, 1)
+        # Each link outputs 2 values: [front_gate_delta, back_gate_delta]
+        self.mean_head = nn.Linear(hidden_size, 2)
+        self.std_head = nn.Linear(hidden_size, 2)
 
         # ---- Duration head (global, discrete) ----
         # Aggregate link features → global feature → duration logits
@@ -148,12 +144,8 @@ class DurationAttentionPolicy(nn.Module):
             x = x.squeeze(0)
         seq_len = x.shape[0]
 
-        # 1. Prepare per-link input
-        x_links = x.view(seq_len, self.act_dim, self.features_per_link).transpose(0, 1)
-
-        # Extract current gate width (last feature per link) for residual shortcut
-        # gate_width = x_links[:, :, -1:]  # (act_dim, seq_len, 1)
-        # gate_width = gate_width.transpose(0, 1)  # (seq_len, act_dim, 1)
+        # 1. Prepare per-link input (num_links tokens, each with features_per_link)
+        x_links = x.view(seq_len, self.num_links, self.features_per_link).transpose(0, 1)
 
         # 2. Shared LSTM
         lstm_out, hidden_out = self.lstm(x_links, hidden)
@@ -168,9 +160,9 @@ class DurationAttentionPolicy(nn.Module):
         )
         coordinated = self.layer_norm(link_features + attn_out)
 
-        # 5a. Action head (per-link)
-        mean = self.mean_head(F.relu(coordinated)).squeeze(-1)  # (seq_len, act_dim)
-        std = F.softplus(self.std_head(F.relu(coordinated))).squeeze(-1).clamp(self.min_std, self.max_std)
+        # 5a. Action head: each link outputs 2 values [front_gate, back_gate]
+        mean = self.mean_head(F.relu(coordinated)).view(seq_len, -1)  # (seq_len, act_dim)
+        std = F.softplus(self.std_head(F.relu(coordinated))).view(seq_len, -1).clamp(self.min_std, self.max_std)
         # action_input = torch.cat([F.relu(coordinated), gate_width], dim=-1)  # (seq_len, act_dim, hidden_size+1)
         # mean = self.mean_head(action_input).squeeze(-1)  # (seq_len, act_dim)
         # std = F.softplus(self.std_head(action_input)).squeeze(-1).clamp(self.min_std, self.max_std)
@@ -202,7 +194,8 @@ class DurationAttentionValueNetwork(nn.Module):
         super().__init__()
         self.obs_dim = obs_dim
         self.act_dim = act_dim
-        self.features_per_link = obs_dim // act_dim
+        self.num_links = act_dim // 2  # Each link has 2 actions: front + back gate
+        self.features_per_link = obs_dim // self.num_links
         self.hidden_size = hidden_size
         self.fusion = fusion
 
@@ -274,7 +267,7 @@ class DurationAttentionValueNetwork(nn.Module):
         seq_len = x.shape[0]
 
         # Per-link LSTM
-        x_lstm_input = x.view(seq_len, self.act_dim, self.features_per_link).transpose(0, 1)
+        x_lstm_input = x.view(seq_len, self.num_links, self.features_per_link).transpose(0, 1)
         lstm_out, hidden_out = self.lstm(x_lstm_input, hidden)
         lstm_features = lstm_out.transpose(0, 1)  # (seq_len, num_links, hidden_size)
 
@@ -341,7 +334,8 @@ class UDDurationPolicyNetwork(nn.Module):
         super().__init__()
         self.obs_dim = obs_dim
         self.act_dim = act_dim
-        self.features_per_link = obs_dim // act_dim
+        self.num_links = act_dim // 2  # Each link has 2 actions: front + back gate
+        self.features_per_link = obs_dim // self.num_links
         self.hidden_size = hidden_size
         self.num_layers = num_layers
         self.min_std = min_std
@@ -364,11 +358,12 @@ class UDDurationPolicyNetwork(nn.Module):
         self.ud_model = nn.Linear(2 * hidden_size, hidden_size)
 
         # Shared latent layer for action coordination
-        self.shared_latent_layer = nn.Linear(hidden_size * act_dim, hidden_size * act_dim)
+        self.shared_latent_layer = nn.Linear(hidden_size * self.num_links, hidden_size * self.num_links)
 
         # ---- Action head (per-link, continuous) ----
-        self.mean_head = nn.Linear(hidden_size, 1)
-        self.std_head = nn.Linear(hidden_size, 1)
+        # Each link outputs 2 values: [front_gate_delta, back_gate_delta]
+        self.mean_head = nn.Linear(hidden_size, 2)
+        self.std_head = nn.Linear(hidden_size, 2)
 
         # ---- Duration head (global, discrete) ----
         # Aggregate link features → global feature → duration logits
@@ -397,7 +392,7 @@ class UDDurationPolicyNetwork(nn.Module):
         seq_len = x.shape[0]
 
         # Reshape input: (seq_len, num_links * features) -> (num_links, seq_len, features)
-        x_lstm_input = x.view(seq_len, self.act_dim, self.features_per_link).transpose(0, 1)
+        x_lstm_input = x.view(seq_len, self.num_links, self.features_per_link).transpose(0, 1)
 
         # LSTM forward (shared weights across all links)
         lstm_out, hidden_out = self.lstm(x_lstm_input, hidden)  # (num_links, seq_len, hidden_size)
@@ -421,12 +416,11 @@ class UDDurationPolicyNetwork(nn.Module):
         # Flatten features for shared latent layer
         shared_features = ud_features.view(seq_len, -1)  # (seq_len, num_links * hidden_size)
         shared_latent = self.shared_latent_layer(shared_features)  # (seq_len, num_links * hidden_size)
-        shared_latent = shared_latent.view(seq_len, self.act_dim, self.hidden_size)  # (seq_len, num_links, hidden_size)
+        shared_latent = shared_latent.view(seq_len, self.num_links, self.hidden_size)  # (seq_len, num_links, hidden_size)
 
-        # shared_latent = ud_features
-        # Action head (per-link)
-        mean = self.mean_head(F.relu(shared_latent)).squeeze(-1)  # (seq_len, act_dim)
-        std = F.softplus(self.std_head(F.relu(shared_latent))).squeeze(-1).clamp(self.min_std, self.max_std)
+        # Action head: each link outputs 2 values [front_gate, back_gate]
+        mean = self.mean_head(F.relu(shared_latent)).view(seq_len, -1)  # (seq_len, act_dim)
+        std = F.softplus(self.std_head(F.relu(shared_latent))).view(seq_len, -1).clamp(self.min_std, self.max_std)
 
         # Duration head (global): mean-pool over links → logits
         global_feat = shared_latent.mean(dim=1)  # (seq_len, hidden_size)
@@ -447,8 +441,8 @@ class UDDurationValueNetwork(nn.Module):
         super().__init__()
         self.obs_dim = obs_dim
         self.act_dim = act_dim
-        self.num_links = act_dim
-        self.features_per_link = obs_dim // act_dim
+        self.num_links = act_dim // 2  # Each link has 2 actions: front + back gate
+        self.features_per_link = obs_dim // self.num_links
         self.hidden_size = hidden_size
         self.num_layers = num_layers
 
@@ -1326,6 +1320,8 @@ def train_hrl_multi_agent_batch(env, agents, delta_actions=False, num_episodes=5
 
                 episode_returns = {aid: 0.0 for aid in agents.keys()}
                 episode_true_returns = {aid: 0.0 for aid in agents.keys()}
+                current_actions = {aid: None for aid in agents.keys()}
+                active_durations = {aid: None for aid in agents.keys()}
                 done = False
                 step = 0
 
@@ -1345,26 +1341,36 @@ def train_hrl_multi_agent_batch(env, agents, delta_actions=False, num_episodes=5
                         batch_duration_probs[agent_id].append(dur_probs)
                         batch_sampled_durations[agent_id].append(duration)
 
+                        # if delta_actions:
+                        #     # Current gate widths are the last features in obs
+                        #     absolute_action = obs[agent_id].reshape(
+                        #         agents[agent_id].act_dim, -1)[:, -1] + action
+                        #     absolute_action = np.clip(
+                        #         absolute_action,
+                        #         agents[agent_id].act_low,
+                        #         agents[agent_id].act_high
+                        #     )
+                        #     absolute_actions[agent_id] = absolute_action
+                        # else:
+                        #     absolute_actions[agent_id] = action
                         if delta_actions:
-                            # Current gate widths are the last features in obs
-                            absolute_action = obs[agent_id].reshape(
-                                agents[agent_id].act_dim, -1)[:, -1] + action
-                            absolute_action = np.clip(
-                                absolute_action,
-                                agents[agent_id].act_low,
-                                agents[agent_id].act_high
-                            )
+                            from rl.rl_utils import extract_current_gate_widths
+                            current_gates = extract_current_gate_widths(obs[agent_id], agents[agent_id].act_dim)
+                            absolute_action = current_gates + action
+                            absolute_action = np.clip(absolute_action, agents[agent_id].act_low, agents[agent_id].act_high)
                             absolute_actions[agent_id] = absolute_action
                         else:
                             absolute_actions[agent_id] = action
-                        actions[agent_id] = action
-                        durations[agent_id] = duration
+                        # actions[agent_id] = action
+                        # durations[agent_id] = duration
+                        current_actions[agent_id] = action  
+                        active_durations[agent_id] = duration
 
                     # --- Execute for k steps (use max duration across agents) ---
                     # All agents commit to their chosen duration.
                     # We use the MAX duration so no agent is "left behind".
                     # Agents whose duration expires earlier just keep their action.
-                    max_k = max(durations.values())
+                    max_k = max(active_durations.values())
                     cumul_rewards = {aid: 0.0 for aid in agents.keys()}
                     cumul_true_rewards = {aid: 0.0 for aid in agents.keys()}
                     start_obs = {aid: obs[aid].copy() for aid in agents.keys()}
@@ -1393,11 +1399,11 @@ def train_hrl_multi_agent_batch(env, agents, delta_actions=False, num_episodes=5
                         # actual_k = min(durations[agent_id], k_step + 1) if done else durations[agent_id]
                         agent.store_transition(
                             state=start_obs[agent_id],
-                            action=actions[agent_id],
+                            action=current_actions[agent_id],
                             next_state=obs[agent_id],
                             reward=cumul_rewards[agent_id],
                             done=done,
-                            duration=durations[agent_id],
+                            duration=active_durations[agent_id],
                             true_reward=cumul_true_rewards[agent_id],
                         )
                         episode_returns[agent_id] += cumul_rewards[agent_id]

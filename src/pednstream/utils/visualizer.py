@@ -1028,7 +1028,7 @@ class NetworkVisualizer:
                 ax.plot(
                     [bp[0] - perpendicular[0] * half_w, bp[0] + perpendicular[0] * half_w],
                     [bp[1] - perpendicular[1] * half_w, bp[1] + perpendicular[1] * half_w],
-                    color='blue', linewidth=3, alpha=0.9, zorder=5, linestyle='dashed'
+                    color='blue', linewidth=3, alpha=0.9, zorder=5, linestyle='solid'
                 )
             
             # --- Front gate of incoming link (v->u): inflow gate, DARK ORANGE ---

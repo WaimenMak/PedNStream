@@ -57,19 +57,24 @@ class SpaceBuilder:
                 dtype=np.float32
             )
         
-        # Gater agents: control gate widths for each outgoing link
+        # Gater agents: control front and back gate widths for each outgoing link
+        # Action layout per link: [front_gate_width, back_gate_width]
         # Action value is actual gate width in meters: [0, link.width]
         for agent_id in self.agent_manager.get_gater_agents():
             out_links = self.agent_manager.get_gater_outgoing_links(agent_id)
+            num_actions = len(out_links) * 2  # 2 actions per link: front + back
             
-            # Build bounds per outgoing link
-            low_bounds = np.zeros(len(out_links), dtype=np.float32)
-            high_bounds = np.array([link.width for link in out_links], dtype=np.float32)
+            # Build bounds: for each link, back_gate ranges [0, link.width] and front_gate of reverse link ranges [0, link.reverse_link.width]
+            low_bounds = np.zeros(num_actions, dtype=np.float32)
+            high_bounds = np.array(
+                [w for link in out_links for w in (link.width, link.reverse_link.width)],
+                dtype=np.float32
+            )
             
             action_spaces[agent_id] = spaces.Box(
                 low=low_bounds,
                 high=high_bounds,
-                shape=(len(out_links),),
+                shape=(num_actions,),
                 dtype=np.float32
             )
         
@@ -124,13 +129,18 @@ class SpaceBuilder:
     def validate_gater_action(self, action: np.ndarray, agent_id: str) -> bool:
         """Validate gater agent action against physical bounds."""
         out_links = self.agent_manager.get_gater_outgoing_links(agent_id)
+        num_actions = len(out_links) * 2  # 2 actions per link: front + back
         
-        if not isinstance(action, np.ndarray) or action.shape != (len(out_links),):
+        if not isinstance(action, np.ndarray) or action.shape != (num_actions,):
             return False
         
         # Check each action dimension against corresponding link width
         for i, link in enumerate(out_links):
-            if not (0.0 <= action[i] <= link.width):
+            front_action = action[i * 2]
+            back_action = action[i * 2 + 1]
+            if not (0.0 <= front_action <= link.width):
+                return False
+            if not (0.0 <= back_action <= link.width):
                 return False
         
         return True

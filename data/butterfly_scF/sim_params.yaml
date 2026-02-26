@@ -18,7 +18,7 @@ network:
 
 # Simulation Parameters
 simulation:
-  simulation_steps: 600
+  simulation_steps: 800
   unit_time: 10
   assign_flows_type: "classic"
   path_finder:
@@ -32,7 +32,7 @@ simulation:
 # Default Link Parameters
 default_link:
   length: 60
-  width: 5
+  width: 4
   free_flow_speed: 1.1
   k_critical: 2
   k_jam: 6
@@ -71,25 +71,29 @@ controllers:
 
 # Demand Configuration
 demand:
-  origin_1:
-   pattern: "gaussian_peaks"
-   peak_lambda: 50
-   base_lambda: 20
-
   origin_0:
-   pattern: "multi_peaks"
-   peak_lambda: 50
-   base_lambda: 20
+   pattern: "single_peak"
+   peak_lambda: 100
+   base_lambda: 10
+   peak_position: 0.3
 
-  origin_8:
-   pattern: "multi_peaks"
-   peak_lambda: 40
-   base_lambda: 20
+  origin_1:
+   pattern: "single_peak"
+   peak_lambda: 110
+   base_lambda: 10
+   peak_position: 0.3
 
   origin_7:
-   pattern: "gaussian_peaks"
-   peak_lambda: 30
-   base_lambda: 20
+   pattern: "single_peak"
+   peak_lambda: 100
+   base_lambda: 9
+   peak_position: 0.7
+
+  origin_8:
+   pattern: "single_peak"
+   peak_lambda: 100
+   base_lambda: 10
+   peak_position: 0.7
 
 
 od_flows:

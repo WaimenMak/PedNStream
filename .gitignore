@@ -30,3 +30,4 @@ docs/_build
 # ignore all checkpoints and all wandb logs
 **/wandb/
 **/checkpoints/
+/rl/outputs/

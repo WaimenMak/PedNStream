@@ -190,28 +190,30 @@ def evaluate_all_runs(base_dir, dataset, algorithms, threshold_ratio=0.7, comput
             
             # Add local metrics if computed
             if compute_local and local_metrics_all:
-                # Aggregate local metrics across runs for each agent
                 agent_local_metrics = {}
                 all_agent_ids = set()
                 for local_metrics in local_metrics_all:
                     all_agent_ids.update(local_metrics.keys())
-                
+
+                metric_keys = [
+                    'congestion_time', 'congestion_fraction', 'avg_travel_time',
+                    'avg_travel_time_spent', 'total_trips', 'served_rate',
+                ]
                 for agent_id in all_agent_ids:
-                    avg_densities = []
-                    avg_normalized_densities = []
+                    collected = {k: [] for k in metric_keys}
                     for local_metrics in local_metrics_all:
                         if agent_id in local_metrics:
-                            avg_densities.append(local_metrics[agent_id]['avg_density'])
-                            avg_normalized_densities.append(local_metrics[agent_id]['avg_normalized_density'])
-                    
-                    if avg_densities:
+                            for k in metric_keys:
+                                collected[k].append(local_metrics[agent_id][k])
+
+                    if collected['congestion_time']:
                         agent_local_metrics[agent_id] = {
-                            'avg_density_mean': np.mean(avg_densities),
-                            'avg_density_std': np.std(avg_densities),
-                            'avg_normalized_density_mean': np.mean(avg_normalized_densities),
-                            'avg_normalized_density_std': np.std(avg_normalized_densities)
+                            f'{k}_mean': np.mean(collected[k]) for k in metric_keys
                         }
-                
+                        agent_local_metrics[agent_id].update({
+                            f'{k}_std': np.std(collected[k]) for k in metric_keys
+                        })
+
                 results[algo]['local_metrics'] = agent_local_metrics
     
     return results
@@ -278,8 +280,11 @@ def print_comparison_table(results):
             print(f"\n  Local Agent Metrics:")
             for agent_id, metrics in sorted(data['local_metrics'].items()):
                 print(f"    {agent_id}:")
-                print(f"      Avg Density: {metrics['avg_density_mean']:.3f} ± {metrics['avg_density_std']:.3f} ped/m²")
-                print(f"      Avg Normalized Density: {metrics['avg_normalized_density_mean']:.3f} ± {metrics['avg_normalized_density_std']:.3f}")
+                print(f"      Congestion:    {metrics['congestion_time_mean']:.2f} ± {metrics['congestion_time_std']:.2f}")
+                print(f"      TravelTime:    {metrics['avg_travel_time_mean']:.2f} ± {metrics['avg_travel_time_std']:.2f}s")
+                print(f"      AvgTimeSpent:  {metrics['avg_travel_time_spent_mean']:.2f} ± {metrics['avg_travel_time_spent_std']:.2f}s")
+                print(f"      TotalTrips:    {metrics['total_trips_mean']:.0f} ± {metrics['total_trips_std']:.0f}")
+                print(f"      ServedRate:    {metrics['served_rate_mean']:.2%} ± {metrics['served_rate_std']:.2%}")
 
 
 def visualize_run(dataset, algorithm, run_id=None, variable='density', vis_actions=True, save_gif=False):

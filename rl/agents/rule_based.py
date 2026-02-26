@@ -25,13 +25,17 @@ class RuleBasedGaterAgent(BaseAgent):
 
     The gate will tend to close if the density of it's link is higher than a threshold. And the inflow
     of the gate is larger than the outflow of the link. Otherwise, the gate will tend to open.
+
+    Action layout: [back_gate_0, rev_front_gate_0, back_gate_1, rev_front_gate_1, ...]
+    This agent only controls back gates of the outgoing links; front gates of the corresponding incoming (reverse) links are kept fully open.
     """
     def __init__(self, outgoing_links: list, obs_mode: str, threshold_density: float = 0.8):
         if obs_mode != "option2":
             raise ValueError("RuleBasedGaterAgent requires density information ('obs_mode' must be 'option2') with density observation.")
         self.outgoing_links = outgoing_links
         self.threshold_density = threshold_density
-        self.features_per_link = 4  # density, inflow, reverse_outflow, current_width
+        # option2 obs per link: [inflow, reverse_outflow, density, back_gate_width, rev_front_gate_width]
+        self.features_per_link = 5
 
     def take_action(self, obs: np.ndarray, deterministic: bool = False) -> np.ndarray:
         """
@@ -39,61 +43,58 @@ class RuleBasedGaterAgent(BaseAgent):
 
         Args:
             obs (np.ndarray): The observation for this agent. It's a flattened
-                              array of features for each outgoing link, padded to
-                              the max out-degree in the network.
+                              array of features for each outgoing link.
 
         Returns:
-            np.ndarray: An array of target gate widths for each outgoing link.
+            np.ndarray: An interleaved array [back_0, rev_front_0, back_1, rev_front_1, ...]
+                        of target gate widths.
         """
+        num_links = len(self.outgoing_links)
+
         # First, calculate average downstream density across all outgoing links
         downstream_densities = []
-        for i in range(len(self.outgoing_links)):
+        for i in range(num_links):
             start_idx = i * self.features_per_link
             link_obs = obs[start_idx: start_idx + self.features_per_link]
-            # The observation vector is structured as:
-            # [inflow, reverse_outflow, density, current_width]
-            density = link_obs[2]  # density
+            # obs layout: [inflow, reverse_outflow, density, back_gate_width, rev_front_gate_width]
+            density = link_obs[2]
             downstream_densities.append(density)
 
         avg_downstream_density = np.mean(downstream_densities) if downstream_densities else 0.0
 
         # If average downstream density is not higher than threshold, open all gates to max width
-        if avg_downstream_density <= 2:
-            actions = [link.width for link in self.outgoing_links]
-            return np.array(actions, dtype=np.float32)
-        
-        # Otherwise, apply per-link logic
-        actions = []
-        for i in range(len(self.outgoing_links)):
+        # if avg_downstream_density <= 2:
+        #     actions = np.empty(num_links * 2, dtype=np.float32)
+        #     for i, link in enumerate(self.outgoing_links):
+        #         actions[i * 2] = link.width                    # back gate: fully open
+        #         actions[i * 2 + 1] = link.reverse_link.width   # rev front gate: fully open
+        #     return actions
+
+        # Otherwise, apply per-link logic (only adjusting back gate)
+        actions = np.empty(num_links * 2, dtype=np.float32)
+        for i, link in enumerate(self.outgoing_links):
             start_idx = i * self.features_per_link
             link_obs = obs[start_idx: start_idx + self.features_per_link]
 
-            # The observation vector is structured as:
-            # [inflow, reverse_outflow, density, current_width]
-            density = link_obs[2]        # density
-            outflow = link_obs[1]          # reverse_link.outflow
-            inflow = link_obs[0]          # inflow
-            current_width = link_obs[-1]
+            # obs layout: [inflow, reverse_outflow, density, back_gate_width, rev_front_gate_width]
+            density = link_obs[2]
+            current_back_width = link_obs[-2]  # back_gate_width is now the second to last feature
 
-            # Calculate the change in width based on pressure differential
-            # change_in_width = self.K * (p_up - self.W_backpressure * p_down)
             change_in_width = 1
-            # if density >= 3.5:
-            #     new_target_width = self.outgoing_links[i].width
             if density > self.threshold_density:
-                new_target_width = current_width + change_in_width
+                new_back_width = current_back_width + change_in_width
             elif density < self.threshold_density:
-                new_target_width = current_width - change_in_width
+                new_back_width = current_back_width - change_in_width
             else:
-                # Keep gate open to max width (action space high bound)
-                new_target_width = self.outgoing_links[i].width
-            # new_target_width = self.outgoing_links[i].width
-            actions.append(new_target_width)
-            # actions.append(self.outgoing_links[i].width)
-        # actions[1] = 2
-        # actions[3] = 2.8
+                new_back_width = link.width
 
-        return np.array(actions, dtype=np.float32)
+            # Back gate: rule-based control; Reverse string Front gate: keep fully open
+            # actions[i * 2] = new_back_width                    # back gate
+            actions[i * 2] = link.width                    # back gate: fully open
+            actions[i * 2 + 1] = link.reverse_link.width       # rev front gate
+
+        actions[3] = 1
+        return actions
 
 class RuleBasedSeparatorAgent(BaseAgent):
     """
@@ -177,7 +178,7 @@ if __name__ == "__main__":
     from rl.pz_pednet_env import PedNetParallelEnv
     from rl.rl_utils import RunningNormalizeWrapper
     # dataset = "one_intersection_v0"
-    dataset = "butterfly_scF"
+    dataset = "butterfly_scC"
     # dataset = "small_network"
     env = PedNetParallelEnv(dataset, obs_mode="option2", action_gap=1, render_mode="animate", verbose=True)
     env = RunningNormalizeWrapper(env, norm_obs=False, norm_reward=True)
@@ -192,7 +193,7 @@ if __name__ == "__main__":
         rule_based_separator_agents[agent_id] = RuleBasedSeparatorAgent(env.agent_manager.get_separator_links(agent_id)[0].width, use_smoothing=True, buffer_size=5)
 
     episode_rewards = {agent_id: 0.0 for agent_id in env.agents}
-    observations, infos = env.reset(options={"randomize": True})
+    observations, infos = env.reset(options={"randomize": False})
     # observations, infos = env.reset(options={"randomize": True})
     # for step in range(env.simulation_steps):
     done = False

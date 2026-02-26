@@ -47,16 +47,17 @@ class ObservationBuilder:
         if obs_mode not in valid_modes:
             raise ValueError(f"obs_mode must be one of {valid_modes}, got: {obs_mode}")
         # Determine features per link based on obs_mode for gater
+        # Each option now includes both front_gate_width and back_gate_width
         if self.obs_mode == "option1":
-            self.features_per_link = 3  # inflow, reverse outflow, gate width
+            self.features_per_link = 4  # inflow, reverse outflow, front_gate, back_gate
         elif self.obs_mode == "option2":
-            self.features_per_link = 4  # inflow, reverse outflow, density, gate width
+            self.features_per_link = 5  # inflow, reverse outflow, density, front_gate, back_gate
         elif self.obs_mode == "option3":
-            self.features_per_link = 5  # inoutflow, reverse inoutflow, gate width
+            self.features_per_link = 6  # inoutflow, reverse inoutflow, front_gate, back_gate
         elif self.obs_mode == "option4":
-            self.features_per_link = 6  # inoutflow, reverse inflow, reverse outflow, velocity gate width
+            self.features_per_link = 7  # inoutflow, reverse inoutflow, density, front_gate, back_gate
         elif self.obs_mode == "option5":
-            self.features_per_link = 7  # inoutflow, reverse inflow, reverse outflow, velocity, density, gate width
+            self.features_per_link = 8  # inoutflow, reverse inoutflow, velocity, density, front_gate, back_gate
         else:
             raise ValueError(f"Unknown observation mode: {self.obs_mode}")
 
@@ -131,11 +132,14 @@ class ObservationBuilder:
             start_idx = i * self.features_per_link
             
             # Extract link features based on obs_mode
+            # All options now include back_gate_width (for the outgoing link) 
+            # and reverse_link.front_gate_width (for the incoming link)
             if self.obs_mode == "option1":
                 link_features = [
                     link.inflow[time_step] if time_step < len(link.inflow) else 0.0,
                     link.reverse_link.outflow[time_step] if time_step < len(link.reverse_link.outflow) else 0.0,
                     link.back_gate_width,
+                    link.reverse_link.front_gate_width,
                 ]
             elif self.obs_mode == "option2":
                 link_features = [
@@ -143,6 +147,7 @@ class ObservationBuilder:
                     link.reverse_link.outflow[time_step] if time_step < len(link.reverse_link.outflow) else 0.0,
                     link.get_density(time_step), # shared density
                     link.back_gate_width,
+                    link.reverse_link.front_gate_width,
                 ]
             elif self.obs_mode == "option3":
                 link_features = [
@@ -151,6 +156,8 @@ class ObservationBuilder:
                     link.reverse_link.inflow[time_step] if time_step < len(link.reverse_link.inflow) else 0.0,
                     link.reverse_link.outflow[time_step] if time_step < len(link.reverse_link.outflow) else 0.0,
                     link.back_gate_width,
+                    # link.reverse_link.front_gate_width,
+                    link.reverse_link.back_gate_width,
                 ]
                 current_link_widths.append(link.width)
 
@@ -162,6 +169,8 @@ class ObservationBuilder:
                     link.reverse_link.outflow[time_step] if time_step < len(link.reverse_link.outflow) else 0.0,
                     link.get_density(time_step) if time_step < len(link.density) else 0.0,
                     link.back_gate_width,
+                    # link.reverse_link.front_gate_width,
+                    link.reverse_link.back_gate_width,
                 ]
             elif self.obs_mode == "option5":
                 link_features = [
@@ -172,6 +181,7 @@ class ObservationBuilder:
                     link.speed[time_step] if time_step < len(link.speed) else 0.0,
                     link.get_density(time_step),
                     link.back_gate_width,
+                    link.reverse_link.front_gate_width,
                 ]
             
             obs[start_idx:start_idx + self.features_per_link] = link_features
@@ -233,14 +243,14 @@ class ObservationBuilder:
                     # Max flow estimate: width * unit_time * speed (1.5) * density (2.0)
                     max_flow = width * self.unit_time * 1.5 * 2
                     
-                    # Normalize inflow (index 0)
+                    # Normalize flows (indices 0-3)
                     normalized[start_idx] = np.clip(normalized[start_idx]/max_flow, 0, 1)
-                    # Normalize flow (indices 1, 2)
                     normalized[start_idx + 1] = np.clip(normalized[start_idx + 1]/max_flow, 0, 1)
                     normalized[start_idx + 2] = np.clip(normalized[start_idx + 2]/max_flow, 0, 1)
                     normalized[start_idx + 3] = np.clip(normalized[start_idx + 3]/max_flow, 0, 1)
-                    # normalize the gate width (index 4)
+                    # Normalize front_gate_width (index 4) and back_gate_width (index 5)
                     normalized[start_idx + 4] = np.clip(normalized[start_idx + 4]/width, 0, 1)
+                    normalized[start_idx + 5] = np.clip(normalized[start_idx + 5]/width, 0, 1)
             elif self.obs_mode == "option4":
                 # Normalize density (index 0)
                 normalized[start_idx] /= self.density_norm
@@ -308,13 +318,10 @@ class ActionApplier:
             action_value = forward_link.separator_width + delta
         return np.clip(action_value, self.min_sep_width, forward_link.width - self.min_sep_width)
 
-    def clip_gater_action_value(self, action_value: float, link: Link):
+    def clip_gater_back_gate_action(self, action_value: float, link: Link):
         """
-        Validate gater agent action value. if the action value is >=0 and <= max link width.
-        If the change of the width is too large, clip the action value to the maximum or minimum value.
+        Clip back gate action value to [0, link.width] with max delta constraint.
         """
-        # if action_value < 0 or action_value > link.width:
-        #     return 0.0 if action_value < 0 else link.width
         if abs(action_value - link.back_gate_width) > self.max_delta_gate_width:
             delta = np.clip(
                 action_value - link.back_gate_width,
@@ -323,6 +330,23 @@ class ActionApplier:
             )
             action_value = link.back_gate_width + delta
         return np.clip(action_value, 0.0, link.width)
+
+    def clip_gater_front_gate_action(self, action_value: float, link: Link):
+        """
+        Clip front gate action value to [0, link.width] with max delta constraint.
+        """
+        if abs(action_value - link.front_gate_width) > self.max_delta_gate_width:
+            delta = np.clip(
+                action_value - link.front_gate_width,
+                -self.max_delta_gate_width,
+                self.max_delta_gate_width
+            )
+            action_value = link.front_gate_width + delta
+        return np.clip(action_value, 0.0, link.width)
+
+    # Keep old name as alias for backward compatibility
+    def clip_gater_action_value(self, action_value: float, link: Link):
+        return self.clip_gater_back_gate_action(action_value, link)
     
     def _apply_separator_action(self, agent_id: str, action: np.ndarray):
         """
@@ -334,17 +358,12 @@ class ActionApplier:
         """
         # Get separator links
         forward_link, reverse_link = self.agent_manager.get_separator_links(agent_id)
-        # total_width = self.agent_discovery.get_separator_total_width(agent_id)
         
         # Convert action to width fraction, ensuring minimum width
         action_value = float(action[0]) # should be the actual width of the forward link
         action_value = self.clip_separator_action_value(action_value, forward_link)
-        # max_frac = 1.0 - self.min_sep_frac
-        # width_frac = self.min_sep_frac + action_value * (max_frac - self.min_sep_frac)
         
         # Set separator width (reverse width is automatically adjusted)
-        # new_width = width_frac * total_width
-        # forward_link.separator_width(action_value)
         forward_link.separator_width = action_value
     
     def _apply_gater_action(self, agent_id: str, action: np.ndarray):
@@ -353,15 +372,24 @@ class ActionApplier:
         
         Args:
             agent_id: Gater agent identifier
-            action: Action array of shape (num_outgoing_links,) with values in [0, 1]
+            action: Action array of shape (num_outgoing_links * 2,)
+                    Layout: [front_gate_0, back_gate_0, front_gate_1, back_gate_1, ...]
         """
         # Get gater outgoing links
         out_links = self.agent_manager.get_gater_outgoing_links(agent_id)
         
-        # Apply actions to all outgoing links (no padding, direct mapping)
+        # Apply actions to all outgoing links (2 actions per link: front + back)
         for i, link in enumerate(out_links):
             # Action value is the actual width of the gate
-            action_value = float(action[i])
-            action_value = self.clip_gater_action_value(action_value, link)
-            link.back_gate_width = action_value
+            back_action = float(action[i * 2])
+            back_action = self.clip_gater_action_value(back_action, link)
+            link.back_gate_width = back_action
+
+            # front_action = float(action[i * 2 + 1])
+            # front_action = self.clip_gater_front_gate_action(front_action, link.reverse_link)
+            # link.reverse_link.front_gate_width = front_action
+
+            rev_back_action = float(action[i * 2 + 1])
+            rev_back_action = self.clip_gater_back_gate_action(rev_back_action, link.reverse_link)
+            link.reverse_link.back_gate_width = rev_back_action
 

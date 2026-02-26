@@ -63,6 +63,7 @@ class Link(BaseLink):
         else:
             self._front_gate_width = self.width  # width of the gate, for gate control in the head
         self.back_gate_width_data = self._back_gate_width * np.ones(simulation_steps + 1)
+        self.front_gate_width_data = self._front_gate_width * np.ones(simulation_steps + 1)
         self.free_flow_speed = kwargs['free_flow_speed']
         self.capacity = self.free_flow_speed * kwargs['k_critical']
         self.k_jam = kwargs['k_jam']
@@ -119,9 +120,9 @@ class Link(BaseLink):
     @front_gate_width.setter
     def front_gate_width(self, value: float):
         self._front_gate_width = value
-        if self.reverse_link:
-            # Set the private attribute on the reverse link to avoid recursion
-            self.reverse_link._back_gate_width = value
+        # if self.reverse_link:
+        #     # Set the private attribute on the reverse link to avoid recursion
+        #     self.reverse_link._back_gate_width = value
 
     @property
     def back_gate_width(self):
@@ -130,9 +131,9 @@ class Link(BaseLink):
     @back_gate_width.setter
     def back_gate_width(self, value: float):
         self._back_gate_width = value
-        if self.reverse_link:
-            # Set the private attribute on the reverse link to avoid recursion
-            self.reverse_link._front_gate_width = value
+        # if self.reverse_link:
+        #     # Set the private attribute on the reverse link to avoid recursion
+        #     self.reverse_link._front_gate_width = value
 
     @property
     def area(self):
@@ -193,8 +194,9 @@ class Link(BaseLink):
         if time_step >= self.avg_travel_time_window:
             self._travel_time_running_sum -= self.travel_time[time_step - self.avg_travel_time_window]
             self.avg_travel_time[time_step] = self._travel_time_running_sum / self.avg_travel_time_window
-        # update the back_gate_width_data
+        # update the gate_width_data
         self.back_gate_width_data[time_step] = self.back_gate_width
+        self.front_gate_width_data[time_step] = self.front_gate_width
 
     def get_density(self, time_step: int):
         """

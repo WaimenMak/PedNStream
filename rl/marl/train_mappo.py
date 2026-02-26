@@ -358,7 +358,13 @@ if __name__ == "__main__":
 
     agents = {}
     agent_keys = sorted(list(env.possible_agents))
+    num_agents = len(agent_keys)
     global_obs_dim = sum([env.observation_space(aid).shape[0] for aid in agent_keys])
+    
+    # Derive num_links_per_agent from action space (each link has 2 actions: front + back gate)
+    # Assumes all agents have the same number of links
+    first_agent_act_dim = env.action_space(agent_keys[0]).shape[0]
+    num_links_per_agent = first_agent_act_dim // 2
     
     for agent_id in agent_keys:
         agents[agent_id] = MAPPOAgentHRL(
@@ -367,6 +373,8 @@ if __name__ == "__main__":
             act_dim=env.action_space(agent_id).shape[0],
             act_low=env.action_space(agent_id).low,
             act_high=env.action_space(agent_id).high,
+            num_agents=num_agents,
+            num_links_per_agent=num_links_per_agent,
             actor_lr=1e-4,
             critic_lr=2e-4,
             use_lr_decay=False,
@@ -381,7 +389,7 @@ if __name__ == "__main__":
             num_heads=2,
             use_param_noise=False,
             use_action_noise=False,
-            num_episodes=400,
+            num_episodes=200,
             tm_window=20,
             max_duration=7,
             duration_entropy_coef=0.05,
@@ -415,7 +423,7 @@ if __name__ == "__main__":
     # Train MAPPO HRL agents
     print("Starting MAPPO Training Loop...")
     return_dict, _ = train_mappo_batch(
-        env, agents, num_episodes=400, num_trajectories_per_update=2, delta_actions=True,
+        env, agents, num_episodes=200, num_trajectories_per_update=2, delta_actions=True,
         randomize=randomize, agents_saved_dir=project_root / f"rl/checkpoints/mappo_hrl_{dataset}",
         num_val_episodes=10, val_freq=10, use_wandb=True,
         debug_save_dir=f"rl_training/{dataset}/mappo_hrl_debug",
@@ -470,7 +478,7 @@ if __name__ == "__main__":
     print("=" * 60)
 
     # render the results
-    project_root = Path(__file__).resolve().parent.parent
+    project_root = Path(__file__).resolve().parent.parent.parent
     # Render final simulation
     env.render(
         simulation_dir=str(project_root / f"outputs/rl_training/{dataset}/{algo}_run5"),

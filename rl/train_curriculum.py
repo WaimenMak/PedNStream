@@ -320,8 +320,9 @@ def train_hrl_curriculum_mixed(
                     batch_track['sampled_durations'].append(duration)
 
                     if delta_actions:
+                        from rl.rl_utils import extract_current_gate_widths
                         absolute_action = (
-                            obs[agent_id].reshape(agent.act_dim, -1)[:, -1] + action
+                            extract_current_gate_widths(obs[agent_id], agent.act_dim) + action
                         )
                         absolute_action = np.clip(
                             absolute_action, agent.act_low, agent.act_high
@@ -815,8 +816,9 @@ def train_hrl_curriculum_incremental(
                 batch_track['sampled_durations'].append(duration)
                 
                 if delta_actions:
+                    from rl.rl_utils import extract_current_gate_widths
                     absolute_action = (
-                        obs[agent_id].reshape(agent.act_dim, -1)[:, -1] + action
+                        extract_current_gate_widths(obs[agent_id], agent.act_dim) + action
                     )
                     absolute_action = np.clip(
                         absolute_action, agent.act_low, agent.act_high

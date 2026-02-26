@@ -45,7 +45,7 @@ if __name__ == "__main__":
     SEED = 77
     NORM = False   # running mean-std normalization for observations
     builder_norm_obs = False  # normalize observations in the environment builder
-    STATE_OPTION = "option4"
+    STATE_OPTION = "option3"
     randomize = True
     norm_ret = True
     action_gap = 1
@@ -64,7 +64,7 @@ if __name__ == "__main__":
     # dataset = "two_coordinators"
     # dataset = "one_intersection_v0"
     # dataset = "small_network"
-    dataset = "butterfly_scF"
+    dataset = "butterfly_scC"
 
     # Create environment with normalization wrapper
     base_env = PedNetParallelEnv(
@@ -218,7 +218,7 @@ if __name__ == "__main__":
         return_dict, _ = train_hrl_multi_agent_batch(
             env, agents, num_episodes=300, num_trajectories_per_update=2, delta_actions=True,
             randomize=randomize, agents_saved_dir=f"./checkpoints/ppo_hrl_agents_{dataset}",
-            num_val_episodes=10, val_freq=10, use_wandb=True,
+            num_val_episodes=10, val_freq=10, use_wandb=False,
             debug_save_dir=f"rl_training/{dataset}/ppo_hrl_debug",
             debug_save_episodes=[5, 50, 100, 150, 200]
         )

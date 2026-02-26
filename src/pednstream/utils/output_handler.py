@@ -62,9 +62,18 @@ class OutputHandler:
                 }
             }
             
-            # Save front_gate_width only for outgoing links from gater nodes (to avoid redundancy)
+            # Save gate_width data for outgoing links from gater nodes (for visualization)
             if hasattr(network, 'controller_gaters') and u in network.controller_gaters:
                 link_entry['back_gate_width'] = link.back_gate_width_data.tolist()
+                link_entry['front_gate_width'] = link.front_gate_width_data.tolist()
+            
+            # Save front_gate_width for incoming links to gater nodes (for visualization)
+            # This captures the front gate of link (v->u) where u is a gater node
+            if hasattr(network, 'controller_gaters') and v in network.controller_gaters:
+                if 'front_gate_width' not in link_entry:
+                    link_entry['front_gate_width'] = link.front_gate_width_data.tolist()
+                if 'back_gate_width' not in link_entry:
+                    link_entry['back_gate_width'] = link.back_gate_width_data.tolist()
 
             # If the link is a separator, save its width data for visualization
             if isinstance(link, Separator) and hasattr(link, 'separator_width_data'):

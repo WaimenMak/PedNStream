@@ -30,7 +30,7 @@ class NetworkEnvGenerator:
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.network = None
         self.network_data = None
-        self.config = None
+        self.config = {}
         self._original_config = (
             None  # Store pristine config from YAML for randomization base
         )
@@ -45,7 +45,7 @@ class NetworkEnvGenerator:
         Returns:
             Dictionary containing network data
         """
-        # yaml_file_path = os.path.join(self.data_dir, f"{data_path}", "sim_params.yaml")
+
         yaml_file_path = os.path.join(self.data_dir, data_path, "sim_params.yaml")
 
         if not os.path.exists(yaml_file_path):
@@ -66,7 +66,7 @@ class NetworkEnvGenerator:
         else:
             edge_distances = None
 
-        # if adj not in yaml, load the adjacency matrix
+        # if not in yaml, load the adjacency matrix
         if "adjacency_matrix" not in self.config:
             adjacency_matrix = np.load(
                 os.path.join(self.data_dir, data_path, "adj_matrix.npy")
@@ -97,10 +97,10 @@ class NetworkEnvGenerator:
     def create_network(
         self,
         data_path: str,
-        custom_demand_functions: List[Callable] = None,
-        od_flows: dict = None,
-        link_params_overrides: dict = None,
-        demand_params_overrides: dict = None,
+        custom_demand_functions: List[Callable] = [],
+        od_flows: dict = {},
+        link_params_overrides: dict = {},
+        demand_params_overrides: dict = {},
         verbose: bool = True,
     ):
         """Create network from saved data, simulation_params is the config dict of the yaml file
@@ -139,12 +139,6 @@ class NetworkEnvGenerator:
                 if origin_key not in self.config["params"]["demand"]:
                     self.config["params"]["demand"][origin_key] = {}
                 self.config["params"]["demand"][origin_key].update(params)
-
-        # if od_nodes_overrides: # override origin and destination nodes
-        #     if 'origin_nodes' in od_nodes_overrides:
-        #         self.config['origin_nodes'] = od_nodes_overrides['origin_nodes']
-        #     if 'destination_nodes' in od_nodes_overrides:
-        #         self.config['destination_nodes'] = od_nodes_overrides['destination_nodes']
 
         # Ensure 'links' dictionary exists in params
         if "links" not in self.config["params"]:
@@ -232,9 +226,10 @@ class NetworkEnvGenerator:
         )
         return network
 
+    # COTINUE HERE:
     def generate_random_demand_params(self) -> dict:
         """
-        Generate randomized demand generation parameters (patterns, lambdas).
+        Generate randomized demand  parameters (patterns, lambdas).
         Uses original YAML config values as base and applies perturbation.
         For new origins not in original config, randomly picks params from an existing origin.
 
@@ -373,7 +368,6 @@ class NetworkEnvGenerator:
                 pattern_type = np.random.choice(
                     ["constant", "linear", "sine", "random_walk"]
                 )
-                # pattern_type = 'sine'
 
                 if pattern_type == "constant":
                     # Constant weight over time

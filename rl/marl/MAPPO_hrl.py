@@ -117,7 +117,12 @@ class DurationAttentionPolicy(nn.Module):
 
         # ---- Action head (per-link, continuous) ----
         # Each link outputs 2 values: [front_gate_delta, back_gate_delta]
-        self.mean_head = nn.Linear(hidden_size, 2)
+        # self.mean_head = nn.Linear(hidden_size, 2)
+        self.mean_head = nn.Sequential(
+            nn.Linear(hidden_size, hidden_size // 2),
+            nn.ReLU(),
+            nn.Linear(hidden_size // 2, 2)
+        )
         self.std_head = nn.Linear(hidden_size, 2)
 
         # ---- Duration head (global, discrete) ----
@@ -175,42 +180,68 @@ class DurationAttentionPolicy(nn.Module):
 
 
 class DurationAttentionValueNetwork(nn.Module):
-    """Attention-based value network for HRL with duration-augmented actions.
+    """Centralized value network for MAPPO with duration-augmented actions.
 
-    Uses attention-based pooling instead of mean pooling for better global
-    aggregation. The learned query attends to all link features, allowing
-    the network to weight links by their importance for value estimation.
+    For MAPPO with disjoint agent link sets, the global state is reshaped as
+    (num_agents * num_links_per_agent, feat_per_link) tokens, where each token
+    represents one controlled link from one agent. This preserves the spatial
+    structure and allows attention to learn interactions across all agent-link pairs.
 
-    Fusion options:
-        - 'attention': Learned query attends to links (default, recommended)
-        - 'mean': Simple mean pooling (original)
+    Architecture:
+        1. Reshape global_obs → (num_tokens, feat_per_link) where num_tokens = num_agents * num_links_per_agent
+        2. LSTM over time for each token (captures temporal dynamics)
+        3. Self-attention over tokens (captures spatial / inter-agent interactions)
+        4. Global pooling → scalar value
+
+    Fusion options for global pooling:
+        - 'attention': Learned query attends to all tokens (default, recommended)
+        - 'mean': Simple mean pooling
         - 'max': Max pooling
         - 'mean_max': Concatenate mean and max pooling
         - 'gated': Gated attention pooling with sigmoid weights
     """
 
-    def __init__(self, obs_dim, act_dim, hidden_size=64, num_layers=1, num_heads=2,
-                 fusion='attention'):
+    def __init__(self, global_obs_dim, num_agents, num_links_per_agent, feat_per_link,
+                 hidden_size=64, num_layers=1, num_heads=2, fusion='attention'):
+        """
+        Args:
+            global_obs_dim: Total dimension of concatenated global state (for validation).
+            num_agents: Number of agents in the environment.
+            num_links_per_agent: Number of controlled links per agent.
+            feat_per_link: Number of features per link (from local observation).
+            hidden_size: LSTM and attention hidden dimension.
+            num_layers: Number of LSTM layers.
+            num_heads: Number of attention heads.
+            fusion: Pooling method for global aggregation.
+        """
         super().__init__()
-        self.obs_dim = obs_dim
-        self.act_dim = act_dim
-        self.num_links = act_dim // 2  # Each link has 2 actions: front + back gate
-        self.features_per_link = obs_dim // self.num_links
+        self.global_obs_dim = global_obs_dim
+        self.num_agents = num_agents
+        self.num_links_per_agent = num_links_per_agent
+        self.feat_per_link = feat_per_link
+        self.num_tokens = num_agents * num_links_per_agent
         self.hidden_size = hidden_size
         self.fusion = fusion
 
-        # Shared LSTM
+        # Validate dimensions
+        expected_dim = num_agents * num_links_per_agent * feat_per_link
+        assert global_obs_dim == expected_dim, (
+            f"global_obs_dim ({global_obs_dim}) != num_agents ({num_agents}) * "
+            f"num_links_per_agent ({num_links_per_agent}) * feat_per_link ({feat_per_link}) = {expected_dim}"
+        )
+
+        # Shared LSTM: processes each (agent, link) token over time
         self.lstm = nn.LSTM(
-            input_size=self.features_per_link,
+            input_size=feat_per_link,
             hidden_size=hidden_size,
             num_layers=num_layers,
             batch_first=True
         )
 
-        # Link feature extractor
+        # Token feature extractor
         self.link_model = nn.Linear(hidden_size, hidden_size)
 
-        # Attention for inter-link coordination
+        # Attention for inter-token (cross-agent, cross-link) coordination
         self.attention = nn.MultiheadAttention(
             embed_dim=hidden_size,
             num_heads=num_heads,
@@ -234,7 +265,7 @@ class DurationAttentionValueNetwork(nn.Module):
             # Concatenate mean and max → 2x hidden_size
             value_input_dim = hidden_size * 2
         elif fusion == 'gated':
-            # Gated attention: learn importance weights per link
+            # Gated attention: learn importance weights per token
             self.gate_fc = nn.Sequential(
                 nn.Linear(hidden_size, hidden_size // 2),
                 nn.ReLU(),
@@ -255,7 +286,7 @@ class DurationAttentionValueNetwork(nn.Module):
     def forward(self, x, hidden=None):
         """
         Args:
-            x: (1, seq_len, obs_dim) or (seq_len, obs_dim)
+            x: (1, seq_len, global_obs_dim) or (seq_len, global_obs_dim)
             hidden: LSTM hidden state tuple or None
 
         Returns:
@@ -266,27 +297,30 @@ class DurationAttentionValueNetwork(nn.Module):
             x = x.squeeze(0)  # Only remove batch dim, safe when seq_len == 1
         seq_len = x.shape[0]
 
-        # Per-link LSTM
-        x_lstm_input = x.view(seq_len, self.num_links, self.features_per_link).transpose(0, 1)
+        # Reshape global state to (seq_len, num_tokens, feat_per_link)
+        # where num_tokens = num_agents * num_links_per_agent
+        # Each token represents one (agent, link) pair
+        x_tokens = x.view(seq_len, self.num_tokens, self.feat_per_link)
+
+        # Per-token LSTM: transpose to (num_tokens, seq_len, feat_per_link) for LSTM
+        x_lstm_input = x_tokens.transpose(0, 1)
         lstm_out, hidden_out = self.lstm(x_lstm_input, hidden)
-        lstm_features = lstm_out.transpose(0, 1)  # (seq_len, num_links, hidden_size)
+        lstm_features = lstm_out.transpose(0, 1)  # (seq_len, num_tokens, hidden_size)
 
-        # Link projection
-        link_features = self.link_model(lstm_features)
+        # Token projection
+        token_features = self.link_model(lstm_features)
 
-        # Inter-link attention
+        # Inter-token attention (cross-agent, cross-link interactions)
         attn_out, _ = self.attention(
-            query=link_features, key=link_features, value=link_features
+            query=token_features, key=token_features, value=token_features
         )
-        coordinated = self.layer_norm(link_features + attn_out)
-        # coordinated: (seq_len, num_links, hidden_size)
+        coordinated = self.layer_norm(token_features + attn_out)
+        # coordinated: (seq_len, num_tokens, hidden_size)
 
         # Global aggregation based on fusion type
         if self.fusion == 'attention':
-            # Learned query attends to all links
-            # Expand query to match seq_len: (seq_len, 1, hidden_size)
+            # Learned query attends to all tokens
             query = self.global_query.expand(seq_len, -1, -1)
-            # Attention pooling: query attends to link features
             global_state, _ = self.pool_attention(
                 query=query, key=coordinated, value=coordinated
             )  # (seq_len, 1, hidden_size)
@@ -298,9 +332,9 @@ class DurationAttentionValueNetwork(nn.Module):
             max_pool = coordinated.max(dim=1)[0]  # (seq_len, hidden_size)
             global_state = torch.cat([mean_pool, max_pool], dim=-1)  # (seq_len, 2*hidden_size)
         elif self.fusion == 'gated':
-            # Compute importance scores for each link
-            gate_scores = self.gate_fc(coordinated)  # (seq_len, num_links, 1)
-            gate_weights = F.softmax(gate_scores, dim=1)  # Softmax over links
+            # Compute importance scores for each token
+            gate_scores = self.gate_fc(coordinated)  # (seq_len, num_tokens, 1)
+            gate_weights = F.softmax(gate_scores, dim=1)  # Softmax over tokens
             global_state = (coordinated * gate_weights).sum(dim=1)  # (seq_len, hidden_size)
         else:  # 'mean'
             global_state = coordinated.mean(dim=1)  # (seq_len, hidden_size)
@@ -328,6 +362,7 @@ class MAPPOAgentHRL:
     """
 
     def __init__(self, obs_dim, global_obs_dim, act_dim, act_low, act_high,
+                 num_agents, num_links_per_agent,
                  actor_lr=3e-4, critic_lr=6e-4,
                  gamma=0.99, lmbda=0.95, epochs=10, device="cpu",
                  clip_eps=0.2, entropy_coef=0.01, entropy_coef_decay=0.995,
@@ -344,18 +379,27 @@ class MAPPOAgentHRL:
                  duration_entropy_coef_min=0.001,
                  value_fusion='gated'):
         """
-        Additional MAPPO args:
+        MAPPO agent with temporal abstraction (duration-augmented actions) and centralized critic.
+
+        Args:
+            obs_dim: Local observation dimension for this agent.
             global_obs_dim: Dimension of the concatenated global state for the centralized critic.
+            act_dim: Action dimension for this agent.
+            act_low, act_high: Action bounds.
+            num_agents: Total number of agents (for centralized critic tokenization).
+            num_links_per_agent: Number of controlled links per agent (assumes uniform).
+            ...
         Additional HRL args:
             max_duration: Maximum number of env steps the agent can commit to (default 5).
-            duration_entropy_coef: Entropy bonus coefficient for the duration head
-                to encourage exploration over durations.
+            duration_entropy_coef: Entropy bonus coefficient for the duration head.
             value_fusion: Pooling method for value network global aggregation.
                 Options: 'attention' (default), 'mean', 'max', 'mean_max', 'gated'
         """
         self.obs_dim = obs_dim
         self.global_obs_dim = global_obs_dim
         self.act_dim = act_dim
+        self.num_agents = num_agents
+        self.num_links_per_agent = num_links_per_agent
         self.act_low = torch.tensor(act_low, dtype=torch.float32)
         self.act_high = torch.tensor(act_high, dtype=torch.float32)
         self.gamma = gamma
@@ -369,8 +413,6 @@ class MAPPOAgentHRL:
         self.duration_entropy_coef_initial = duration_entropy_coef
         self.duration_entropy_coef_min = duration_entropy_coef_min
         self.value_fusion = value_fusion
-        # Temperature used only for duration sampling at inference (deterministic=True)
-        # self.duration_temperature_eval = 0.7
 
         # Entropy coefficient with exponential decay
         self.entropy_coef_initial = entropy_coef
@@ -399,6 +441,10 @@ class MAPPOAgentHRL:
         self.actor_lr = actor_lr
         self.critic_lr = critic_lr
 
+        # Derive feat_per_link from local obs structure
+        # Local obs is structured as (num_links_per_agent * feat_per_link)
+        feat_per_link = obs_dim // num_links_per_agent
+
         # Create networks
         self.actor = DurationAttentionPolicy(
             obs_dim, act_dim,
@@ -409,7 +455,10 @@ class MAPPOAgentHRL:
             num_heads=num_heads
         )
         self.value_net = DurationAttentionValueNetwork(
-            global_obs_dim, act_dim,
+            global_obs_dim=global_obs_dim,
+            num_agents=num_agents,
+            num_links_per_agent=num_links_per_agent,
+            feat_per_link=feat_per_link,
             hidden_size=lstm_hidden_size,
             num_layers=num_lstm_layers,
             num_heads=num_heads,
@@ -994,6 +1043,8 @@ class MAPPOAgentHRL:
             'act_dim': self.act_dim,
             'act_low': self.act_low.tolist(),
             'act_high': self.act_high.tolist(),
+            'num_agents': self.num_agents,
+            'num_links_per_agent': self.num_links_per_agent,
             'gamma': self.gamma,
             'lmbda': self.lmbda,
             'epochs': self.epochs,

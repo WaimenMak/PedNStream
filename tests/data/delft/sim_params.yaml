@@ -1,0 +1,84 @@
+# Network Configuration, origin and destination and adjacency matrix
+network:
+#  origin_nodes: [0, 8, 80, 13]
+#  destination_nodes: [0, 8, 74, 136]
+#  origin_nodes: [0, 80]
+#  destination_nodes: [8, 74]
+  origin_nodes: [0, 8, 80, 13, 247, 266, 143, 249, 97, 146, 142, 294]
+  destination_nodes: [0, 8, 74, 136, 10, 13, 182, 35, 216, 219, 80, 274]
+
+# Simulation Parameters
+simulation:
+  seed: 42
+  simulation_steps: 500
+  unit_time: 10
+  assign_flows_type: "classic"
+  path_finder:
+    k_paths: 5
+    temp: 10 # temperature parameter for softmax
+    alpha: 1 # congestion weight
+    beta: 0.5 # congestion weight
+    omega: 0.8 # capacity weight
+    std_dev: 0 # standard deviation for stochastic path choice
+
+# Controller Configuration (for dynamic rerouting)
+#controllers:
+#  enabled: true  # Set to true to enable controller-based path expansion
+#  nodes: [6, 4]  # List of node IDs that act as controllers, e.g., [3, 4, 5]
+  # Optional fields for future use:
+  # links: []  # List of link IDs for link-based control, e.g., [(2,3), (4,5)]
+  # schedule: {}  # Time-based activation, e.g., {3: [[0, 100], [200, 300]]}
+
+# Default Link Parameters
+default_link:
+  length: 50
+  width: 2
+  free_flow_speed: 1.1
+  k_critical: 2
+  k_jam: 6
+  gamma: 0.01
+  speed_noise_std: 0.05
+  fd_type: "greenshields"
+  activity_probability: 0
+  bi_factor: 1
+
+# Link-specific Parameters (optional)
+#links:
+#  "1_2":
+#    length: 120
+#    width: 1.5
+#    free_flow_speed: 1.5
+#    k_critical: 2
+#    k_jam: 10
+#
+#  "2_4":
+#    length: 80
+#    width: 2.0
+#    free_flow_speed: 1.5
+#    k_critical: 2
+#    k_jam: 10
+
+# Demand Configuration
+demand:
+#  origin_1:
+#    pattern: "constant"
+#    value: 8
+  origin_0:
+    pattern: "sudden_demand"
+    peak_lambda: 20
+    base_lambda: 5
+
+  origin_80:
+    pattern: "gaussian_peaks"
+    peak_lambda: 15
+    base_lambda: 6
+
+  origin_13:
+    pattern: "sudden_demand"
+    peak_lambda: 25
+    base_lambda: 5
+
+#OD Flow Configuration
+#od_flows:
+#  "1_4": 30
+#  "1_5": 5

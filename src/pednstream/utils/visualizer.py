@@ -955,15 +955,16 @@ class NetworkVisualizer:
                     u, v = link_id.split('-')
                     gater_nodes.add(u)
             
-            # Only process outgoing links from gater nodes (links with back_gate_width)
             for link_id, link_info in self.link_data.items():
-                if 'back_gate_width' not in link_info:
+                if 'back_gate_width' not in link_info and 'front_gate_width' not in link_info:
                     continue
                 u, v = link_id.split('-')
                 front_gw = None
-                back_gw = np.array(link_info['back_gate_width'])[time_step]
+                back_gw = None
                 if 'front_gate_width' in link_info:
                     front_gw = np.array(link_info['front_gate_width'])[time_step]
+                if 'back_gate_width' in link_info:
+                    back_gw = np.array(link_info['back_gate_width'])[time_step]
                 link_gate_data[(u, v)] = (front_gw, back_gw)
 
             # Build lookup for front gates of ALL links that have the data
@@ -973,13 +974,6 @@ class NetworkVisualizer:
                 if 'front_gate_width' in link_info:
                     src, dst = link_id.split('-')
                     all_front_gates[(src, dst)] = np.array(link_info['front_gate_width'])[time_step]
-            
-            # Build lookup for back gates of ALL links that have the data
-            all_back_gates = {}
-            for link_id, link_info in self.link_data.items():
-                if 'back_gate_width' in link_info:
-                    src, dst = link_id.split('-')
-                    all_back_gates[(src, dst)] = np.array(link_info['back_gate_width'])[time_step]
         else:
             if self.network is None:
                 return
@@ -1000,12 +994,6 @@ class NetworkVisualizer:
             for (src, dst), link in self.network.links.items():
                 if hasattr(link, 'front_gate_width_data'):
                     all_front_gates[(str(src), str(dst))] = link.front_gate_width_data[time_step]
-            
-            # Build lookup for back gates of ALL links
-            all_back_gates = {}
-            for (src, dst), link in self.network.links.items():
-                if hasattr(link, 'back_gate_width_data'):
-                    all_back_gates[(str(src), str(dst))] = link.back_gate_width_data[time_step]
 
         # Determine graph coordinate scale to make sizes invariant
         x_coords = [coord[0] for coord in self.pos.values()]
@@ -1054,19 +1042,6 @@ class NetworkVisualizer:
                     [fp[0] - perpendicular[0] * half_w, fp[0] + perpendicular[0] * half_w],
                     [fp[1] - perpendicular[1] * half_w, fp[1] + perpendicular[1] * half_w],
                     color='darkorange', linewidth=3, alpha=1.0, zorder=6, linestyle='solid'
-                )
-            
-            # --- Back gate of incoming link (v->u): at node v (opposite end) ---
-            # Draw at the junction near node v
-            junction_v = v_pos - junction_distance * direction_norm
-            rev_back_gw = all_back_gates.get(incoming_link_key, None)
-            if rev_back_gw is not None:
-                bp_v = junction_v + direction_norm * para_offset
-                half_w = rev_back_gw * scale_factor / 2
-                ax.plot(
-                    [bp_v[0] - perpendicular[0] * half_w, bp_v[0] + perpendicular[0] * half_w],
-                    [bp_v[1] - perpendicular[1] * half_w, bp_v[1] + perpendicular[1] * half_w],
-                    color='cyan', linewidth=3, alpha=0.9, zorder=5, linestyle='solid'
                 )
 
 

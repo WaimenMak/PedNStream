@@ -15,6 +15,7 @@ Provides multi-agent RL environment with two controller types:
 import numpy as np
 import random
 from typing import Dict, Any, Optional, List, Tuple
+from pathlib import Path
 from pettingzoo import ParallelEnv
 
 from gymnasium import spaces
@@ -30,8 +31,8 @@ from .builders import ObservationBuilder, ActionApplier
 
 import matplotlib.pyplot as plt
 import matplotlib
-from handlers.output_handler import OutputHandler
-# from pednstream.utils import OutputHandler
+# from handlers.output_handler import OutputHandler
+from pednstream.utils import OutputHandler
 from matplotlib.animation import PillowWriter
 import os
 
@@ -44,7 +45,7 @@ class PedNetParallelEnv(ParallelEnv):
     
     Agents:
     - Separators (sep_u_v): control Separator.separator_width for bidirectional corridors
-    - Gaters (gate_n): control Link.front_gate_width for outgoing links at nodes
+    - Gaters (gate_n): control Link.front_gate_width and Link.back_gate_width for outgoing links at nodes
     """
     
     metadata = {"render_modes": ["human", "animate"], "name": "pednet_v0"}

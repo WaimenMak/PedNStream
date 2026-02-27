@@ -190,6 +190,21 @@ class PedNetParallelEnv(ParallelEnv):
         self._prev_delay = {agent: 0.0 for agent in self.possible_agents}
         self._prev_throughput = {agent: 0.0 for agent in self.possible_agents}
         
+        # Late-start: fast-forward the simulation without agent control
+        # This creates diverse starting conditions (system already populated with pedestrians)
+        late_start_prob = options.get('late_start_prob', self.late_start_prob) if options else self.late_start_prob
+        late_start_max_frac = options.get('late_start_max_frac', self.late_start_max_frac) if options else self.late_start_max_frac
+        late_start_step = 1  # default: no late start
+        
+        if late_start_prob > 0.0 and np.random.random() < late_start_prob:
+            max_skip = max(1, int(self.simulation_steps * late_start_max_frac))
+            skip_steps = np.random.randint(1, max_skip + 1)
+            # Run simulation without agent actions for skip_steps
+            for t in range(1, skip_steps + 1):
+                self.network.network_loading(t)
+            self.sim_step = skip_steps + 1
+            late_start_step = self.sim_step
+        
         # Build initial observations
         observations = self._get_observations()
         infos = self._get_infos()

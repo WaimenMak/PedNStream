@@ -204,6 +204,7 @@ class PedNetParallelEnv(ParallelEnv):
         late_start_max_frac = options.get('late_start_max_frac', self.late_start_max_frac) if options else self.late_start_max_frac
         late_start_step = 1  # default: no late start
         
+        warmup_observations = []  # observations from skipped steps for LSTM warm-up
         if late_start_prob > 0.0 and np.random.random() < late_start_prob:
             max_skip = max(1, int(self.simulation_steps * late_start_max_frac))
             skip_steps = np.random.randint(1, max_skip + 1)

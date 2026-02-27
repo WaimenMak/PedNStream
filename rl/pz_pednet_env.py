@@ -64,6 +64,9 @@ class PedNetParallelEnv(ParallelEnv):
             verbose: Whether to enable logging output. Default False for RL training.
             action_gap: Number of steps between applying actions. Default 1.
             seed: Random seed for reproducibility. Set once at construction time.
+            late_start_prob: Probability of starting the agent later in the episode (0.0 = always start at t=1).
+                Only use during training to create diverse starting conditions. Default 0.0 (disabled).
+            late_start_max_frac: Maximum fraction of simulation steps to skip when late-starting (default 0.5).
         """
         super().__init__()
         

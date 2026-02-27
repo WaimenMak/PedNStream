@@ -220,6 +220,10 @@ class PedNetParallelEnv(ParallelEnv):
         # Record late-start info for tracking
         for agent_id in self.possible_agents:
             infos[agent_id]['late_start_step'] = late_start_step
+            # Per-agent warmup observations for LSTM hidden state warm-up
+            infos[agent_id]['warmup_obs'] = [
+                step_obs[agent_id] for step_obs in warmup_observations
+            ]
         
         return observations, infos
 

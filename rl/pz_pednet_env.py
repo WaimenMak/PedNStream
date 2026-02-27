@@ -52,7 +52,8 @@ class PedNetParallelEnv(ParallelEnv):
     
     def __init__(self, dataset: str, normalize_obs: bool = False, obs_mode: str = "option1",
                  render_mode: Optional[str] = None, verbose: bool = False, action_gap: int = 1,
-                 seed: Optional[int] = None):
+                 seed: Optional[int] = None,
+                 late_start_prob: float = 0.0, late_start_max_frac: float = 0.5):
         """
         Initialize the PedNet environment.
         

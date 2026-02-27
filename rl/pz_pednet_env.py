@@ -209,6 +209,10 @@ class PedNetParallelEnv(ParallelEnv):
         observations = self._get_observations()
         infos = self._get_infos()
         
+        # Record late-start info for tracking
+        for agent_id in self.possible_agents:
+            infos[agent_id]['late_start_step'] = late_start_step
+        
         return observations, infos
 
     def step(self, actions: Dict[str, Any]) -> Tuple[Dict, Dict, Dict, Dict, Dict]:

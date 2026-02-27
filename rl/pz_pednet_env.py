@@ -120,6 +120,10 @@ class PedNetParallelEnv(ParallelEnv):
         self.last_actions = None
         self.current_actions = None
 
+        # Late-start parameters (for training diversity)
+        self.late_start_prob = late_start_prob
+        self.late_start_max_frac = late_start_max_frac
+
         # Initialize visualizer
         self.visualizer = None
     

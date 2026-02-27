@@ -210,6 +210,8 @@ class PedNetParallelEnv(ParallelEnv):
             # Run simulation without agent actions for skip_steps
             for t in range(1, skip_steps + 1):
                 self.network.network_loading(t)
+                self.sim_step = t  # update so _get_observations reads correct step
+                warmup_observations.append(self._get_observations())
             self.sim_step = skip_steps + 1
             late_start_step = self.sim_step
         

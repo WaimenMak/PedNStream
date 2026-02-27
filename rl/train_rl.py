@@ -68,7 +68,9 @@ if __name__ == "__main__":
 
     # Create environment with normalization wrapper
     base_env = PedNetParallelEnv(
-        dataset=dataset, normalize_obs=builder_norm_obs, obs_mode=STATE_OPTION, render_mode="animate", action_gap=action_gap
+        dataset=dataset, normalize_obs=builder_norm_obs,
+        obs_mode=STATE_OPTION, late_start_prob=0.5, late_start_max_frac=0.3,
+        render_mode="animate", action_gap=action_gap
     )
     env = RunningNormalizeWrapper(base_env, norm_obs=NORM, norm_reward=norm_ret)
     env.seed(SEED)

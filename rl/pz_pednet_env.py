@@ -208,7 +208,7 @@ class PedNetParallelEnv(ParallelEnv):
         if late_start_prob > 0.0 and np.random.random() < late_start_prob:
             max_skip = max(1, int(self.simulation_steps * late_start_max_frac))
             skip_steps = np.random.randint(1, max_skip + 1)
-            # Run simulation without agent actions for skip_steps
+            # Run simulation without agent actions, collect observations for LSTM warm-up
             for t in range(1, skip_steps + 1):
                 self.network.network_loading(t)
                 self.sim_step = t  # update so _get_observations reads correct step

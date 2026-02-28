@@ -664,6 +664,25 @@ class PPOAgentHRL:
         if self.use_param_noise:
             self._apply_param_noise()
 
+    @torch.no_grad()
+    def warmup_hidden(self, observations):
+        """Run observations through LSTM to warm up hidden state before acting.
+
+        Used when late-start skips the first N steps of the simulation.
+        This feeds the skipped observations through the actor and critic
+        LSTMs (no gradients, no transitions stored) so the agent starts
+        with meaningful temporal context.
+
+        Args:
+            observations: list of np.ndarray, one per skipped time step.
+        """
+        for obs in observations:
+            state_tensor = torch.tensor(
+                np.array(obs), dtype=torch.float
+            ).unsqueeze(0).to(self.device)
+            _, _, _, self.actor_hidden = self.actor(state_tensor, self.actor_hidden)
+            _, self.critic_hidden = self.value_net(state_tensor, self.critic_hidden)
+
     def init_batch_buffer(self):
         self.batch_buffer = []
 
@@ -1317,6 +1336,12 @@ def train_hrl_multi_agent_batch(env, agents, delta_actions=False, num_episodes=5
                     obs, infos = env.reset(options={'randomize': False})
                 else:
                     obs, infos = env.reset(options={'randomize': randomize})
+
+                # Warm up LSTM hidden states with late-start observations
+                for agent_id, agent in agents.items():
+                    warmup_obs = infos[agent_id].get('warmup_obs', [])
+                    if warmup_obs:
+                        agent.warmup_hidden(warmup_obs)
 
                 episode_returns = {aid: 0.0 for aid in agents.keys()}
                 episode_true_returns = {aid: 0.0 for aid in agents.keys()}

@@ -180,17 +180,18 @@ class DurationAttentionPolicy(nn.Module):
 
 
 class DurationAttentionValueNetwork(nn.Module):
-    """Centralized value network for MAPPO with duration-augmented actions.
+    """Attention-based value network for MAPPO with duration-augmented actions.
 
-    For MAPPO with disjoint agent link sets, the global state is reshaped as
-    (num_agents * num_links_per_agent, feat_per_link) tokens, where each token
-    represents one controlled link from one agent. This preserves the spatial
-    structure and allows attention to learn interactions across all agent-link pairs.
+    Used in two modes:
+    - **Shared/centralized critic** (standard MAPPO): Takes the concatenated global state
+      of all agents as input. Tokens = num_agents * num_links_per_agent.
+    - **Per-agent/local critic**: Takes a single agent's local observation as input.
+      Tokens = num_links_per_agent (num_agents=1).
 
     Architecture:
-        1. Reshape global_obs → (num_tokens, feat_per_link) where num_tokens = num_agents * num_links_per_agent
+        1. Reshape input → (num_tokens, feat_per_link)
         2. LSTM over time for each token (captures temporal dynamics)
-        3. Self-attention over tokens (captures spatial / inter-agent interactions)
+        3. Self-attention over tokens (captures spatial / inter-link interactions)
         4. Global pooling → scalar value
 
     Fusion options for global pooling:
@@ -430,7 +431,8 @@ class MAPPOAgentHRL:
 
         self.kl_tolerance = kl_tolerance
         self.transition_dict = {
-            'states': [], 'global_states': [], 'actions': [], 'next_global_states': [],
+            'states': [], 'global_states': [], 'actions': [],
+            'next_states': [], 'next_global_states': [],
             'rewards': [], 'dones': [],
             'durations': [],        # chosen duration k per decision
             'true_rewards': [],
@@ -466,14 +468,14 @@ class MAPPOAgentHRL:
         # Critic network: shared or per-agent
         self._owns_critic = (shared_critic is None)
         if shared_critic is not None:
-            # Use shared critic (standard MAPPO)
+            # Use shared critic (standard MAPPO) — takes global state as input
             self.value_net = shared_critic
             self.critic_optimizer = shared_critic_optimizer
         else:
-            # Create own critic (legacy behavior)
+            # Per-agent critic — uses LOCAL observation only (not global state)
             self.value_net = DurationAttentionValueNetwork(
-                global_obs_dim=global_obs_dim,
-                num_agents=num_agents,
+                global_obs_dim=obs_dim,          # local obs dimension
+                num_agents=1,                     # single agent's links only
                 num_links_per_agent=num_links_per_agent,
                 feat_per_link=feat_per_link,
                 hidden_size=lstm_hidden_size,
@@ -520,7 +522,8 @@ class MAPPOAgentHRL:
     def reset_buffer(self):
         """Clear rollout buffer, reset hidden states, apply param noise."""
         self.transition_dict = {
-            'states': [], 'global_states': [], 'actions': [], 'next_global_states': [],
+            'states': [], 'global_states': [], 'actions': [],
+            'next_states': [], 'next_global_states': [],
             'rewards': [], 'dones': [],
             'durations': [],
             'true_rewards': [],
@@ -546,6 +549,7 @@ class MAPPOAgentHRL:
                 'states': np.array(self.transition_dict['states']),
                 'global_states': np.array(self.transition_dict['global_states']),
                 'actions': np.array(self.transition_dict['actions']),
+                'next_states': np.array(self.transition_dict['next_states']),
                 'next_global_states': np.array(self.transition_dict['next_global_states']),
                 'rewards': np.array(self.transition_dict['rewards']),
                 'dones': np.array(self.transition_dict['dones']),
@@ -561,7 +565,7 @@ class MAPPOAgentHRL:
             return 0
         return len(self.batch_buffer)
 
-    def store_transition(self, state, global_state, action, next_global_state, reward, done,
+    def store_transition(self, state, global_state, action, next_state, next_global_state, reward, done,
                          duration=1, true_reward=None):
         """Store a macro-transition.
 
@@ -569,6 +573,7 @@ class MAPPOAgentHRL:
             state: local observation at decision point
             global_state: combined observations at decision point for centralized critic
             action: continuous action (delta widths)
+            next_state: local observation after k env steps
             next_global_state: global observation after k env steps
             reward: *cumulative* global reward over k steps
             done: whether episode ended during the k steps
@@ -578,6 +583,7 @@ class MAPPOAgentHRL:
         self.transition_dict['states'].append(state)
         self.transition_dict['global_states'].append(global_state)
         self.transition_dict['actions'].append(action)
+        self.transition_dict['next_states'].append(next_state)
         self.transition_dict['next_global_states'].append(next_global_state)
         self.transition_dict['rewards'].append(reward)
         self.transition_dict['dones'].append(done)
@@ -812,10 +818,21 @@ class MAPPOAgentHRL:
                 next_global_states_seq = next_global_states.unsqueeze(0)
                 T_traj = states_seq.size(1)
 
-                # Value estimates (using centralized critic)
-                next_values, _ = self.value_net(next_global_states_seq)
+                # Choose critic input: local obs for per-agent critic, global state for shared critic
+                if self._owns_critic:
+                    # Per-agent critic uses local observation
+                    critic_input_seq = states_seq
+                    next_states = torch.tensor(traj['next_states'], dtype=torch.float).to(self.device)
+                    next_critic_input_seq = next_states.unsqueeze(0)
+                else:
+                    # Shared critic uses global state
+                    critic_input_seq = global_states_seq
+                    next_critic_input_seq = next_global_states_seq
+
+                # Value estimates
+                next_values, _ = self.value_net(next_critic_input_seq)
                 next_values = next_values.squeeze(0)
-                current_values, _ = self.value_net(global_states_seq)
+                current_values, _ = self.value_net(critic_input_seq)
                 current_values = current_values.squeeze(0)
 
                 # Old log probs for actor
@@ -843,6 +860,7 @@ class MAPPOAgentHRL:
                 trajectory_data.append({
                     'states_seq': states_seq,
                     'global_states_seq': global_states_seq,
+                    'critic_input_seq': critic_input_seq,
                     'actions': actions,
                     'td_target': td_target,
                     'advantage': advantage,
@@ -934,7 +952,7 @@ class MAPPOAgentHRL:
 
                     # Slices
                     s_chunk = states_seq[:, t:end_t, :]
-                    gs_chunk = global_states_seq[:, t:end_t, :]
+                    critic_chunk = data['critic_input_seq'][:, t:end_t, :]
                     a_chunk = actions[t:end_t]
                     old_alp_chunk = old_action_lp[t:end_t]
                     old_dlp_chunk = old_dur_lp[t:end_t]
@@ -989,7 +1007,7 @@ class MAPPOAgentHRL:
                     ) * chunk_weight
 
                     # ---- Critic forward ----
-                    curr_val, critic_hidden = self.value_net(gs_chunk, critic_hidden)
+                    curr_val, critic_hidden = self.value_net(critic_chunk, critic_hidden)
                     critic_loss = torch.mean(F.mse_loss(curr_val, tdt_chunk)) * chunk_weight
 
                     actor_loss.backward()

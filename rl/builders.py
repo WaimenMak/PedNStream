@@ -204,7 +204,7 @@ class ObservationBuilder:
             normalized[:4] /= self.flow_norm
         elif self.obs_mode == "option3":
             # Density features (indices 0, 3)
-            normalized[[0, 3]] /= self.density_norm
+            # normalized[[0, 3]] /= self.density_norm
             # Flow features (indices 1, 2, 4, 5)
             normalized[[1, 2, 4, 5]] /= self.flow_norm
         elif self.obs_mode == "option4":

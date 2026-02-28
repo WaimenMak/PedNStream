@@ -33,12 +33,17 @@ def train_mappo_batch(env, agents, delta_actions=False, num_episodes=50,
     """
     Train MAPPO agents with duration-augmented actions.
     
-    In MAPPO, the actor is decentralized (uses local state), but the critic is centralized
-    (uses a concatenated global state) and SHARED across all agents.
+    Supports two critic modes:
+    - **Shared critic** (standard MAPPO): The critic is centralized
+      (uses a concatenated global state) and SHARED across all agents.
+    - **Per-agent critic**: Each agent has its own critic that uses only
+      local observations. Activated when shared_critic is None.
+    
     The global reward is the sum of local rewards.
     
     Args:
         shared_critic: The shared DurationAttentionValueNetwork instance.
+            If None, each agent uses its own local critic.
         shared_critic_optimizer: Optimizer for the shared critic.
     """
     if use_wandb and WANDB_AVAILABLE:
@@ -132,6 +137,7 @@ def train_mappo_batch(env, agents, delta_actions=False, num_episodes=50,
                                     state=start_obs[agent_id],
                                     global_state=start_global_state[agent_id],
                                     action=current_actions[agent_id],
+                                    next_state=obs[agent_id].copy(),
                                     next_global_state=global_state,
                                     reward=cumul_rewards[agent_id],
                                     done=False, # Wait till end of episode for terminal done
@@ -207,6 +213,7 @@ def train_mappo_batch(env, agents, delta_actions=False, num_episodes=50,
                                     state=start_obs[agent_id],
                                     global_state=start_global_state[agent_id],
                                     action=current_actions[agent_id],
+                                    next_state=obs[agent_id].copy(),
                                     next_global_state=final_global_state,
                                     reward=cumul_rewards[agent_id],
                                     done=done,
@@ -367,7 +374,7 @@ if __name__ == "__main__":
     # Enable deterministic behavior for reproducibility
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
-    dataset = "butterfly_scG"
+    dataset = "butterfly_scF"
     print("=" * 60)
     print(f"Fine-tuning {algo} Agents on PedNet Environment ({dataset})")
     print("=" * 60)
@@ -436,13 +443,14 @@ if __name__ == "__main__":
             num_heads=num_heads,
             use_param_noise=False,
             use_action_noise=False,
-            num_episodes=200,
+            num_episodes=300,
             tm_window=20,
             max_duration=7,
             duration_entropy_coef=0.05,
             duration_entropy_coef_min=0.001,
             value_fusion=value_fusion,
             shared_critic=shared_critic,
+            # shared_critic=None,
             shared_critic_optimizer=shared_critic_optimizer,
         )
 
@@ -472,7 +480,7 @@ if __name__ == "__main__":
     # Train MAPPO HRL agents
     print("Starting MAPPO Training Loop...")
     return_dict, _ = train_mappo_batch(
-        env, agents, num_episodes=200, num_trajectories_per_update=2, delta_actions=True,
+        env, agents, num_episodes=300, num_trajectories_per_update=2, delta_actions=True,
         randomize=randomize, agents_saved_dir=project_root / f"rl/checkpoints/mappo_hrl_{dataset}",
         num_val_episodes=10, val_freq=10, use_wandb=True,
         debug_save_dir=f"rl_training/{dataset}/mappo_hrl_debug",

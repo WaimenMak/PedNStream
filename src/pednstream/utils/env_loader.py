@@ -505,7 +505,7 @@ class NetworkEnvGenerator:
                     'back_gate_width': back_gate
                 }
                 
-                # Set front_gate_width for reverse link (same physical gate)
+                # Set front_gate_width for reverse link
                 if reverse_link_id not in gate_width_overrides:
                     gate_width_overrides[reverse_link_id] = {}
                 gate_width_overrides[reverse_link_id]['front_gate_width'] = back_gate

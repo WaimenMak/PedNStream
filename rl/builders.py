@@ -65,7 +65,7 @@ class ObservationBuilder:
         self.density_norm = 6.0    # Typical jam density
         self.speed_norm = 1.5       # Typical free-flow speed
         # self.time_norm = 100.0      # Typical travel time
-        self.flow_norm = 20.0       # Typical flow rate
+        self.flow_norm = 1.0       # Typical flow rate (reduced from 10.0 to amplify signal)
         # self.link_widths = []      # list of link widths for normalization
         self.unit_time = network.params['unit_time']
     
@@ -196,23 +196,23 @@ class ObservationBuilder:
         """Normalize separator observation features based on obs_mode."""
         normalized = obs.copy()
         
-        if self.obs_mode == "option1":
-            # All flow features (indices 0-3)
-            normalized[:] /= self.flow_norm
-        elif self.obs_mode == "option2":
-            # Flow features (indices 0-3), separator width not normalized (index 4)
-            normalized[:4] /= self.flow_norm
-        elif self.obs_mode == "option3":
-            # Density features (indices 0, 3)
-            # normalized[[0, 3]] /= self.density_norm
-            # Flow features (indices 1, 2, 4, 5)
-            normalized[[0, 1, 2, 3]] /= self.flow_norm
-        elif self.obs_mode == "option4":
-            # Density features (indices 0, 3)
-            normalized[[0, 3]] /= self.density_norm
-            # Flow features (indices 1, 2, 4, 5)
-            normalized[[1, 2, 4, 5]] /= self.flow_norm
-            # Separator width not normalized (index 6)
+        # if self.obs_mode == "option1":
+        #     # All flow features (indices 0-3)
+        #     normalized[:] /= self.flow_norm
+        # elif self.obs_mode == "option2":
+        #     # Flow features (indices 0-3), separator width not normalized (index 4)
+        #     normalized[:4] /= self.flow_norm
+        # elif self.obs_mode == "option3":
+        #     # Density features (indices 0, 3)
+        #     # normalized[[0, 3]] /= self.density_norm
+        #     # Flow features (indices 1, 2, 4, 5)
+        #     normalized[[0, 1, 2, 3]] /= self.flow_norm
+        # elif self.obs_mode == "option4":
+        #     # Density features (indices 0, 3)
+        #     normalized[[0, 3]] /= self.density_norm
+        #     # Flow features (indices 1, 2, 4, 5)
+        #     normalized[[1, 2, 4, 5]] /= self.flow_norm
+        #     # Separator width not normalized (index 6)
         
         return normalized
     
@@ -240,17 +240,18 @@ class ObservationBuilder:
             elif self.obs_mode == "option3":
                 if link_widths and i < len(link_widths):
                     width = link_widths[i]
-                    # Max flow estimate: width * unit_time * speed (1.5) * density (2.0)
-                    max_flow = width * self.unit_time * 1.5 * 2
+                    # Max flow estimate: reduced scale to amplify the observation signal
+                    # max_flow = width * self.unit_time * 1.0
+                    max_flow = 1.5
                     
                     # Normalize flows (indices 0-3)
-                    normalized[start_idx] = np.clip(normalized[start_idx]/max_flow, 0, 1)
-                    normalized[start_idx + 1] = np.clip(normalized[start_idx + 1]/max_flow, 0, 1)
-                    normalized[start_idx + 2] = np.clip(normalized[start_idx + 2]/max_flow, 0, 1)
-                    normalized[start_idx + 3] = np.clip(normalized[start_idx + 3]/max_flow, 0, 1)
+                    normalized[start_idx] = normalized[start_idx]/max_flow
+                    normalized[start_idx + 1] = normalized[start_idx + 1]/max_flow
+                    normalized[start_idx + 2] = normalized[start_idx + 2]/max_flow
+                    normalized[start_idx + 3] = normalized[start_idx + 3]/max_flow
                     # Normalize front_gate_width (index 4) and back_gate_width (index 5)
-                    normalized[start_idx + 4] = np.clip(normalized[start_idx + 4]/width, 0, 1)
-                    normalized[start_idx + 5] = np.clip(normalized[start_idx + 5]/width, 0, 1)
+                    # normalized[start_idx + 4] = np.clip(normalized[start_idx + 4]/width, 0, 1)
+                    # normalized[start_idx + 5] = np.clip(normalized[start_idx + 5]/width, 0, 1)
             elif self.obs_mode == "option4":
                 # Normalize density (index 0)
                 normalized[start_idx] /= self.density_norm

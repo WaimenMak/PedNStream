@@ -298,6 +298,8 @@ class RunningNormalizeWrapper:
     def set_training(self, training: bool):
         """Set training mode (whether to update running statistics)."""
         self.training = training
+        if hasattr(self.env, 'training'):
+            self.env.training = training
     
     def get_normalization_stats(self) -> Dict[str, Any]:
         """Get current normalization statistics for saving."""

@@ -65,7 +65,7 @@ class ObservationBuilder:
         self.density_norm = 6.0    # Typical jam density
         self.speed_norm = 1.5       # Typical free-flow speed
         # self.time_norm = 100.0      # Typical travel time
-        self.flow_norm = 1.0       # Typical flow rate (reduced from 10.0 to amplify signal)
+        self.flow_norm = 10.0       # Typical flow rate (reduced from 10.0 to amplify signal)
         # self.link_widths = []      # list of link widths for normalization
         self.unit_time = network.params['unit_time']
     

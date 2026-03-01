@@ -119,6 +119,7 @@ class PedNetParallelEnv(ParallelEnv):
         self._action_gap = action_gap
         self.last_actions = None
         self.current_actions = None
+        self.training = True  # Disable early jam termination during eval/validation
 
         # Late-start parameters (for training diversity)
         self.late_start_prob = late_start_prob

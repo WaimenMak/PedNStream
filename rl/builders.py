@@ -242,7 +242,7 @@ class ObservationBuilder:
                     width = link_widths[i]
                     # Max flow estimate: reduced scale to amplify the observation signal
                     # max_flow = width * self.unit_time * 1.0
-                    max_flow = 1.5
+                    max_flow = self.flow_norm
                     
                     # Normalize flows (indices 0-3)
                     normalized[start_idx] = normalized[start_idx]/max_flow

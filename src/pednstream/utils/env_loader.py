@@ -159,12 +159,12 @@ class NetworkEnvGenerator:
                 if f"{v}_{u}" not in self.config['params']['links']:
                     # Create a copy of final_params for reverse link and swap front/back gate widths
                     reverse_params = final_params.copy()
-                    original_front = reverse_params.pop('front_gate_width', None)
-                    original_back = reverse_params.pop('back_gate_width', None)
-                    if original_front is not None:
-                        reverse_params['back_gate_width'] = original_front
-                    if original_back is not None:
-                        reverse_params['front_gate_width'] = original_back
+                    # original_front = reverse_params.pop('front_gate_width', None)
+                    # original_back = reverse_params.pop('back_gate_width', None)
+                    # if original_front is not None:
+                    #     reverse_params['back_gate_width'] = original_front
+                    # if original_back is not None:
+                    #     reverse_params['front_gate_width'] = original_back
                     self.config['params']['links'][f"{v}_{u}"] = reverse_params
 
         # Create network
@@ -499,6 +499,7 @@ class NetworkEnvGenerator:
                 
                 # Randomize back_gate_width from uniform [0, link_width]
                 back_gate = np.random.uniform(0, link_width)
+                rev_back_gate = np.random.uniform(0, link_width)
                 
                 # Set back_gate_width for outgoing link
                 gate_width_overrides[link_id] = {
@@ -508,7 +509,7 @@ class NetworkEnvGenerator:
                 # Set front_gate_width for reverse link
                 if reverse_link_id not in gate_width_overrides:
                     gate_width_overrides[reverse_link_id] = {}
-                gate_width_overrides[reverse_link_id]['front_gate_width'] = back_gate
+                gate_width_overrides[reverse_link_id]['back_gate_width'] = rev_back_gate
         
         return gate_width_overrides
 

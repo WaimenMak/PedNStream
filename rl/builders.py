@@ -57,7 +57,7 @@ class ObservationBuilder:
         elif self.obs_mode == "option4":
             self.features_per_link = 7  # inoutflow, reverse inoutflow, density, front_gate, back_gate
         elif self.obs_mode == "option5":
-            self.features_per_link = 8  # inoutflow, reverse inoutflow, velocity, density, front_gate, back_gate
+            self.features_per_link = 6  # travel_time_ratio, density_ratio, demand, throughput, back_gate, rev_back_gate
         else:
             raise ValueError(f"Unknown observation mode: {self.obs_mode}")
 
@@ -65,7 +65,7 @@ class ObservationBuilder:
         self.density_norm = 6.0    # Typical jam density
         self.speed_norm = 1.5       # Typical free-flow speed
         # self.time_norm = 100.0      # Typical travel time
-        self.flow_norm = 10.0       # Typical flow rate (reduced from 10.0 to amplify signal)
+        self.flow_norm = 20.0       # Typical flow rate (reduced from 10.0 to amplify signal)
         # self.link_widths = []      # list of link widths for normalization
         self.unit_time = network.params['unit_time']
     
@@ -173,15 +173,21 @@ class ObservationBuilder:
                     link.reverse_link.back_gate_width,
                 ]
             elif self.obs_mode == "option5":
+                # 1. Normalized Travel Time
+                T_free = link.length / link.free_flow_speed if link.free_flow_speed > 0 else 1.0
+                tt = link.travel_time[time_step] if time_step < len(link.travel_time) else T_free
+                
+                # 2. Critical Density Ratio
+                k_crit = link.k_critical if hasattr(link, 'k_critical') else 2.0
+                density_ratio = link.get_density(time_step) / k_crit
+                
                 link_features = [
-                    link.inflow[time_step] if time_step < len(link.inflow) else 0.0,
-                    link.outflow[time_step] if time_step < len(link.outflow) else 0.0,
+                    tt / T_free,
+                    density_ratio,
                     link.reverse_link.inflow[time_step] if time_step < len(link.reverse_link.inflow) else 0.0,
-                    link.reverse_link.outflow[time_step] if time_step < len(link.reverse_link.outflow) else 0.0,
-                    link.speed[time_step] if time_step < len(link.speed) else 0.0,
-                    link.get_density(time_step),
+                    link.outflow[time_step] if time_step < len(link.outflow) else 0.0,
                     link.back_gate_width,
-                    link.reverse_link.front_gate_width,
+                    link.reverse_link.back_gate_width,
                 ]
             
             obs[start_idx:start_idx + self.features_per_link] = link_features
@@ -258,6 +264,13 @@ class ObservationBuilder:
                 # Normalize flows (indices 0-3)
                 normalized[start_idx] = normalized[start_idx]/max_flow
                 normalized[start_idx + 1] = normalized[start_idx + 1]/max_flow
+                normalized[start_idx + 2] = normalized[start_idx + 2]/max_flow
+                normalized[start_idx + 3] = normalized[start_idx + 3]/max_flow
+            elif self.obs_mode == "option5":
+                max_flow = self.flow_norm
+                
+                # tt_ratio (0) and density_ratio (1) are naturally bounded/interpretable
+                # We normalize demand (idx 2) and throughput (idx 3) using flow_norm
                 normalized[start_idx + 2] = normalized[start_idx + 2]/max_flow
                 normalized[start_idx + 3] = normalized[start_idx + 3]/max_flow
         

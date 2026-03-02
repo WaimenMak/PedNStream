@@ -18,7 +18,7 @@ network:
 
 # Simulation Parameters
 simulation:
-  simulation_steps: 800
+  simulation_steps: 600
   unit_time: 10
   assign_flows_type: "classic"
   path_finder:

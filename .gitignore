@@ -31,3 +31,4 @@ docs/_build
 **/wandb/
 **/checkpoints/
 /rl/outputs/
+/src/outputs/logs/network.log

@@ -100,6 +100,26 @@ def train_mappo_batch(env, agents, delta_actions=False, num_episodes=50,
                 else:
                     obs, infos = env.reset(options={'randomize': randomize})
 
+                # Warm up LSTM hidden states with late-start observations
+                # Check if any agent has warmup obs (all agents share same warmup steps)
+                first_aid = next(iter(agents))
+                warmup_obs_list = infos[first_aid].get('warmup_obs', [])
+                if warmup_obs_list:
+                    num_warmup = len(warmup_obs_list)
+                    # Build per-step global states for centralized critic
+                    warmup_global_states = []
+                    for t_idx in range(num_warmup):
+                        global_obs_t = np.concatenate(
+                            [infos[aid]['warmup_obs'][t_idx] for aid in agent_keys], axis=0
+                        )
+                        warmup_global_states.append(global_obs_t)
+                    # Warm up each agent
+                    for agent_id, agent in agents.items():
+                        agent.warmup_hidden(
+                            infos[agent_id]['warmup_obs'],
+                            global_states=warmup_global_states
+                        )
+
                 episode_returns = {aid: 0.0 for aid in agents.keys()}
                 episode_true_returns = {aid: 0.0 for aid in agents.keys()}
                 done = False
@@ -374,14 +394,15 @@ if __name__ == "__main__":
     # Enable deterministic behavior for reproducibility
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
-    dataset = "butterfly_scF"
+    dataset = "butterfly_scG"
     print("=" * 60)
     print(f"Fine-tuning {algo} Agents on PedNet Environment ({dataset})")
     print("=" * 60)
 
     # Create environment with normalization wrapper
     base_env = PedNetParallelEnv(
-        dataset=dataset, normalize_obs=builder_norm_obs, obs_mode=STATE_OPTION, render_mode="animate", action_gap=action_gap
+        dataset=dataset, normalize_obs=builder_norm_obs, obs_mode=STATE_OPTION,
+        render_mode="animate", action_gap=action_gap, late_start_prob=0.5, late_start_max_frac=0.1
     )
     env = RunningNormalizeWrapper(base_env, norm_obs=NORM, norm_reward=norm_ret)
     env.seed(SEED)
@@ -443,14 +464,14 @@ if __name__ == "__main__":
             num_heads=num_heads,
             use_param_noise=False,
             use_action_noise=False,
-            num_episodes=300,
+            num_episodes=400,
             tm_window=20,
             max_duration=7,
             duration_entropy_coef=0.05,
             duration_entropy_coef_min=0.001,
             value_fusion=value_fusion,
-            shared_critic=shared_critic,
-            # shared_critic=None,
+            # shared_critic=shared_critic,
+            shared_critic=None,
             shared_critic_optimizer=shared_critic_optimizer,
         )
 
@@ -480,7 +501,7 @@ if __name__ == "__main__":
     # Train MAPPO HRL agents
     print("Starting MAPPO Training Loop...")
     return_dict, _ = train_mappo_batch(
-        env, agents, num_episodes=300, num_trajectories_per_update=2, delta_actions=True,
+        env, agents, num_episodes=400, num_trajectories_per_update=4, delta_actions=True,
         randomize=randomize, agents_saved_dir=project_root / f"rl/checkpoints/mappo_hrl_{dataset}",
         num_val_episodes=10, val_freq=10, use_wandb=True,
         debug_save_dir=f"rl_training/{dataset}/mappo_hrl_debug",

@@ -117,12 +117,12 @@ class DurationAttentionPolicy(nn.Module):
 
         # ---- Action head (per-link, continuous) ----
         # Each link outputs 2 values: [front_gate_delta, back_gate_delta]
-        # self.mean_head = nn.Linear(hidden_size, 2)
-        self.mean_head = nn.Sequential(
-            nn.Linear(hidden_size, hidden_size // 2),
-            nn.ReLU(),
-            nn.Linear(hidden_size // 2, 2)
-        )
+        self.mean_head = nn.Linear(hidden_size, 2)
+        # self.mean_head = nn.Sequential(
+        #     nn.Linear(hidden_size, hidden_size // 2),
+        #     nn.ReLU(),
+        #     nn.Linear(hidden_size // 2, 2)
+        # )
         self.std_head = nn.Linear(hidden_size, 2)
 
         # ---- Duration head (global, discrete) ----
@@ -536,6 +536,38 @@ class MAPPOAgentHRL:
         self._committed_action = None
         if self.use_param_noise:
             self._apply_param_noise()
+
+    @torch.no_grad()
+    def warmup_hidden(self, observations, global_states=None):
+        """Run observations through LSTM to warm up hidden state before acting.
+
+        Used when late-start skips the first N steps of the simulation.
+        This feeds the skipped observations through the actor and critic
+        LSTMs (no gradients, no transitions stored) so the agent starts
+        with meaningful temporal context.
+
+        Args:
+            observations: list of np.ndarray (local obs), one per skipped step.
+            global_states: list of np.ndarray (concatenated global obs), one per
+                skipped step. Used for shared critic warmup. If None and critic
+                is shared, critic hidden state is not warmed up.
+        """
+        for i, obs in enumerate(observations):
+            state_tensor = torch.tensor(
+                np.array(obs), dtype=torch.float
+            ).unsqueeze(0).to(self.device)
+            _, _, _, self.actor_hidden = self.actor(state_tensor, self.actor_hidden)
+
+            # Critic warmup: per-agent critic uses local obs, shared critic uses global state
+            if self._owns_critic:
+                # Per-agent critic — warm up with local observations
+                _, self.critic_hidden = self.value_net(state_tensor, self.critic_hidden)
+            elif global_states is not None:
+                # Shared critic — warm up with global state
+                global_tensor = torch.tensor(
+                    np.array(global_states[i]), dtype=torch.float
+                ).unsqueeze(0).to(self.device)
+                _, self.critic_hidden = self.value_net(global_tensor, self.critic_hidden)
 
     def init_batch_buffer(self):
         self.batch_buffer = []

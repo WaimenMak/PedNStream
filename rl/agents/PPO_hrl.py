@@ -1316,7 +1316,7 @@ def train_hrl_multi_agent_batch(env, agents, delta_actions=False, num_episodes=5
     if hasattr(first_agent, "total_updates"):
         effective_updates = max(
             1,
-            int(num_episodes / float(max(1, num_trajectories_per_update)) * 0.8),
+            int(num_episodes / float(max(1, num_trajectories_per_update)) * 1),
         )
         for agent in agents.values():
             agent.total_updates = effective_updates

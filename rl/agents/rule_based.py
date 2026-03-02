@@ -178,8 +178,8 @@ if __name__ == "__main__":
     from rl.pz_pednet_env import PedNetParallelEnv
     from rl.rl_utils import RunningNormalizeWrapper
     # dataset = "one_intersection_v0"
-    dataset = "butterfly_scC"
-    # dataset = "small_network"
+    # dataset = "butterfly_scC"
+    dataset = "one_intersection"
     env = PedNetParallelEnv(dataset, obs_mode="option2", action_gap=1, render_mode="animate", verbose=True)
     env = RunningNormalizeWrapper(env, norm_obs=False, norm_reward=True)
     env.seed(30)

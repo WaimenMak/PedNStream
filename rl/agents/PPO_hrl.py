@@ -653,6 +653,7 @@ class PPOAgentHRL:
             'states': [], 'actions': [], 'next_states': [],
             'rewards': [], 'dones': [],
             'durations': [],
+            'chosen_durations': [],
             'true_rewards': [],
         }
         self.actor_hidden = None
@@ -698,6 +699,7 @@ class PPOAgentHRL:
                 'rewards': np.array(self.transition_dict['rewards']),
                 'dones': np.array(self.transition_dict['dones']),
                 'durations': np.array(self.transition_dict['durations']),
+                'chosen_durations': np.array(self.transition_dict['chosen_durations']),
             }
             self.batch_buffer.append(trajectory)
 
@@ -710,7 +712,7 @@ class PPOAgentHRL:
         return len(self.batch_buffer)
 
     def store_transition(self, state, action, next_state, reward, done,
-                         duration=1, true_reward=None):
+                         duration=1, chosen_duration=None, true_reward=None):
         """Store a macro-transition.
 
         Args:
@@ -719,7 +721,9 @@ class PPOAgentHRL:
             next_state: observation after k env steps
             reward: *cumulative* reward over k steps
             done: whether episode ended during the k steps
-            duration: chosen k
+            duration: actual number of env steps (for TD target)
+            chosen_duration: duration sampled from policy (for log_prob). 
+                If None, defaults to duration.
             true_reward: unnormalized cumulative reward (for logging)
         """
         self.transition_dict['states'].append(state)
@@ -728,6 +732,8 @@ class PPOAgentHRL:
         self.transition_dict['rewards'].append(reward)
         self.transition_dict['dones'].append(done)
         self.transition_dict['durations'].append(duration)
+        self.transition_dict['chosen_durations'].append(
+            chosen_duration if chosen_duration is not None else duration)
         self.transition_dict['true_rewards'].append(
             true_reward if true_reward is not None else reward)
 
@@ -862,6 +868,7 @@ class PPOAgentHRL:
                 next_states = torch.tensor(traj['next_states'], dtype=torch.float).to(self.device)
                 dones = torch.tensor(traj['dones'], dtype=torch.float).view(-1, 1).to(self.device)
                 durations = torch.tensor(traj['durations'], dtype=torch.float).view(-1, 1).to(self.device)
+                chosen_durations = torch.tensor(traj['chosen_durations'], dtype=torch.float).view(-1, 1).to(self.device)
 
                 states_seq = states.unsqueeze(0)       # (1, T, obs_dim)
                 next_states_seq = next_states.unsqueeze(0)
@@ -880,12 +887,13 @@ class PPOAgentHRL:
                 action_dist = torch.distributions.Normal(mu, std)
                 old_action_log_probs = action_dist.log_prob(actions)  # (T, act_dim)
 
+                # Use chosen_duration for log_prob (what the agent sampled)
                 dur_probs = F.softmax(dur_logits.squeeze(0), dim=-1)  # (T, max_duration)
-                dur_indices = (durations - 1).long().squeeze(-1)         # 0-indexed (T,)
+                dur_indices = (chosen_durations - 1).long().squeeze(-1)  # 0-indexed (T,)
                 dur_dist = torch.distributions.Categorical(dur_probs)
                 old_dur_log_probs = dur_dist.log_prob(dur_indices).unsqueeze(-1)  # (T, 1)
 
-                # TD target with variable discount: γ^k
+                # TD target with variable discount: γ^k (use actual duration)
                 gamma_k = self.gamma ** durations  # (T, 1)
                 td_target = rewards + gamma_k * next_values * (1 - dones)  # (T, 1)
                 td_delta = td_target - current_values
@@ -1345,94 +1353,96 @@ def train_hrl_multi_agent_batch(env, agents, delta_actions=False, num_episodes=5
 
                 episode_returns = {aid: 0.0 for aid in agents.keys()}
                 episode_true_returns = {aid: 0.0 for aid in agents.keys()}
-                current_actions = {aid: None for aid in agents.keys()}
-                active_durations = {aid: None for aid in agents.keys()}
                 done = False
                 step = 0
 
+                # --- Async state trackers (mirrors MAPPO) ---
+                active_durations = {aid: 0 for aid in agents.keys()}
+                chosen_durations = {aid: None for aid in agents.keys()}
+                current_actions = {aid: None for aid in agents.keys()}
+                absolute_actions = {aid: None for aid in agents.keys()}
+                start_obs = {aid: None for aid in agents.keys()}
+                cumul_rewards = {aid: 0.0 for aid in agents.keys()}
+                cumul_true_rewards = {aid: 0.0 for aid in agents.keys()}
+                time_in_macro = {aid: 0 for aid in agents.keys()}
+
                 while not done:
-                    # --- Decision point: get action + duration from each agent ---
-                    actions = {}
-                    absolute_actions = {}
-                    durations = {}
-
+                    # --- Decision point for agents whose duration has expired ---
                     for agent_id, agent in agents.items():
-                        agent_state = obs[agent_id]
-                        action, duration, mu, sigma, dur_probs = agent.take_action(
-                            agent_state, return_distribution=True
-                        )
-                        batch_policy_mu[agent_id].append(np.atleast_1d(mu))
-                        batch_policy_sigma[agent_id].append(np.atleast_1d(sigma))
-                        batch_duration_probs[agent_id].append(dur_probs)
-                        batch_sampled_durations[agent_id].append(duration)
+                        if active_durations[agent_id] <= 0:
+                            # Store finished macro-transition
+                            if start_obs[agent_id] is not None:
+                                agent.store_transition(
+                                    state=start_obs[agent_id],
+                                    action=current_actions[agent_id],
+                                    next_state=obs[agent_id].copy(),
+                                    reward=cumul_rewards[agent_id],
+                                    done=False,
+                                    duration=time_in_macro[agent_id],
+                                    chosen_duration=chosen_durations[agent_id],
+                                    true_reward=cumul_true_rewards[agent_id],
+                                )
+                                episode_returns[agent_id] += cumul_rewards[agent_id]
+                                episode_true_returns[agent_id] += cumul_true_rewards[agent_id]
+                                cumul_rewards[agent_id] = 0.0
+                                cumul_true_rewards[agent_id] = 0.0
+                                time_in_macro[agent_id] = 0
 
-                        # if delta_actions:
-                        #     # Current gate widths are the last features in obs
-                        #     absolute_action = obs[agent_id].reshape(
-                        #         agents[agent_id].act_dim, -1)[:, -1] + action
-                        #     absolute_action = np.clip(
-                        #         absolute_action,
-                        #         agents[agent_id].act_low,
-                        #         agents[agent_id].act_high
-                        #     )
-                        #     absolute_actions[agent_id] = absolute_action
-                        # else:
-                        #     absolute_actions[agent_id] = action
-                        if delta_actions:
-                            from rl.rl_utils import extract_current_gate_widths
-                            current_gates = extract_current_gate_widths(obs[agent_id], agents[agent_id].act_dim)
-                            absolute_action = current_gates + action
-                            absolute_action = np.clip(absolute_action, agents[agent_id].act_low, agents[agent_id].act_high)
-                            absolute_actions[agent_id] = absolute_action
-                        else:
-                            absolute_actions[agent_id] = action
-                        # actions[agent_id] = action
-                        # durations[agent_id] = duration
-                        current_actions[agent_id] = action  
-                        active_durations[agent_id] = duration
+                            # Sample new action and duration
+                            action, duration, mu, sigma, dur_probs = agent.take_action(
+                                obs[agent_id], return_distribution=True
+                            )
+                            batch_policy_mu[agent_id].append(np.atleast_1d(mu))
+                            batch_policy_sigma[agent_id].append(np.atleast_1d(sigma))
+                            batch_duration_probs[agent_id].append(dur_probs)
+                            batch_sampled_durations[agent_id].append(duration)
 
-                    # --- Execute for k steps (use max duration across agents) ---
-                    # All agents commit to their chosen duration.
-                    # We use the MAX duration so no agent is "left behind".
-                    # Agents whose duration expires earlier just keep their action.
-                    max_k = max(active_durations.values())
-                    cumul_rewards = {aid: 0.0 for aid in agents.keys()}
-                    cumul_true_rewards = {aid: 0.0 for aid in agents.keys()}
-                    start_obs = {aid: obs[aid].copy() for aid in agents.keys()}
-
-                    for k_step in range(max_k):
-                        next_obs, rewards, terms, truncs, infos = env.step(absolute_actions)
-
-                        for aid in agents.keys():
-                            # cumul_rewards[aid] += rewards[aid]
-                            # multi step discount reward
-                            gamma = agents[aid].gamma
-                            cumul_rewards[aid] += rewards[aid] * (gamma ** k_step)
-                            if aid in infos and 'true_reward' in infos[aid]:
-                                cumul_true_rewards[aid] += infos[aid]['true_reward']
+                            if delta_actions:
+                                from rl.rl_utils import extract_current_gate_widths
+                                current_gates = extract_current_gate_widths(obs[agent_id], agents[agent_id].act_dim)
+                                absolute_action = current_gates + action
+                                absolute_action = np.clip(absolute_action, agents[agent_id].act_low, agents[agent_id].act_high)
+                                absolute_actions[agent_id] = absolute_action
                             else:
-                                cumul_true_rewards[aid] += rewards[aid]
+                                absolute_actions[agent_id] = action
 
-                        obs = next_obs
-                        step += 1
-                        done = any(terms.values()) or any(truncs.values())
-                        if done:
-                            break
+                            current_actions[agent_id] = action
+                            active_durations[agent_id] = duration
+                            chosen_durations[agent_id] = duration
+                            start_obs[agent_id] = obs[agent_id].copy()
 
-                    # --- Store macro-transitions ---
-                    for agent_id, agent in agents.items():
-                        # actual_k = min(durations[agent_id], k_step + 1) if done else durations[agent_id]
-                        agent.store_transition(
-                            state=start_obs[agent_id],
-                            action=current_actions[agent_id],
-                            next_state=obs[agent_id],
-                            reward=cumul_rewards[agent_id],
-                            done=done,
-                            duration=active_durations[agent_id],
-                            true_reward=cumul_true_rewards[agent_id],
-                        )
-                        episode_returns[agent_id] += cumul_rewards[agent_id]
-                        episode_true_returns[agent_id] += cumul_true_rewards[agent_id]
+                    # --- Execute 1 env step ---
+                    next_obs, rewards, terms, truncs, infos = env.step(absolute_actions)
+
+                    for aid in agents.keys():
+                        gamma = agents[aid].gamma
+                        k_step = time_in_macro[aid]
+                        cumul_rewards[aid] += rewards[aid] * (gamma ** k_step)
+                        cumul_true_rewards[aid] += infos[aid].get('true_reward', rewards[aid])
+                        active_durations[aid] -= 1
+                        time_in_macro[aid] += 1
+
+                    obs = next_obs
+                    step += 1
+                    done = any(terms.values()) or any(truncs.values())
+
+                    # --- Handle terminal state ---
+                    if done:
+                        for agent_id, agent in agents.items():
+                            if start_obs[agent_id] is not None:
+                                agent.store_transition(
+                                    state=start_obs[agent_id],
+                                    action=current_actions[agent_id],
+                                    next_state=obs[agent_id].copy(),
+                                    reward=cumul_rewards[agent_id],
+                                    done=done,
+                                    duration=time_in_macro[agent_id],
+                                    chosen_duration=chosen_durations[agent_id],
+                                    true_reward=cumul_true_rewards[agent_id],
+                                )
+                                episode_returns[agent_id] += cumul_rewards[agent_id]
+                                episode_true_returns[agent_id] += cumul_true_rewards[agent_id]
+                        break
 
                 # End of episode
                 for agent_id, agent in agents.items():
@@ -1509,7 +1519,7 @@ def train_hrl_multi_agent_batch(env, agents, delta_actions=False, num_episodes=5
 
                     # Validation
                     if (agents_saved_dir
-                            and global_update > (num_episodes // num_trajectories_per_update) // 2
+                            and global_update > (num_episodes // num_trajectories_per_update) // 3
                             and global_update % val_freq == 0):
                         best_avg_return = validate_and_save_best(
                             env, agents, agents_saved_dir,

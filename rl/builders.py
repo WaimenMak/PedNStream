@@ -55,7 +55,7 @@ class ObservationBuilder:
         elif self.obs_mode == "option3":
             self.features_per_link = 6  # inoutflow, reverse inoutflow, front_gate, back_gate
         elif self.obs_mode == "option4":
-            self.features_per_link = 7  # inoutflow, reverse inoutflow, density, front_gate, back_gate
+            self.features_per_link = 8  # inoutflow, reverse inoutflow, density, front_gate, back_gate
         elif self.obs_mode == "option5":
             self.features_per_link = 6  # travel_time_ratio, density_ratio, demand, throughput, back_gate, rev_back_gate
         else:
@@ -165,9 +165,10 @@ class ObservationBuilder:
                 link_features = [
                     link.inflow[time_step] if time_step < len(link.inflow) else 0.0,
                     link.outflow[time_step] if time_step < len(link.outflow) else 0.0,
+                    link.density[time_step] if time_step < len(link.density) else 0.0,
                     link.reverse_link.inflow[time_step] if time_step < len(link.reverse_link.inflow) else 0.0,
                     link.reverse_link.outflow[time_step] if time_step < len(link.reverse_link.outflow) else 0.0,
-                    link.get_density(time_step) if time_step < len(link.density) else 0.0,
+                    link.reverse_link.density[time_step] if time_step < len(link.reverse_link.density) else 0.0,
                     link.back_gate_width,
                     # link.reverse_link.front_gate_width,
                     link.reverse_link.back_gate_width,

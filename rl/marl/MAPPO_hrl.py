@@ -93,12 +93,28 @@ class DurationAttentionPolicy(nn.Module):
         super().__init__()
         self.obs_dim = obs_dim
         self.act_dim = act_dim
-        self.num_links = act_dim // 2  # Each link has 2 actions: front + back gate
-        self.features_per_link = obs_dim // self.num_links
+        # We explicitly model each physical direction as its own "logical link"
+        self.num_links = act_dim  # One action per direction (back_gate_width)
+        self.num_physical_links = act_dim // 2
+        # Each token gets ALL features from the physical link (both directions)
+        self.features_per_link = obs_dim // self.num_physical_links  # e.g. 6 for option3
         self.hidden_size = hidden_size
         self.min_std = min_std
         self.max_std = max_std
         self.max_duration = max_duration
+
+        # ---- Directional feature reordering ----
+        # Original obs layout per physical link (option3, 6 features):
+        #   [fwd_in(0), fwd_out(1), rev_in(2), rev_out(3), back_gate(4), rev_back_gate(5)]
+        # We reorder so "my direction" features come first:
+        #   Forward token: [fwd_in, fwd_out, back_gate, rev_in, rev_out, rev_back_gate]
+        #   Reverse token: [rev_in, rev_out, rev_back_gate, fwd_in, fwd_out, back_gate]
+        fppl = self.features_per_link
+        half = fppl // 2  # 3 features per direction
+        fwd_idx = list(range(half - 1)) + [fppl - 2] + list(range(half - 1, fppl - 2)) + [fppl - 1]
+        rev_idx = list(range(half - 1, fppl - 2)) + [fppl - 1] + list(range(half - 1)) + [fppl - 2]
+        self.register_buffer('fwd_idx', torch.tensor(fwd_idx, dtype=torch.long))
+        self.register_buffer('rev_idx', torch.tensor(rev_idx, dtype=torch.long))
 
         # ---- Shared backbone (same as AttentionPolicy) ----
         self.lstm = nn.LSTM(
@@ -115,15 +131,10 @@ class DurationAttentionPolicy(nn.Module):
         )
         self.layer_norm = nn.LayerNorm(hidden_size)
 
-        # ---- Action head (per-link, continuous) ----
-        # Each link outputs 2 values: [front_gate_delta, back_gate_delta]
-        self.mean_head = nn.Linear(hidden_size, 2)
-        # self.mean_head = nn.Sequential(
-        #     nn.Linear(hidden_size, hidden_size // 2),
-        #     nn.ReLU(),
-        #     nn.Linear(hidden_size // 2, 2)
-        # )
-        self.std_head = nn.Linear(hidden_size, 2)
+        # ---- Action head (per-direction, continuous) ----
+        # Each logical direction outputs 1 value: [back_gate_delta]
+        self.mean_head = nn.Linear(hidden_size, 1)
+        self.std_head = nn.Linear(hidden_size, 1)
 
         # ---- Duration head (global, discrete) ----
         # Aggregate link features → global feature → duration logits
@@ -149,8 +160,15 @@ class DurationAttentionPolicy(nn.Module):
             x = x.squeeze(0)
         seq_len = x.shape[0]
 
-        # 1. Prepare per-link input (num_links tokens, each with features_per_link)
-        x_links = x.view(seq_len, self.num_links, self.features_per_link).transpose(0, 1)
+        # 1. Reshape to physical links, then create directional tokens
+        #    Each token gets all 6 features with "my direction first" ordering
+        x_phys = x.view(seq_len, self.num_physical_links, self.features_per_link)
+        fwd_tokens = x_phys[:, :, self.fwd_idx]  # (seq_len, num_phys, 6)
+        rev_tokens = x_phys[:, :, self.rev_idx]   # (seq_len, num_phys, 6)
+        # Interleave: [fwd0, rev0, fwd1, rev1, ...] to match action layout
+        x_links = torch.stack([fwd_tokens, rev_tokens], dim=2)  # (seq_len, num_phys, 2, 6)
+        x_links = x_links.view(seq_len, self.num_links, self.features_per_link)  # (seq_len, num_links, 6)
+        x_links = x_links.transpose(0, 1)  # (num_links, seq_len, 6)
 
         # 2. Shared LSTM
         lstm_out, hidden_out = self.lstm(x_links, hidden)
@@ -165,12 +183,9 @@ class DurationAttentionPolicy(nn.Module):
         )
         coordinated = self.layer_norm(link_features + attn_out)
 
-        # 5a. Action head: each link outputs 2 values [front_gate, back_gate]
+        # 5a. Action head: each direction outputs 1 value [back_gate_delta]
         mean = self.mean_head(F.relu(coordinated)).view(seq_len, -1)  # (seq_len, act_dim)
         std = F.softplus(self.std_head(F.relu(coordinated))).view(seq_len, -1).clamp(self.min_std, self.max_std)
-        # action_input = torch.cat([F.relu(coordinated), gate_width], dim=-1)  # (seq_len, act_dim, hidden_size+1)
-        # mean = self.mean_head(action_input).squeeze(-1)  # (seq_len, act_dim)
-        # std = F.softplus(self.std_head(action_input)).squeeze(-1).clamp(self.min_std, self.max_std)
 
         # 5b. Duration head (global): mean-pool over links → logits
         global_feat = coordinated.mean(dim=1)  # (seq_len, hidden_size)

@@ -386,6 +386,7 @@ if __name__ == "__main__":
     norm_ret = True
     action_gap = 1
     USE_PRETRAINED = False
+    num_episodes = 600
 
     # set torch seed
     torch.manual_seed(SEED)
@@ -412,10 +413,10 @@ if __name__ == "__main__":
     num_agents = len(agent_keys)
     global_obs_dim = sum([env.observation_space(aid).shape[0] for aid in agent_keys])
     
-    # Derive num_links_per_agent from action space (each link has 2 actions: front + back gate)
-    # Assumes all agents have the same number of links
+    # Derive num_links_per_agent from action space
+    # Each physical link produces 2 directional actions (fwd + rev back gate)
     first_agent_act_dim = env.action_space(agent_keys[0]).shape[0]
-    num_links_per_agent = first_agent_act_dim // 2
+    num_links_per_agent = first_agent_act_dim // 2  # physical links per agent
     
     # Derive feat_per_link from first agent's observation space
     first_agent_obs_dim = env.observation_space(agent_keys[0]).shape[0]
@@ -464,14 +465,14 @@ if __name__ == "__main__":
             num_heads=num_heads,
             use_param_noise=False,
             use_action_noise=False,
-            num_episodes=400,
+            num_episodes=num_episodes,
             tm_window=20,
             max_duration=7,
             duration_entropy_coef=0.05,
             duration_entropy_coef_min=0.001,
             value_fusion=value_fusion,
-            # shared_critic=shared_critic,
-            shared_critic=None,
+            shared_critic=shared_critic,
+            # shared_critic=None,
             shared_critic_optimizer=shared_critic_optimizer,
         )
 
@@ -501,11 +502,11 @@ if __name__ == "__main__":
     # Train MAPPO HRL agents
     print("Starting MAPPO Training Loop...")
     return_dict, _ = train_mappo_batch(
-        env, agents, num_episodes=400, num_trajectories_per_update=4, delta_actions=True,
+        env, agents, num_episodes=num_episodes, num_trajectories_per_update=4, delta_actions=True,
         randomize=randomize, agents_saved_dir=project_root / f"rl/checkpoints/mappo_hrl_{dataset}",
         num_val_episodes=10, val_freq=10, use_wandb=True,
         debug_save_dir=f"rl_training/{dataset}/mappo_hrl_debug",
-        debug_save_episodes=[5, 50, 100, 200, 400],
+        debug_save_episodes=[5, 50, 100, 200, 400, 800],
         shared_critic=shared_critic,
         shared_critic_optimizer=shared_critic_optimizer,
     )

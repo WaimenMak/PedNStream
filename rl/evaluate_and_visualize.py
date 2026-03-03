@@ -383,7 +383,8 @@ def run_tests(dataset, algorithms, num_runs=10, seed=42, randomize=False):
         print("=" * 80)
         
         try:
-            if algo in ['ppo', 'sac', 'ppo_dyna', 'pome', 'ppo_hrl']:
+            # if algo in ['ppo', 'sac', 'ppo_dyna', 'pome', 'ppo_hrl', 'mappo']:
+            if algo in ['ppo', 'pome', 'ppo_hrl', 'mappo_hrl']:
                 # Load RL agents
                 agents_dir = project_root / "rl" / f"{algo}_agents_{dataset}"
                 if not agents_dir.exists():
@@ -613,7 +614,7 @@ Examples:
     parser.add_argument('--threshold', type=float, default=0.7,
                         help='Congestion threshold ratio (default: 0.7)')
     parser.add_argument('--algorithms', type=str, nargs='+',
-                        default=['ppo', 'sac', 'ppo_dyna', 'pome', 'ppo_hrl',
+                        default=['ppo', 'pome', 'ppo_hrl', 'mappo_hrl',
                          'sb3_ppo', 'rule_based', 'optimization_based', 'no_control'],
                         help='List of algorithms to evaluate (default: ppo sac rule_based optimization_based no_control)')
     parser.add_argument('--run-test', action='store_true',

@@ -64,7 +64,7 @@ if __name__ == "__main__":
     # dataset = "two_coordinators"
     # dataset = "one_intersection_v0"
     # dataset = "small_network"
-    dataset = "butterfly_scD"
+    dataset = "butterfly_scG"
     # dataset = "nine_intersections"
     # Create environment with normalization wrapper
     base_env = PedNetParallelEnv(

@@ -313,6 +313,7 @@ class PedNetParallelEnv(ParallelEnv):
                 all_densities = []
                 tt_term = 0
                 flow_term = 0
+                demand_term = 0
                 for link in out_links:
                     # link_flow = 0.0
                     # link_travel_time = 0.0
@@ -323,7 +324,12 @@ class PedNetParallelEnv(ParallelEnv):
                     T_ell_reverse = link.reverse_link.travel_time[self.sim_step] if self.sim_step < len(link.reverse_link.travel_time) else link.reverse_link.travel_time[0]
                     link_flow_forward = link.link_flow[self.sim_step] if self.sim_step < len(link.outflow) else 0.0
                     link_flow_reverse = link.reverse_link.link_flow[self.sim_step] if self.sim_step < len(link.reverse_link.outflow) else 0.0
-                    link_flow = link_flow_forward + link_flow_reverse
+                    #whether the flow is moving
+                    # forward_moving = 1 if link.outflow[self.sim_step] > 0 else 0
+                    # reverse_moving = 1 if link.reverse_link.outflow[self.sim_step] > 0 else 0
+                    # link_flow = (link_flow_forward) + (link_flow_reverse)
+                    link_flow = link.outflow[self.sim_step]
+                    demand = link.reverse_link.inflow[self.sim_step]
                     T_free = link.length/link.free_flow_speed
                     # number of pedestrians
                     # num_peds = link.num_pedestrians[self.sim_step] if self.sim_step < len(link.num_pedestrians) else 0.0
@@ -333,29 +339,33 @@ class PedNetParallelEnv(ParallelEnv):
                     
                     # normalize the travel time by the free flow travel time
                     # T_max = 1000
-                    norm_link_travel_time = np.clip(np.log(link_travel_time / 2 / T_free), 0, 2)
-                    norm_link_flow = np.clip((link_flow / 2) / (link.free_flow_speed * link.k_critical), 0, 1)
+                    norm_link_travel_time = np.clip(np.log(link_travel_time / 2 / T_free), 0, 1)
+                    # norm_link_flow = np.clip((link_flow / 2) / (link.free_flow_speed * link.k_critical * link.unit_time * link.width), 0, 1)
+                    norm_link_flow = np.clip((link_flow) / (link.free_flow_speed * link.k_critical * link.unit_time * link.width), 0, 1)
+                    norm_demand = np.clip((demand) / (link.free_flow_speed * link.k_critical * link.unit_time * link.width), 0, 1)
                     # print(norm_link_travel_time, norm_link_flow)
                     # link_rewards -= norm_link_travel_time
                     # link_rewards += norm_link_flow
                     tt_term -= norm_link_travel_time
                     flow_term += norm_link_flow
+                    demand_term += norm_demand
 
                 # Fairness
                 diff_term = 0.0
-                if len(all_densities) > 1 and np.max(all_densities) > 0.6:
+                if len(all_densities) > 1 and np.max(all_densities) > 2/6: # critical density / jam density
                     avg_density = np.mean(all_densities)
-                    diff_term = -np.mean(np.abs(np.array(all_densities) - avg_density))
+                    diff_term = -np.clip(np.mean(np.abs(np.array(all_densities) - avg_density)), 0, 1)
                     # penalty for norm density larger than 0.6
                     # diff_term = -np.sum(np.maximum(np.array(all_densities) - 0.6, 0))
                     # diff = np.var(all_densities)
                     # penalty = variance_penalty_weight * diff
                     # link_rewards -= penalty
 
-                w1 = 2.0  # throughput
+                w1 = 1.0  # throughput
                 w2 = 1.0  # delay
-                w3 = 0.01  # fairness
-                agent_rewards = w1*flow_term + w2*tt_term + w3*diff_term
+                w3 = 0.5  # fairness
+                w4 = 2.0  # demand
+                agent_rewards = w1*flow_term + w2*tt_term + w3*diff_term + w4*demand_term
                 # print(f"Agent {agent_id} reward components: flow={flow_term:.3f}, tt={tt_term:.3f}, diff={diff_term:.3f}, total={agent_rewards:.3f}")
                 rewards[agent_id] = agent_rewards
         return rewards
@@ -371,11 +381,11 @@ class PedNetParallelEnv(ParallelEnv):
         # Standard termination: reached simulation end
         terminated = self.sim_step >= self.simulation_steps
         
-        # Early termination on severe jam: Check if any agent has all its links jammed
-        # if not terminated and self.sim_step > 0:
+        # Early termination on severe jam: only during training for exploration efficiency
+        # if not terminated and self.training and self.sim_step > 0:
         #     for agent_id in self.possible_agents:
         #         agent_type = self.agent_manager.get_agent_type(agent_id)
-                
+        #
         #         if agent_type == "sep":
         #             # Separator agent: check both forward and reverse links
         #             forward_link, reverse_link = self.agent_manager.get_separator_links(agent_id)
@@ -385,7 +395,7 @@ class PedNetParallelEnv(ParallelEnv):
         #             links_to_check = self.agent_manager.get_gater_outgoing_links(agent_id)
         #         else:
         #             continue
-                
+        #
         #         # Check if ALL links for this agent are at jam density
         #         all_jammed = True
         #         for link in links_to_check:
@@ -394,7 +404,7 @@ class PedNetParallelEnv(ParallelEnv):
         #             if current_density < 0.99 * link.k_jam:
         #                 all_jammed = False
         #                 break
-                
+        #
         #         if all_jammed:
         #             # This agent's links are all jammed - terminate episode
         #             terminated = True

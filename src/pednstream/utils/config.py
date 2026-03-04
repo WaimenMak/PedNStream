@@ -1,6 +1,7 @@
 import yaml
 import numpy as np
 from typing import Dict, Any
+from pednstream.exceptions import RequiredConfigError
 
 
 def load_config(config_path: str) -> dict:
@@ -70,13 +71,12 @@ def validate_config(config: Dict[str, Any]) -> None:
         "default_link": ["length", "width", "free_flow_speed", "k_critical", "k_jam"],
     }
 
-    # TODO: implement custom exceptions
     for section, fields in required_fields.items():
         if section not in config:
-            raise ValueError(f"Missing required section: {section}")
+            raise RequiredConfigError(f"Missing required section: {section}")
 
         for field in fields:
             if field not in config[section]:
-                raise ValueError(
+                raise RequiredConfigError(
                     f"Missing required field: {field} in section {section}"
                 )

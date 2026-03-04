@@ -250,9 +250,6 @@ class Link(BaseLink):
             sending_flow = min(sending_flow_boundary, sending_flow_max)
             # TODO: fix the flow release logic: if sending flow >0, then use diffusion flow
 
-        """ The purpose is to mitigate the maximum sending flow to avoid unrealistic high flow (Added)"""
-        original_sending_flow = sending_flow
-
         """ Smooth the sending flow to avoid unrealistic high flow (Added) """
         sending_flow = max(0, sending_flow)
         if sending_flow < 0:

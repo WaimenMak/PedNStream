@@ -24,6 +24,35 @@ if TYPE_CHECKING:
     from rl.agents.rule_based import RuleBasedGaterAgent
     from rl.agents.optimization_based import DecentralizedOptimizationAgent
 
+
+def extract_current_gate_widths(obs: np.ndarray, act_dim: int) -> np.ndarray:
+    """
+    Extract current gate widths from a gater agent's observation.
+    
+    The observation has layout: [link_0_features..., link_1_features..., ...]
+    where each link's features end with [..., back_gate_width, rev_front_gate_width].
+    
+    The action layout is: [back_gate_0, rev_front_gate_0, back_gate_1, rev_front_gate_1, ...]
+    
+    Args:
+        obs: Flat observation array of shape (num_links * features_per_link,)
+        act_dim: Action dimension = num_links * 2
+    
+    Returns:
+        Array of shape (act_dim,) with interleaved [back_0, rev_front_0, back_1, rev_front_1, ...]
+    """
+    num_links = act_dim // 2
+    obs_reshaped = obs.reshape(num_links, -1)
+    
+    # In builders.py, the last two features are exactly [back_gate_width, rev_front_gate_width]
+    gate_1 = obs_reshaped[:, -2]
+    gate_2 = obs_reshaped[:, -1]
+    
+    current_gates = np.empty(act_dim)
+    current_gates[0::2] = gate_1        # Even indices: back_gate
+    current_gates[1::2] = gate_2   # Odd indices: rev_front_gate
+    return current_gates
+
 def layer_init(layer, std=np.sqrt(2), bias_const=0.0):
     """
     PPO 标准初始化技巧：
@@ -269,6 +298,8 @@ class RunningNormalizeWrapper:
     def set_training(self, training: bool):
         """Set training mode (whether to update running statistics)."""
         self.training = training
+        if hasattr(self.env, 'training'):
+            self.env.training = training
     
     def get_normalization_stats(self) -> Dict[str, Any]:
         """Get current normalization statistics for saving."""
@@ -413,7 +444,7 @@ def validate_agents(env, agents, delta_actions: bool = False, num_episodes: int 
                         # For other agents, this might be incorrect if they are fully normalized.
                         
                         # Assuming last feature is the value to control
-                        current_val = obs[agent_id].reshape(agent.act_dim, -1)[:, -1]
+                        current_val = extract_current_gate_widths(obs[agent_id], agent.act_dim)
                         absolute_action = current_val + action
                         absolute_action = np.clip(
                             absolute_action,
@@ -757,6 +788,7 @@ def load_all_agents(save_dir: str, device: str = "cpu", agent_class=None):
         'PPOAgent_dyna': 'rl.agents.PPO_dyna',
         'POMEAgent': 'rl.agents.POME',
         'PPOAgentHRL': 'rl.agents.PPO_hrl',
+        'MAPPOAgentHRL': 'rl.marl.MAPPO_hrl',
         'SACAgent': 'rl.agents.SAC_copy',
     }
     
@@ -795,7 +827,7 @@ def load_all_agents(save_dir: str, device: str = "cpu", agent_class=None):
                 raise ValueError(f"Cannot load agent type: {agent_type}")
         
         # Create agent instance based on config
-        if agent_type in ['PPOAgent', 'PPOAgent_dyna', 'POMEAgent', 'PPOAgentHRL']:
+        if agent_type in ['PPOAgent', 'PPOAgent_dyna', 'POMEAgent', 'PPOAgentHRL', 'MAPPOAgentHRL']:
             # PPO-style agents: create using config parameters
             # Build kwargs from config, filtering out None values
             agent_kwargs = {
@@ -830,6 +862,26 @@ def load_all_agents(save_dir: str, device: str = "cpu", agent_class=None):
             for param in optional_params:
                 if param in config:
                     agent_kwargs[param] = config[param]
+            
+            if agent_type == 'MAPPOAgentHRL':
+                # Handle global_obs_dim dynamically for older checkpoints that didn't save it
+                if 'global_obs_dim' in config:
+                    agent_kwargs['global_obs_dim'] = config['global_obs_dim']
+                else:
+                    agent_kwargs['global_obs_dim'] = sum([c['obs_dim'] for c in config_data['agent_configs'].values()])
+                
+                # Handle num_agents and num_links_per_agent for centralized critic
+                if 'num_agents' in config:
+                    agent_kwargs['num_agents'] = config['num_agents']
+                else:
+                    # Infer from number of agent configs
+                    agent_kwargs['num_agents'] = len(config_data['agent_configs'])
+                
+                if 'num_links_per_agent' in config:
+                    agent_kwargs['num_links_per_agent'] = config['num_links_per_agent']
+                else:
+                    # Infer from act_dim (each link has 2 actions: front + back gate)
+                    agent_kwargs['num_links_per_agent'] = config['act_dim'] // 2
             
             # Create agent
             agent = agent_class_to_use(**agent_kwargs)
@@ -1448,130 +1500,154 @@ def compute_served_trips_rate(simulation_dir=None):
 
 def compute_agent_local_metrics(simulation_dir=None, dataset=None):
     """
-    Compute local metrics for each agent based on connected links.
-    
-    For each controller (gate/separator), calculate the average density over time
-    on the links connected to that controller.
-    
+    Compute local metrics for each gater agent based on its connected links.
+
+    Metrics (mirroring the network-level evaluation):
+        - congestion_time: area-time weighted excess density above k_critical
+        - congestion_fraction: fraction of link-timesteps that are congested
+        - avg_travel_time: mean travel time across connected links
+        - avg_travel_time_spent: total person-time on connected links / total_trips
+        - total_trips: cumulative inflow of the incoming links to the node
+        - served_rate: cumulative outflow of outgoing links / total_trips
+
     Args:
         simulation_dir: Path to saved simulation directory
         dataset: Dataset name (needed to reconstruct network topology)
-        
+
     Returns:
-        dict: {
-            agent_id: {
-                'avg_density': float,  # Average density across connected links and time
-                'avg_normalized_density': float,  # Average density normalized by k_jam
-                'num_links': int,  # Number of links connected to this agent
-                'link_densities': {link_key: avg_density}  # Per-link average densities
-            }
-        }
+        dict: {agent_id: {metric_name: value, ...}}
     """
     import numpy as np
     from pathlib import Path
     import json
-    
+
     sim_path = Path(simulation_dir)
-    
-    # Load link data
+
     link_data_path = sim_path / 'link_data.json'
     if not link_data_path.exists():
         raise FileNotFoundError(f"link_data.json not found in {simulation_dir}")
-    
     with open(link_data_path, 'r') as f:
         link_data = json.load(f)
-    
-    # Load network parameters to get agent-link mapping
+
     network_params_path = sim_path / 'network_params.json'
     if not network_params_path.exists():
         raise FileNotFoundError(f"network_params.json not found in {simulation_dir}")
-    
     with open(network_params_path, 'r') as f:
         network_params = json.load(f)
-    
-    # Reconstruct agent manager to get agent-link mappings
-    # We need to recreate the network to access agent information
+    unit_time = network_params.get('unit_time', 1.0)
+
     if dataset is None:
         raise ValueError("dataset parameter is required to compute agent local metrics")
-    
+
     from pednstream.utils.env_loader import NetworkEnvGenerator
     from rl.discovery import AgentManager
-    
+
     env_generator = NetworkEnvGenerator()
     network = env_generator.create_network(dataset, verbose=False)
     agent_manager = AgentManager(network)
-    
+
     agent_metrics = {}
-    
-    # Process each agent
+
     for agent_id in agent_manager.get_all_agent_ids():
         agent_type = agent_manager.get_agent_type(agent_id)
-        
-        # Get connected links based on agent type
-        connected_links = []
-        if agent_type == 'gate':
-            # Gater: get incoming and outgoing links of the controlled node
-            node = agent_manager.get_gater_node(agent_id)
-            for link in node.incoming_links:
-                if not (hasattr(link, 'virtual_incoming_link') and link == link.virtual_incoming_link):
-                    link_key = f"{link.start_node.node_id}-{link.end_node.node_id}"
-                    connected_links.append(link_key)
-            for link in node.outgoing_links:
-                if not (hasattr(link, 'virtual_outgoing_link') and link == link.virtual_outgoing_link):
-                    link_key = f"{link.start_node.node_id}-{link.end_node.node_id}"
-                    connected_links.append(link_key)
-        
-        elif agent_type == 'sep':
-            # Separator: get forward and reverse links of the corridor
-            forward_link, reverse_link = agent_manager.get_separator_links(agent_id)
-            forward_key = f"{forward_link.start_node.node_id}-{forward_link.end_node.node_id}"
-            reverse_key = f"{reverse_link.start_node.node_id}-{reverse_link.end_node.node_id}"
-            connected_links.append(forward_key)
-            connected_links.append(reverse_key)
-        
-        # Calculate metrics for this agent's connected links
-        link_avg_densities = {}
-        link_avg_normalized_densities = {}
-        
-        for link_key in connected_links:
+        if agent_type != 'gate':
+            continue
+
+        node = agent_manager.get_gater_node(agent_id)
+
+        incoming_keys = []
+        for link in node.incoming_links:
+            if not (hasattr(node, 'virtual_incoming_link') and link == node.virtual_incoming_link):
+                incoming_keys.append(f"{link.start_node.node_id}-{link.end_node.node_id}")
+
+        outgoing_keys = []
+        for link in node.outgoing_links:
+            if not (hasattr(node, 'virtual_outgoing_link') and link == node.virtual_outgoing_link):
+                outgoing_keys.append(f"{link.start_node.node_id}-{link.end_node.node_id}")
+
+        all_keys = incoming_keys + outgoing_keys
+
+        # --- Congestion ---
+        total_congestion_time = 0.0
+        total_area_time = 0.0
+        congestion_timesteps = 0
+        total_timesteps = 0
+
+        for link_key in all_keys:
             if link_key not in link_data:
                 continue
-            
             link_info = link_data[link_key]
             density_array = link_info.get('density', [])
             params = link_info.get('parameters', {})
-            k_jam = params.get('k_jam', 1.0)
-            
-            if not density_array:
+            k_critical = params.get('k_critical', 1.0)
+            length = params.get('length', 1.0)
+            width = params.get('width', 1.0)
+            area = length * width
+
+            for density in density_array:
+                if density is None or density < 0:
+                    continue
+                area_t = area * unit_time
+                total_area_time += area_t
+                total_timesteps += 1
+                if density > k_critical:
+                    congestion_timesteps += 1
+                    total_congestion_time += (density - k_critical) * area_t
+
+        congestion_fraction = congestion_timesteps / total_timesteps if total_timesteps > 0 else 0.0
+
+        # --- Travel time ---
+        link_avg_tts = []
+        for link_key in all_keys:
+            if link_key not in link_data:
                 continue
-            
-            # Filter out invalid values
-            valid_densities = [d for d in density_array if d is not None and d >= 0]
-            
-            if valid_densities:
-                avg_density = np.mean(valid_densities)
-                avg_normalized_density = avg_density / k_jam
-                link_avg_densities[link_key] = avg_density
-                link_avg_normalized_densities[link_key] = avg_normalized_density
-        
-        # Compute agent-level metrics
-        if link_avg_densities:
-            agent_metrics[agent_id] = {
-                'avg_density': np.mean(list(link_avg_densities.values())),
-                'avg_normalized_density': np.mean(list(link_avg_normalized_densities.values())),
-                'num_links': len(link_avg_densities),
-                'link_densities': link_avg_densities,
-                'link_normalized_densities': link_avg_normalized_densities
-            }
-        else:
-            agent_metrics[agent_id] = {
-                'avg_density': 0.0,
-                'avg_normalized_density': 0.0,
-                'num_links': 0,
-                'link_densities': {},
-                'link_normalized_densities': {}
-            }
-    
+            tt_array = link_data[link_key].get('travel_time', [])
+            valid = [tt for tt in tt_array if tt is not None and tt >= 0]
+            if valid:
+                link_avg_tts.append(np.mean(valid))
+        avg_travel_time = np.mean(link_avg_tts) if link_avg_tts else 0.0
+
+        # --- Total person-time on connected links ---
+        total_person_time = 0.0
+        for link_key in all_keys:
+            if link_key not in link_data:
+                continue
+            for n_peds in link_data[link_key].get('num_pedestrians', []):
+                if n_peds is not None and n_peds >= 0:
+                    total_person_time += n_peds * unit_time
+
+        # --- Total trips (cumulative inflow of incoming links) ---
+        total_trips = 0.0
+        for link_key in incoming_keys:
+            if link_key not in link_data:
+                continue
+            cum_inflow = link_data[link_key].get('cumulative_inflow', [])
+            if cum_inflow:
+                total_trips += cum_inflow[-1]
+
+        # --- Served rate (cumulative outflow of outgoing links / total trips) ---
+        total_outflow = 0.0
+        for link_key in outgoing_keys:
+            if link_key not in link_data:
+                continue
+            cum_outflow = link_data[link_key].get('cumulative_outflow', [])
+            if cum_outflow:
+                total_outflow += cum_outflow[-1]
+
+        served_rate = total_outflow / total_trips if total_trips > 0 else 0.0
+        avg_travel_time_spent = total_person_time / total_trips if total_trips > 0 else 0.0
+
+        agent_metrics[agent_id] = {
+            'congestion_time': total_congestion_time,
+            'congestion_fraction': congestion_fraction,
+            'avg_travel_time': avg_travel_time,
+            'avg_travel_time_spent': avg_travel_time_spent,
+            'total_trips': total_trips,
+            'served_rate': served_rate,
+            'num_incoming_links': len(incoming_keys),
+            'num_outgoing_links': len(outgoing_keys),
+        }
+
     return agent_metrics
 
 
@@ -1729,7 +1805,7 @@ def _evaluate_single_run(env, agents, delta_actions: bool, deterministic: bool, 
                     
                     # Also compute absolute action for environment step
                     # Current width is in observation
-                    current_width = obs[agent_id].reshape(env.action_space(agent_id).high, -1)[:, -1]
+                    current_width = extract_current_gate_widths(obs[agent_id], env.action_space(agent_id).shape[0])
                     absolute_action = current_width + actions[agent_id]
                     # absolute_action = np.clip(absolute_action, agent.act_low, agent.act_high)
                     absolute_actions[agent_id] = absolute_action
@@ -1760,7 +1836,7 @@ def _evaluate_single_run(env, agents, delta_actions: bool, deterministic: bool, 
                 
                 if delta_actions and hasattr(agent, 'act_low'):
                     # Convert delta to absolute action
-                    absolute_action = obs[agent_id].reshape(agent.act_dim, -1)[:, -1] + action
+                    absolute_action = extract_current_gate_widths(obs[agent_id], agent.act_dim) + action
                     absolute_action = np.clip(absolute_action, agent.act_low, agent.act_high)
                     absolute_actions[agent_id] = absolute_action
                 else:
@@ -2088,7 +2164,7 @@ def train_sequential_curriculum(
                     
                     # Convert delta to absolute action if needed
                     if delta_actions:
-                        current_gate_widths = agent_obs.reshape(agent.act_dim, -1)[:, -1]
+                        current_gate_widths = extract_current_gate_widths(agent_obs, agent.act_dim)
                         absolute_action = current_gate_widths + action
                         absolute_action = np.clip(absolute_action, agent.act_low.numpy(), agent.act_high.numpy())
                     else:

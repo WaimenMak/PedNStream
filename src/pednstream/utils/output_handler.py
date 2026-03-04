@@ -1,6 +1,4 @@
-
-
-import os
+import inspect
 import json
 import pandas as pd
 from datetime import datetime
@@ -8,13 +6,24 @@ from pathlib import Path
 from pednstream.ltm.network import Network
 from pednstream.ltm.link import Separator
 
+
 class OutputHandler:
-    def __init__(self, base_dir="outputs", simulation_dir=None):
+    def __init__(self, base_dir=None, simulation_dir=None):
         """
         Initialize output handler
-        :param base_dir: Base directory for outputs
+        :param base_dir: Base directory for outputs. If None, defaults to 'outputs' 
+                         folder at the same level as the calling file.
+        :param simulation_dir: Subdirectory name for this simulation
         """
-        self.base_dir = Path(base_dir)
+        if base_dir is None:
+            # Get the caller's file location and create outputs folder there
+            caller_frame = inspect.stack()[1]
+            caller_file = Path(caller_frame.filename).resolve()
+            caller_dir = caller_frame.filename if caller_file.is_dir() else caller_file.parent
+            self.base_dir = Path(caller_dir) / "outputs"
+        else:
+            self.base_dir = Path(base_dir)
+        
         self.timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         if simulation_dir is not None:
             self.simulation_dir = self.base_dir / simulation_dir
@@ -53,9 +62,18 @@ class OutputHandler:
                 }
             }
             
-            # Save front_gate_width only for outgoing links from gater nodes (to avoid redundancy)
+            # Save gate_width data for outgoing links from gater nodes (for visualization)
             if hasattr(network, 'controller_gaters') and u in network.controller_gaters:
                 link_entry['back_gate_width'] = link.back_gate_width_data.tolist()
+                link_entry['front_gate_width'] = link.front_gate_width_data.tolist()
+            
+            # Save front_gate_width for incoming links to gater nodes (for visualization)
+            # This captures the front gate of link (v->u) where u is a gater node
+            if hasattr(network, 'controller_gaters') and v in network.controller_gaters:
+                if 'front_gate_width' not in link_entry:
+                    link_entry['front_gate_width'] = link.front_gate_width_data.tolist()
+                if 'back_gate_width' not in link_entry:
+                    link_entry['back_gate_width'] = link.back_gate_width_data.tolist()
 
             # If the link is a separator, save its width data for visualization
             if isinstance(link, Separator) and hasattr(link, 'separator_width_data'):

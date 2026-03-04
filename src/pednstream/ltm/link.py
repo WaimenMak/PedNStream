@@ -70,16 +70,13 @@ class Link(BaseLink):
         if kwargs.get("front_gate_width", None) is not None:
             self._front_gate_width = kwargs["front_gate_width"]
         else:
-            self._front_gate_width = (
-                self.width
-            )  # width of the gate, for gate control in the head
-        self.back_gate_width_data = self._back_gate_width * np.ones(
-            simulation_steps + 1
-        )
-        self.free_flow_speed = kwargs["free_flow_speed"]
-        self.capacity = self.free_flow_speed * kwargs["k_critical"]
-        self.k_jam = kwargs["k_jam"]
-        self.k_critical = kwargs["k_critical"]
+            self._front_gate_width = self.width  # width of the gate, for gate control in the head
+        self.back_gate_width_data = self._back_gate_width * np.ones(simulation_steps + 1)
+        self.front_gate_width_data = self._front_gate_width * np.ones(simulation_steps + 1)
+        self.free_flow_speed = kwargs['free_flow_speed']
+        self.capacity = self.free_flow_speed * kwargs['k_critical']
+        self.k_jam = kwargs['k_jam']
+        self.k_critical = kwargs['k_critical']
         self.shockwave_speed = self.capacity / (self.k_jam - self.k_critical)
         self.current_speed = self.free_flow_speed
         self.max_travel_time = (
@@ -109,10 +106,7 @@ class Link(BaseLink):
 
         # For efficient moving average calculation
         self.avg_travel_time_window = round(100 / self.unit_time)
-        self.avg_travel_time = np.zeros(simulation_steps + 1, dtype=np.float32)
-        self.avg_travel_time[: self.avg_travel_time_window] = self.travel_time[
-            0
-        ]  # initialize the first window
+        self.avg_travel_time = np.ones(simulation_steps + 1, dtype=np.float32) * self.travel_time[0]
 
         # Additional dynamic attributes
         self.num_pedestrians = np.zeros(simulation_steps + 1, dtype=np.float32)
@@ -136,9 +130,9 @@ class Link(BaseLink):
     @front_gate_width.setter
     def front_gate_width(self, value: float):
         self._front_gate_width = value
-        if self.reverse_link:
-            # Set the private attribute on the reverse link to avoid recursion
-            self.reverse_link._back_gate_width = value
+        # if self.reverse_link:
+        #     # Set the private attribute on the reverse link to avoid recursion
+        #     self.reverse_link._back_gate_width = value
 
     @property
     def back_gate_width(self):
@@ -147,9 +141,9 @@ class Link(BaseLink):
     @back_gate_width.setter
     def back_gate_width(self, value: float):
         self._back_gate_width = value
-        if self.reverse_link:
-            # Set the private attribute on the reverse link to avoid recursion
-            self.reverse_link._front_gate_width = value
+        # if self.reverse_link:
+        #     # Set the private attribute on the reverse link to avoid recursion
+        #     self.reverse_link._front_gate_width = value
 
     @property
     def area(self):
@@ -194,6 +188,7 @@ class Link(BaseLink):
             )
         # update the back_gate_width_data
         self.back_gate_width_data[time_step] = self.back_gate_width
+        self.front_gate_width_data[time_step] = self.front_gate_width
 
     def get_density(self, time_step: int):
         """
@@ -245,16 +240,16 @@ class Link(BaseLink):
 
         else:
             # if time_step - tau + 1 < 0: # congestion stage
-            """ for the normal stage or the congestion stage """
-            idx = max(0, time_step + 1 - tau)
-
+            ''' for the normal stage or the congestion stage '''
+           
+            idx = min(max(0, time_step + 1 - tau), len(self.cumulative_inflow) - 1)
+          
+            # congestion_factor = np.clip(self.density[time_step] / self.k_jam, 0, 1)
             congestion_factor = np.clip(
-                (self.density[time_step] - self.k_critical)
-                / (self.k_jam - self.k_critical),
-                0,
-                1,
-            )  # this one is theoratically more realistic for unidirectional condition
-
+              (self.density[time_step] - self.k_critical) / (self.k_jam - self.k_critical),
+              0, 1
+            ) # this one is theoratically more realistic for unidirectional condition
+            
             boundary_congestion = self.num_pedestrians[time_step]
             boundary_freeflow = max(
                 0, self.cumulative_inflow[idx] - self.cumulative_outflow[time_step]

@@ -164,13 +164,14 @@ class NetworkEnvGenerator:
                 if f"{v}_{u}" not in self.config["params"]["links"]:
                     # Create a copy of final_params for reverse link and swap front/back gate widths
                     reverse_params = final_params.copy()
-                    original_front = reverse_params.pop("front_gate_width", None)
-                    original_back = reverse_params.pop("back_gate_width", None)
-                    if original_front is not None:
-                        reverse_params["back_gate_width"] = original_front
-                    if original_back is not None:
-                        reverse_params["front_gate_width"] = original_back
-                    self.config["params"]["links"][f"{v}_{u}"] = reverse_params
+                    # TODO: Do we need the code below at all?
+                    # original_front = reverse_params.pop('front_gate_width', None)
+                    # original_back = reverse_params.pop('back_gate_width', None)
+                    # if original_front is not None:
+                    #     reverse_params['back_gate_width'] = original_front
+                    # if original_back is not None:
+                    #     reverse_params['front_gate_width'] = original_back
+                    self.config['params']['links'][f"{v}_{u}"] = reverse_params
 
         # Create network
         self.network = Network(
@@ -242,14 +243,15 @@ class NetworkEnvGenerator:
         origin_nodes = self.config.get("origin_nodes", [])
         original_demand_config = self._original_config["params"].get("demand", {})
         demand_params = {}
-
+        
         available_patterns = [
-            "gaussian_peaks",
-            "constant",
-            "sudden_demand",
-            "multi_peaks",
+          'gaussian_peaks', 
+          'constant', 
+          'sudden_demand', 
+          'multi_peaks', 
+          'single_peak'
         ]
-
+        
         # Default values if not specified in config
         default_base_lambda = 10.0
         default_peak_lambda = 30.0
@@ -275,7 +277,7 @@ class NetworkEnvGenerator:
             # Randomize pattern (use existing as more likely choice)
             existing_pattern = origin_config.get("pattern", None)
             if existing_pattern and np.random.random() < 0.5:
-                # 70% chance to keep existing pattern
+                # 50% chance to keep existing pattern
                 pattern = existing_pattern
             else:
                 pattern = np.random.choice(available_patterns)
@@ -300,7 +302,11 @@ class NetworkEnvGenerator:
                 "base_lambda": float(base_lambda),
                 "peak_lambda": float(peak_lambda),
             }
-
+            
+            # For single_peak pattern, randomize peak_position (0.1-0.9)
+            if pattern == 'single_peak':
+                demand_params[origin_key]['peak_position'] = float(np.random.uniform(0.1, 0.9))
+        
         # Optionally shuffle demand profiles across origins for extra diversity
         demand_params = self._shuffle_demand_among_origins(
             demand_params, shuffle_prob=0.5
@@ -541,15 +547,18 @@ class NetworkEnvGenerator:
 
                 # Randomize back_gate_width from uniform [0, link_width]
                 back_gate = np.random.uniform(0, link_width)
-
+                rev_back_gate = np.random.uniform(0, link_width)
+                
                 # Set back_gate_width for outgoing link
-                gate_width_overrides[link_id] = {"back_gate_width": back_gate}
-
-                # Set front_gate_width for reverse link (same physical gate)
+                gate_width_overrides[link_id] = {
+                    'back_gate_width': back_gate
+                }
+                
+                # Set front_gate_width for reverse link
                 if reverse_link_id not in gate_width_overrides:
                     gate_width_overrides[reverse_link_id] = {}
-                gate_width_overrides[reverse_link_id]["front_gate_width"] = back_gate
-
+                gate_width_overrides[reverse_link_id]['back_gate_width'] = rev_back_gate
+        
         return gate_width_overrides
 
     def generate_random_link_params(self) -> dict:

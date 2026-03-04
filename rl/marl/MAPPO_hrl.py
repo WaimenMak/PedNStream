@@ -111,7 +111,6 @@ class DurationAttentionPolicy(nn.Module):
         #   Reverse token: [rev_in, rev_out, rev_back_gate, fwd_in, fwd_out, back_gate]
         fppl = self.features_per_link
         half = fppl // 2  # 3 features per direction
-        # For option3: fwd features at [0,1,4], rev features at [2,3,5]
         fwd_idx = list(range(half - 1)) + [fppl - 2] + list(range(half - 1, fppl - 2)) + [fppl - 1]
         rev_idx = list(range(half - 1, fppl - 2)) + [fppl - 1] + list(range(half - 1)) + [fppl - 2]
         self.register_buffer('fwd_idx', torch.tensor(fwd_idx, dtype=torch.long))
@@ -187,9 +186,6 @@ class DurationAttentionPolicy(nn.Module):
         # 5a. Action head: each direction outputs 1 value [back_gate_delta]
         mean = self.mean_head(F.relu(coordinated)).view(seq_len, -1)  # (seq_len, act_dim)
         std = F.softplus(self.std_head(F.relu(coordinated))).view(seq_len, -1).clamp(self.min_std, self.max_std)
-        # action_input = torch.cat([F.relu(coordinated), gate_width], dim=-1)  # (seq_len, act_dim, hidden_size+1)
-        # mean = self.mean_head(action_input).squeeze(-1)  # (seq_len, act_dim)
-        # std = F.softplus(self.std_head(action_input)).squeeze(-1).clamp(self.min_std, self.max_std)
 
         # 5b. Duration head (global): mean-pool over links → logits
         global_feat = coordinated.mean(dim=1)  # (seq_len, hidden_size)
@@ -199,51 +195,69 @@ class DurationAttentionPolicy(nn.Module):
 
 
 class DurationAttentionValueNetwork(nn.Module):
-    """Attention-based value network for HRL with duration-augmented actions.
+    """Attention-based value network for MAPPO with duration-augmented actions.
 
-    Uses attention-based pooling instead of mean pooling for better global
-    aggregation. The learned query attends to all link features, allowing
-    the network to weight links by their importance for value estimation.
+    Used in two modes:
+    - **Shared/centralized critic** (standard MAPPO): Takes the concatenated global state
+      of all agents as input. Tokens = num_agents * num_links_per_agent.
+    - **Per-agent/local critic**: Takes a single agent's local observation as input.
+      Tokens = num_links_per_agent (num_agents=1).
 
-    Fusion options:
-        - 'attention': Learned query attends to links (default, recommended)
-        - 'mean': Simple mean pooling (original)
+    Architecture:
+        1. Reshape input → (num_tokens, feat_per_link)
+        2. LSTM over time for each token (captures temporal dynamics)
+        3. Self-attention over tokens (captures spatial / inter-link interactions)
+        4. Global pooling → scalar value
+
+    Fusion options for global pooling:
+        - 'attention': Learned query attends to all tokens (default, recommended)
+        - 'mean': Simple mean pooling
         - 'max': Max pooling
         - 'mean_max': Concatenate mean and max pooling
         - 'gated': Gated attention pooling with sigmoid weights
     """
 
-    def __init__(self, obs_dim, act_dim, hidden_size=64, num_layers=1, num_heads=2,
-                 fusion='attention'):
+    def __init__(self, global_obs_dim, num_agents, num_links_per_agent, feat_per_link,
+                 hidden_size=64, num_layers=1, num_heads=2, fusion='attention'):
+        """
+        Args:
+            global_obs_dim: Total dimension of concatenated global state (for validation).
+            num_agents: Number of agents in the environment.
+            num_links_per_agent: Number of controlled links per agent.
+            feat_per_link: Number of features per link (from local observation).
+            hidden_size: LSTM and attention hidden dimension.
+            num_layers: Number of LSTM layers.
+            num_heads: Number of attention heads.
+            fusion: Pooling method for global aggregation.
+        """
         super().__init__()
-        self.obs_dim = obs_dim
-        self.act_dim = act_dim
-        self.num_links = act_dim  # 2 directional tokens per physical link
-        self.num_physical_links = act_dim // 2
-        self.features_per_link = obs_dim // self.num_physical_links  # full bidirectional features (e.g. 6)
+        self.global_obs_dim = global_obs_dim
+        self.num_agents = num_agents
+        self.num_links_per_agent = num_links_per_agent
+        self.feat_per_link = feat_per_link
+        self.num_tokens = num_agents * num_links_per_agent
         self.hidden_size = hidden_size
         self.fusion = fusion
 
-        # Directional feature reordering (same as policy network)
-        fppl = self.features_per_link
-        half = fppl // 2
-        fwd_idx = list(range(half - 1)) + [fppl - 2] + list(range(half - 1, fppl - 2)) + [fppl - 1]
-        rev_idx = list(range(half - 1, fppl - 2)) + [fppl - 1] + list(range(half - 1)) + [fppl - 2]
-        self.register_buffer('fwd_idx', torch.tensor(fwd_idx, dtype=torch.long))
-        self.register_buffer('rev_idx', torch.tensor(rev_idx, dtype=torch.long))
+        # Validate dimensions
+        expected_dim = num_agents * num_links_per_agent * feat_per_link
+        assert global_obs_dim == expected_dim, (
+            f"global_obs_dim ({global_obs_dim}) != num_agents ({num_agents}) * "
+            f"num_links_per_agent ({num_links_per_agent}) * feat_per_link ({feat_per_link}) = {expected_dim}"
+        )
 
-        # Shared LSTM
+        # Shared LSTM: processes each (agent, link) token over time
         self.lstm = nn.LSTM(
-            input_size=self.features_per_link,
+            input_size=feat_per_link,
             hidden_size=hidden_size,
             num_layers=num_layers,
             batch_first=True
         )
 
-        # Link feature extractor
+        # Token feature extractor
         self.link_model = nn.Linear(hidden_size, hidden_size)
 
-        # Attention for inter-link coordination
+        # Attention for inter-token (cross-agent, cross-link) coordination
         self.attention = nn.MultiheadAttention(
             embed_dim=hidden_size,
             num_heads=num_heads,
@@ -267,7 +281,7 @@ class DurationAttentionValueNetwork(nn.Module):
             # Concatenate mean and max → 2x hidden_size
             value_input_dim = hidden_size * 2
         elif fusion == 'gated':
-            # Gated attention: learn importance weights per link
+            # Gated attention: learn importance weights per token
             self.gate_fc = nn.Sequential(
                 nn.Linear(hidden_size, hidden_size // 2),
                 nn.ReLU(),
@@ -288,7 +302,7 @@ class DurationAttentionValueNetwork(nn.Module):
     def forward(self, x, hidden=None):
         """
         Args:
-            x: (1, seq_len, obs_dim) or (seq_len, obs_dim)
+            x: (1, seq_len, global_obs_dim) or (seq_len, global_obs_dim)
             hidden: LSTM hidden state tuple or None
 
         Returns:
@@ -299,32 +313,30 @@ class DurationAttentionValueNetwork(nn.Module):
             x = x.squeeze(0)  # Only remove batch dim, safe when seq_len == 1
         seq_len = x.shape[0]
 
-        # Directional token construction (same as policy network)
-        x_phys = x.view(seq_len, self.num_physical_links, self.features_per_link)
-        fwd_tokens = x_phys[:, :, self.fwd_idx]
-        rev_tokens = x_phys[:, :, self.rev_idx]
-        x_links = torch.stack([fwd_tokens, rev_tokens], dim=2)
-        x_links = x_links.view(seq_len, self.num_links, self.features_per_link)
-        x_lstm_input = x_links.transpose(0, 1)  # (num_links, seq_len, features_per_link)
+        # Reshape global state to (seq_len, num_tokens, feat_per_link)
+        # where num_tokens = num_agents * num_links_per_agent
+        # Each token represents one (agent, link) pair
+        x_tokens = x.view(seq_len, self.num_tokens, self.feat_per_link)
+
+        # Per-token LSTM: transpose to (num_tokens, seq_len, feat_per_link) for LSTM
+        x_lstm_input = x_tokens.transpose(0, 1)
         lstm_out, hidden_out = self.lstm(x_lstm_input, hidden)
-        lstm_features = lstm_out.transpose(0, 1)  # (seq_len, num_links, hidden_size)
+        lstm_features = lstm_out.transpose(0, 1)  # (seq_len, num_tokens, hidden_size)
 
-        # Link projection
-        link_features = self.link_model(lstm_features)
+        # Token projection
+        token_features = self.link_model(lstm_features)
 
-        # Inter-link attention
+        # Inter-token attention (cross-agent, cross-link interactions)
         attn_out, _ = self.attention(
-            query=link_features, key=link_features, value=link_features
+            query=token_features, key=token_features, value=token_features
         )
-        coordinated = self.layer_norm(link_features + attn_out)
-        # coordinated: (seq_len, num_links, hidden_size)
+        coordinated = self.layer_norm(token_features + attn_out)
+        # coordinated: (seq_len, num_tokens, hidden_size)
 
         # Global aggregation based on fusion type
         if self.fusion == 'attention':
-            # Learned query attends to all links
-            # Expand query to match seq_len: (seq_len, 1, hidden_size)
+            # Learned query attends to all tokens
             query = self.global_query.expand(seq_len, -1, -1)
-            # Attention pooling: query attends to link features
             global_state, _ = self.pool_attention(
                 query=query, key=coordinated, value=coordinated
             )  # (seq_len, 1, hidden_size)
@@ -336,9 +348,9 @@ class DurationAttentionValueNetwork(nn.Module):
             max_pool = coordinated.max(dim=1)[0]  # (seq_len, hidden_size)
             global_state = torch.cat([mean_pool, max_pool], dim=-1)  # (seq_len, 2*hidden_size)
         elif self.fusion == 'gated':
-            # Compute importance scores for each link
-            gate_scores = self.gate_fc(coordinated)  # (seq_len, num_links, 1)
-            gate_weights = F.softmax(gate_scores, dim=1)  # Softmax over links
+            # Compute importance scores for each token
+            gate_scores = self.gate_fc(coordinated)  # (seq_len, num_tokens, 1)
+            gate_weights = F.softmax(gate_scores, dim=1)  # Softmax over tokens
             global_state = (coordinated * gate_weights).sum(dim=1)  # (seq_len, hidden_size)
         else:  # 'mean'
             global_state = coordinated.mean(dim=1)  # (seq_len, hidden_size)
@@ -348,23 +360,25 @@ class DurationAttentionValueNetwork(nn.Module):
 
         return value, hidden_out
 
+
 # =============================================================================
-# HRL PPO Agent
+# MAPPO HRL Agent
 # =============================================================================
 
-class PPOAgentHRL:
-    """PPO agent with temporal abstraction (duration-augmented actions).
+class MAPPOAgentHRL:
+    """Multi-Agent PPO agent with temporal abstraction (duration-augmented actions)
+    and a centralized critic.
 
-    At each decision point the agent outputs:
+    At each decision point each agent outputs:
       - delta_width  (continuous, one per link/gate)
       - duration k   (discrete, 1..max_duration): how many env steps to hold the action
 
-    The environment is stepped k times with the same action, accumulating reward.
-    This gives a macro-transition (s_t, a, k, R_cumul, s_{t+k}, done) which is
-    used for PPO updates.
+    The macro-transition stores both local state (for the actor) and the global state 
+    (for the centralized critic).
     """
 
-    def __init__(self, obs_dim, act_dim, act_low, act_high,
+    def __init__(self, obs_dim, global_obs_dim, act_dim, act_low, act_high,
+                 num_agents, num_links_per_agent,
                  actor_lr=3e-4, critic_lr=6e-4,
                  gamma=0.99, lmbda=0.95, epochs=10, device="cpu",
                  clip_eps=0.2, entropy_coef=0.01, entropy_coef_decay=0.995,
@@ -379,17 +393,36 @@ class PPOAgentHRL:
                  max_duration=5,
                  duration_entropy_coef=0.05,
                  duration_entropy_coef_min=0.001,
-                 value_fusion='gated'):
+                 value_fusion='gated',
+                 shared_critic=None,
+                 shared_critic_optimizer=None):
         """
+        MAPPO agent with temporal abstraction (duration-augmented actions) and centralized critic.
+
+        Args:
+            obs_dim: Local observation dimension for this agent.
+            global_obs_dim: Dimension of the concatenated global state for the centralized critic.
+            act_dim: Action dimension for this agent.
+            act_low, act_high: Action bounds.
+            num_agents: Total number of agents (for centralized critic tokenization).
+            num_links_per_agent: Number of controlled links per agent (assumes uniform).
+            shared_critic: Optional shared DurationAttentionValueNetwork instance.
+                If provided, all agents share this critic (standard MAPPO).
+                If None, each agent creates its own critic (legacy behavior).
+            shared_critic_optimizer: Optional shared optimizer for the critic.
+                Must be provided if shared_critic is provided.
+            ...
         Additional HRL args:
             max_duration: Maximum number of env steps the agent can commit to (default 5).
-            duration_entropy_coef: Entropy bonus coefficient for the duration head
-                to encourage exploration over durations.
+            duration_entropy_coef: Entropy bonus coefficient for the duration head.
             value_fusion: Pooling method for value network global aggregation.
                 Options: 'attention' (default), 'mean', 'max', 'mean_max', 'gated'
         """
         self.obs_dim = obs_dim
+        self.global_obs_dim = global_obs_dim
         self.act_dim = act_dim
+        self.num_agents = num_agents
+        self.num_links_per_agent = num_links_per_agent
         self.act_low = torch.tensor(act_low, dtype=torch.float32)
         self.act_high = torch.tensor(act_high, dtype=torch.float32)
         self.gamma = gamma
@@ -403,8 +436,6 @@ class PPOAgentHRL:
         self.duration_entropy_coef_initial = duration_entropy_coef
         self.duration_entropy_coef_min = duration_entropy_coef_min
         self.value_fusion = value_fusion
-        # Temperature used only for duration sampling at inference (deterministic=True)
-        # self.duration_temperature_eval = 0.7
 
         # Entropy coefficient with exponential decay
         self.entropy_coef_initial = entropy_coef
@@ -415,7 +446,8 @@ class PPOAgentHRL:
 
         self.kl_tolerance = kl_tolerance
         self.transition_dict = {
-            'states': [], 'actions': [], 'next_states': [],
+            'states': [], 'global_states': [], 'actions': [],
+            'next_states': [], 'next_global_states': [],
             'rewards': [], 'dones': [],
             'durations': [],        # chosen duration k per decision
             'true_rewards': [],
@@ -433,7 +465,12 @@ class PPOAgentHRL:
         self.actor_lr = actor_lr
         self.critic_lr = critic_lr
 
-        # Create networks
+        # Derive feat_per_link from local obs structure
+        # Local obs is structured as (num_links_per_agent * feat_per_link)
+        feat_per_link = obs_dim // num_links_per_agent
+        self.feat_per_link = feat_per_link
+
+        # Create actor network (always per-agent / decentralized)
         self.actor = DurationAttentionPolicy(
             obs_dim, act_dim,
             hidden_size=lstm_hidden_size,
@@ -442,16 +479,28 @@ class PPOAgentHRL:
             max_duration=max_duration,
             num_heads=num_heads
         )
-        self.value_net = DurationAttentionValueNetwork(
-            obs_dim, act_dim,
-            hidden_size=lstm_hidden_size,
-            num_layers=num_lstm_layers,
-            num_heads=num_heads,
-            fusion=value_fusion
-        )
+
+        # Critic network: shared or per-agent
+        self._owns_critic = (shared_critic is None)
+        if shared_critic is not None:
+            # Use shared critic (standard MAPPO) — takes global state as input
+            self.value_net = shared_critic
+            self.critic_optimizer = shared_critic_optimizer
+        else:
+            # Per-agent critic — uses LOCAL observation only (not global state)
+            self.value_net = DurationAttentionValueNetwork(
+                global_obs_dim=obs_dim,          # local obs dimension
+                num_agents=1,                     # single agent's links only
+                num_links_per_agent=num_links_per_agent,
+                feat_per_link=feat_per_link,
+                hidden_size=lstm_hidden_size,
+                num_layers=num_lstm_layers,
+                num_heads=num_heads,
+                fusion=value_fusion
+            )
+            self.critic_optimizer = torch.optim.Adam(self.value_net.parameters(), lr=critic_lr)
 
         self.actor_optimizer = torch.optim.Adam(self.actor.parameters(), lr=actor_lr)
-        self.critic_optimizer = torch.optim.Adam(self.value_net.parameters(), lr=critic_lr)
         self.device = device
 
         # Param noise (adaptive, targets mean_head only)
@@ -470,7 +519,7 @@ class PPOAgentHRL:
         self.action_noise_std_min = action_noise_std_min
         self.total_updates = num_episodes * 1
 
-        # LR scheduler
+        # LR scheduler (only for actor if critic is shared)
         self.use_lr_decay = use_lr_decay
         self.lr_warmup_frac = lr_warmup_frac
         self.lr_min_ratio = lr_min_ratio
@@ -488,10 +537,10 @@ class PPOAgentHRL:
     def reset_buffer(self):
         """Clear rollout buffer, reset hidden states, apply param noise."""
         self.transition_dict = {
-            'states': [], 'actions': [], 'next_states': [],
+            'states': [], 'global_states': [], 'actions': [],
+            'next_states': [], 'next_global_states': [],
             'rewards': [], 'dones': [],
             'durations': [],
-            'chosen_durations': [],
             'true_rewards': [],
         }
         self.actor_hidden = None
@@ -504,7 +553,7 @@ class PPOAgentHRL:
             self._apply_param_noise()
 
     @torch.no_grad()
-    def warmup_hidden(self, observations):
+    def warmup_hidden(self, observations, global_states=None):
         """Run observations through LSTM to warm up hidden state before acting.
 
         Used when late-start skips the first N steps of the simulation.
@@ -513,14 +562,27 @@ class PPOAgentHRL:
         with meaningful temporal context.
 
         Args:
-            observations: list of np.ndarray, one per skipped time step.
+            observations: list of np.ndarray (local obs), one per skipped step.
+            global_states: list of np.ndarray (concatenated global obs), one per
+                skipped step. Used for shared critic warmup. If None and critic
+                is shared, critic hidden state is not warmed up.
         """
-        for obs in observations:
+        for i, obs in enumerate(observations):
             state_tensor = torch.tensor(
                 np.array(obs), dtype=torch.float
             ).unsqueeze(0).to(self.device)
             _, _, _, self.actor_hidden = self.actor(state_tensor, self.actor_hidden)
-            _, self.critic_hidden = self.value_net(state_tensor, self.critic_hidden)
+
+            # Critic warmup: per-agent critic uses local obs, shared critic uses global state
+            if self._owns_critic:
+                # Per-agent critic — warm up with local observations
+                _, self.critic_hidden = self.value_net(state_tensor, self.critic_hidden)
+            elif global_states is not None:
+                # Shared critic — warm up with global state
+                global_tensor = torch.tensor(
+                    np.array(global_states[i]), dtype=torch.float
+                ).unsqueeze(0).to(self.device)
+                _, self.critic_hidden = self.value_net(global_tensor, self.critic_hidden)
 
     def init_batch_buffer(self):
         self.batch_buffer = []
@@ -532,12 +594,13 @@ class PPOAgentHRL:
         if len(self.transition_dict['states']) > 0:
             trajectory = {
                 'states': np.array(self.transition_dict['states']),
+                'global_states': np.array(self.transition_dict['global_states']),
                 'actions': np.array(self.transition_dict['actions']),
                 'next_states': np.array(self.transition_dict['next_states']),
+                'next_global_states': np.array(self.transition_dict['next_global_states']),
                 'rewards': np.array(self.transition_dict['rewards']),
                 'dones': np.array(self.transition_dict['dones']),
                 'durations': np.array(self.transition_dict['durations']),
-                'chosen_durations': np.array(self.transition_dict['chosen_durations']),
             }
             self.batch_buffer.append(trajectory)
 
@@ -549,29 +612,29 @@ class PPOAgentHRL:
             return 0
         return len(self.batch_buffer)
 
-    def store_transition(self, state, action, next_state, reward, done,
-                         duration=1, chosen_duration=None, true_reward=None):
+    def store_transition(self, state, global_state, action, next_state, next_global_state, reward, done,
+                         duration=1, true_reward=None):
         """Store a macro-transition.
 
         Args:
-            state: observation at decision point
+            state: local observation at decision point
+            global_state: combined observations at decision point for centralized critic
             action: continuous action (delta widths)
-            next_state: observation after k env steps
-            reward: *cumulative* reward over k steps
+            next_state: local observation after k env steps
+            next_global_state: global observation after k env steps
+            reward: *cumulative* global reward over k steps
             done: whether episode ended during the k steps
-            duration: actual number of env steps (for TD target)
-            chosen_duration: duration sampled from policy (for log_prob). 
-                If None, defaults to duration.
+            duration: chosen k
             true_reward: unnormalized cumulative reward (for logging)
         """
         self.transition_dict['states'].append(state)
+        self.transition_dict['global_states'].append(global_state)
         self.transition_dict['actions'].append(action)
         self.transition_dict['next_states'].append(next_state)
+        self.transition_dict['next_global_states'].append(next_global_state)
         self.transition_dict['rewards'].append(reward)
         self.transition_dict['dones'].append(done)
         self.transition_dict['durations'].append(duration)
-        self.transition_dict['chosen_durations'].append(
-            chosen_duration if chosen_duration is not None else duration)
         self.transition_dict['true_rewards'].append(
             true_reward if true_reward is not None else reward)
 
@@ -676,64 +739,164 @@ class PPOAgentHRL:
     # ------------------------------------------------------------------
     # PPO update
     # ------------------------------------------------------------------
-    def update_batch(self):
-        """PPO update with TBPTT over macro-transitions.
+    def update_actor_only(self, trajectory_data, total_timesteps):
+        """Update only the actor network (used when critic is shared).
+        
+        Args:
+            trajectory_data: List of preprocessed trajectory dicts with advantages/targets.
+            total_timesteps: Total timesteps across all trajectories for weighting.
+        """
+        for epoch in range(self.epochs):
+            self.actor_optimizer.zero_grad()
+            epoch_kl_exceeded = False
 
-        Each macro-transition stores (s, a, k, R_cum, s', done).
-        The TD target uses γ^k for discounting:
-            target_i = R_cum_i + γ^{k_i} * V(s'_i) * (1 - done_i)
+            for data in trajectory_data:
+                states_seq = data['states_seq']
+                actions = data['actions']
+                advantage = data['advantage']
+                old_action_lp = data['old_action_log_probs']
+                old_dur_lp = data['old_dur_log_probs']
+                dur_indices = data['dur_indices']
+                T_traj = data['T']
+                traj_weight = float(T_traj) / float(total_timesteps)
+
+                actor_hidden = None
+
+                for t in range(0, T_traj, self.tm_window):
+                    end_t = min(t + self.tm_window, T_traj)
+                    chunk_len = end_t - t
+                    chunk_weight = float(chunk_len) / float(T_traj) * traj_weight
+
+                    # Slices
+                    s_chunk = states_seq[:, t:end_t, :]
+                    a_chunk = actions[t:end_t]
+                    old_alp_chunk = old_action_lp[t:end_t]
+                    old_dlp_chunk = old_dur_lp[t:end_t]
+                    adv_chunk = advantage[t:end_t]
+                    dur_chunk = dur_indices[t:end_t]
+
+                    # Detach hidden
+                    if actor_hidden is not None:
+                        actor_hidden = (actor_hidden[0].detach(), actor_hidden[1].detach())
+
+                    # ---- Actor forward ----
+                    mu, std, dur_logits, actor_hidden = self.actor(s_chunk, actor_hidden)
+                    mu = mu.squeeze(0)
+                    std = std.squeeze(0)
+
+                    # Action distribution
+                    act_dist = torch.distributions.Normal(mu, std)
+                    act_entropy = act_dist.entropy().mean()
+                    act_lp = act_dist.log_prob(a_chunk)
+
+                    # Duration distribution
+                    dur_probs = F.softmax(dur_logits.squeeze(0), dim=-1)
+                    dur_dist = torch.distributions.Categorical(dur_probs)
+                    dur_entropy = dur_dist.entropy().mean()
+                    dur_lp = dur_dist.log_prob(dur_chunk).unsqueeze(-1)
+
+                    # Action head ratio & clipped surrogate
+                    act_log_ratio = (act_lp - old_alp_chunk).clamp(-20, 20)
+                    act_log_ratio_mean = act_log_ratio.mean(dim=-1, keepdim=True)
+                    act_ratio = torch.exp(act_log_ratio_mean)
+                    act_surr1 = act_ratio * adv_chunk
+                    act_surr2 = torch.clamp(act_ratio, 1 - self.clip_eps,
+                                            1 + self.clip_eps) * adv_chunk
+                    act_loss = torch.mean(-torch.min(act_surr1, act_surr2))
+
+                    # Duration head ratio & clipped surrogate
+                    dur_log_ratio = (dur_lp - old_dlp_chunk).clamp(-20, 20)
+                    dur_ratio = torch.exp(dur_log_ratio)
+                    dur_surr1 = dur_ratio * adv_chunk
+                    dur_surr2 = torch.clamp(dur_ratio, 1 - self.clip_eps,
+                                            1 + self.clip_eps) * adv_chunk
+                    dur_loss = torch.mean(-torch.min(dur_surr1, dur_surr2))
+
+                    # Combined actor loss
+                    actor_loss = (
+                        act_loss + dur_loss
+                        - self.entropy_coef * act_entropy
+                        - self.duration_entropy_coef * dur_entropy
+                    ) * chunk_weight
+
+                    actor_loss.backward()
+
+                    # KL early stopping
+                    with torch.no_grad():
+                        approx_kl = act_log_ratio.mean()
+                        if approx_kl > 1.5 * self.kl_tolerance:
+                            epoch_kl_exceeded = True
+                            break
+
+                if epoch_kl_exceeded:
+                    break
+
+            if epoch_kl_exceeded:
+                break
+
+            torch.nn.utils.clip_grad_norm_(self.actor.parameters(), max_norm=0.5)
+            self.actor_optimizer.step()
+
+    def precompute_trajectory_data(self):
+        """Precompute TD targets and advantages for all trajectories in batch buffer.
+        
+        Returns:
+            trajectory_data: List of dicts with preprocessed data for each trajectory.
+            all_advantages: List of advantage tensors (for global normalization).
         """
         if not hasattr(self, 'batch_buffer') or len(self.batch_buffer) == 0:
-            print("Warning: No trajectories in batch buffer. Skipping update.")
-            return
+            return [], []
 
-        if self.use_param_noise and self._param_noise_applied:
-            self._adapt_param_noise_std()
-            # NOTE: restore is deferred until after old log probs are computed
-            # so that π_old matches the noisy collection policy.
-
-        num_trajectories = len(self.batch_buffer)
-
-        # --- Precompute targets (no_grad) ---
         trajectory_data = []
         all_advantages = []
 
         with torch.no_grad():
             for traj in self.batch_buffer:
                 states = torch.tensor(traj['states'], dtype=torch.float).to(self.device)
+                global_states = torch.tensor(traj['global_states'], dtype=torch.float).to(self.device)
                 actions = torch.tensor(traj['actions']).view(-1, self.act_dim).to(self.device)
                 rewards = torch.tensor(traj['rewards'], dtype=torch.float).view(-1, 1).to(self.device)
-                next_states = torch.tensor(traj['next_states'], dtype=torch.float).to(self.device)
+                next_global_states = torch.tensor(traj['next_global_states'], dtype=torch.float).to(self.device)
                 dones = torch.tensor(traj['dones'], dtype=torch.float).view(-1, 1).to(self.device)
                 durations = torch.tensor(traj['durations'], dtype=torch.float).view(-1, 1).to(self.device)
-                chosen_durations = torch.tensor(traj['chosen_durations'], dtype=torch.float).view(-1, 1).to(self.device)
 
-                states_seq = states.unsqueeze(0)       # (1, T, obs_dim)
-                next_states_seq = next_states.unsqueeze(0)
+                states_seq = states.unsqueeze(0)
+                global_states_seq = global_states.unsqueeze(0)
+                next_global_states_seq = next_global_states.unsqueeze(0)
                 T_traj = states_seq.size(1)
 
+                # Choose critic input: local obs for per-agent critic, global state for shared critic
+                if self._owns_critic:
+                    # Per-agent critic uses local observation
+                    critic_input_seq = states_seq
+                    next_states = torch.tensor(traj['next_states'], dtype=torch.float).to(self.device)
+                    next_critic_input_seq = next_states.unsqueeze(0)
+                else:
+                    # Shared critic uses global state
+                    critic_input_seq = global_states_seq
+                    next_critic_input_seq = next_global_states_seq
+
                 # Value estimates
-                next_values, _ = self.value_net(next_states_seq)
-                next_values = next_values.squeeze(0)   # (T, 1)
-                current_values, _ = self.value_net(states_seq)
+                next_values, _ = self.value_net(next_critic_input_seq)
+                next_values = next_values.squeeze(0)
+                current_values, _ = self.value_net(critic_input_seq)
                 current_values = current_values.squeeze(0)
 
-                # Old log probs for action and duration
+                # Old log probs for actor
                 mu, std, dur_logits, _ = self.actor(states_seq)
                 mu = mu.squeeze(0)
                 std = std.squeeze(0)
                 action_dist = torch.distributions.Normal(mu, std)
-                old_action_log_probs = action_dist.log_prob(actions)  # (T, act_dim)
+                old_action_log_probs = action_dist.log_prob(actions)
 
-                # Use chosen_duration for log_prob (what the agent sampled)
-                dur_probs = F.softmax(dur_logits.squeeze(0), dim=-1)  # (T, max_duration)
-                dur_indices = (chosen_durations - 1).long().squeeze(-1)  # 0-indexed (T,)
+                dur_probs = F.softmax(dur_logits.squeeze(0), dim=-1)
+                dur_indices = (durations - 1).long().squeeze(-1)
                 dur_dist = torch.distributions.Categorical(dur_probs)
-                old_dur_log_probs = dur_dist.log_prob(dur_indices).unsqueeze(-1)  # (T, 1)
+                old_dur_log_probs = dur_dist.log_prob(dur_indices).unsqueeze(-1)
 
-                # TD target with variable discount: γ^k (use actual duration)
-                gamma_k = self.gamma ** durations  # (T, 1)
-                td_target = rewards + gamma_k * next_values * (1 - dones)  # (T, 1)
+                # TD target with variable discount
+                gamma_k = self.gamma ** durations
+                td_target = rewards + gamma_k * next_values * (1 - dones)
                 td_delta = td_target - current_values
 
                 advantage = compute_gae_variable_gamma(
@@ -743,6 +906,8 @@ class PPOAgentHRL:
 
                 trajectory_data.append({
                     'states_seq': states_seq,
+                    'global_states_seq': global_states_seq,
+                    'critic_input_seq': critic_input_seq,
                     'actions': actions,
                     'td_target': td_target,
                     'advantage': advantage,
@@ -753,11 +918,37 @@ class PPOAgentHRL:
                 })
                 all_advantages.append(advantage)
 
-            # Global advantage normalization
-            all_adv = torch.cat(all_advantages, dim=0)
-            g_mean, g_std = all_adv.mean(), all_adv.std() + 1e-8
-            for d in trajectory_data:
-                d['advantage'] = (d['advantage'] - g_mean) / g_std
+        return trajectory_data, all_advantages
+
+    def update_batch(self, skip_critic=False):
+        """PPO update with TBPTT over macro-transitions.
+
+        Each macro-transition stores (s, a, k, R_cum, s', done).
+        The TD target uses γ^k for discounting:
+            target_i = R_cum_i + γ^{k_i} * V(s'_i) * (1 - done_i)
+            
+        Args:
+            skip_critic: If True, only update actor (used when critic is shared and
+                updated separately). Default False for backward compatibility.
+        """
+        if not hasattr(self, 'batch_buffer') or len(self.batch_buffer) == 0:
+            print("Warning: No trajectories in batch buffer. Skipping update.")
+            return
+
+        if self.use_param_noise and self._param_noise_applied:
+            self._adapt_param_noise_std()
+
+        # --- Precompute targets (no_grad) ---
+        trajectory_data, all_advantages = self.precompute_trajectory_data()
+        
+        if not trajectory_data:
+            return
+
+        # Global advantage normalization
+        all_adv = torch.cat(all_advantages, dim=0)
+        g_mean, g_std = all_adv.mean(), all_adv.std() + 1e-8
+        for d in trajectory_data:
+            d['advantage'] = (d['advantage'] - g_mean) / g_std
 
         # Restore clean actor params now that old log probs are captured
         if self.use_param_noise and self._param_noise_applied:
@@ -765,7 +956,22 @@ class PPOAgentHRL:
 
         total_timesteps = sum(d['T'] for d in trajectory_data)
 
-        # --- PPO epochs ---
+        if skip_critic:
+            # Only update actor (critic is shared and updated separately)
+            self.update_actor_only(trajectory_data, total_timesteps)
+        else:
+            # Update both actor and critic (legacy behavior / per-agent critic)
+            self._update_actor_and_critic(trajectory_data, total_timesteps)
+
+        self.clear_batch_buffer()
+        self.update_count += 1
+        self._decay_entropy_coef()
+        self._step_lr_scheduler()
+        if self.use_action_noise:
+            self._decay_action_noise_std()
+
+    def _update_actor_and_critic(self, trajectory_data, total_timesteps):
+        """Update both actor and critic networks (used when critic is per-agent)."""
         for epoch in range(self.epochs):
             self.actor_optimizer.zero_grad()
             self.critic_optimizer.zero_grad()
@@ -773,6 +979,7 @@ class PPOAgentHRL:
 
             for data in trajectory_data:
                 states_seq = data['states_seq']
+                global_states_seq = data['global_states_seq']
                 actions = data['actions']
                 td_target = data['td_target']
                 advantage = data['advantage']
@@ -792,6 +999,7 @@ class PPOAgentHRL:
 
                     # Slices
                     s_chunk = states_seq[:, t:end_t, :]
+                    critic_chunk = data['critic_input_seq'][:, t:end_t, :]
                     a_chunk = actions[t:end_t]
                     old_alp_chunk = old_action_lp[t:end_t]
                     old_dlp_chunk = old_dur_lp[t:end_t]
@@ -821,14 +1029,8 @@ class PPOAgentHRL:
                     dur_entropy = dur_dist.entropy().mean()
                     dur_lp = dur_dist.log_prob(dur_chunk).unsqueeze(-1)
 
-                    # --- Separate PPO objectives for action and duration heads ---
-                    # Each head gets its own ratio and clipped surrogate so the
-                    # duration head receives a clean gradient signal, not one
-                    # dominated by the action ratio.
-
                     # Action head ratio & clipped surrogate
                     act_log_ratio = (act_lp - old_alp_chunk).clamp(-20, 20)
-                    # Average over act_dim to get per-timestep scalar
                     act_log_ratio_mean = act_log_ratio.mean(dim=-1, keepdim=True)
                     act_ratio = torch.exp(act_log_ratio_mean)
                     act_surr1 = act_ratio * adv_chunk
@@ -844,7 +1046,7 @@ class PPOAgentHRL:
                                             1 + self.clip_eps) * adv_chunk
                     dur_loss = torch.mean(-torch.min(dur_surr1, dur_surr2))
 
-                    # Combined actor loss = action loss + duration loss + entropy bonuses
+                    # Combined actor loss
                     actor_loss = (
                         act_loss + dur_loss
                         - self.entropy_coef * act_entropy
@@ -852,14 +1054,13 @@ class PPOAgentHRL:
                     ) * chunk_weight
 
                     # ---- Critic forward ----
-                    curr_val, critic_hidden = self.value_net(s_chunk, critic_hidden)
-                    # curr_val = curr_val.squeeze(0)
+                    curr_val, critic_hidden = self.value_net(critic_chunk, critic_hidden)
                     critic_loss = torch.mean(F.mse_loss(curr_val, tdt_chunk)) * chunk_weight
 
                     actor_loss.backward()
                     critic_loss.backward()
 
-                    # KL early stopping (on action log probs)
+                    # KL early stopping
                     with torch.no_grad():
                         approx_kl = act_log_ratio.mean()
                         if approx_kl > 1.5 * self.kl_tolerance:
@@ -872,19 +1073,10 @@ class PPOAgentHRL:
             if epoch_kl_exceeded:
                 break
 
-            torch.nn.utils.clip_grad_norm_(self.actor.parameters(), max_norm=0.4)
-            torch.nn.utils.clip_grad_norm_(self.value_net.parameters(), max_norm=0.4)
+            torch.nn.utils.clip_grad_norm_(self.actor.parameters(), max_norm=0.5)
+            torch.nn.utils.clip_grad_norm_(self.value_net.parameters(), max_norm=0.5)
             self.actor_optimizer.step()
             self.critic_optimizer.step()
-
-        self.clear_batch_buffer()
-        self.update_count += 1
-        self._decay_entropy_coef()
-        self._step_lr_scheduler()
-        # param_noise_std is adapted in update_batch before restoring params
-        # (no separate decay call needed here)
-        if self.use_action_noise:
-            self._decay_action_noise_std()
 
     # ------------------------------------------------------------------
     # Decay helpers (same as PPO_tbptt)
@@ -1043,9 +1235,12 @@ class PPOAgentHRL:
     def get_config(self) -> dict:
         config = {
             'obs_dim': self.obs_dim,
+            'global_obs_dim': self.global_obs_dim,
             'act_dim': self.act_dim,
             'act_low': self.act_low.tolist(),
             'act_high': self.act_high.tolist(),
+            'num_agents': self.num_agents,
+            'num_links_per_agent': self.num_links_per_agent,
             'gamma': self.gamma,
             'lmbda': self.lmbda,
             'epochs': self.epochs,
@@ -1116,284 +1311,75 @@ class PPOAgentHRL:
 
 
 # =============================================================================
-# Training loop for HRL agent
+# Shared Critic Update Function
 # =============================================================================
 
-def train_hrl_multi_agent_batch(env, agents, delta_actions=False, num_episodes=50,
-                                num_trajectories_per_update=4, randomize=False,
-                                agents_saved_dir=None, use_wandb=True,
-                                val_freq=10, num_val_episodes=3,
-                                debug_save_dir=None, debug_save_episodes=None):
+def update_shared_critic(agents: dict, shared_critic, shared_critic_optimizer,
+                         epochs: int = 10, tm_window: int = 50, device: str = "cpu"):
+    """Update the shared centralized critic using data from all agents.
+    
+    This function collects trajectory data from all agents and performs a single
+    critic update using the combined data. This is more sample-efficient than
+    having each agent update its own critic.
+    
+    Args:
+        agents: Dict mapping agent_id -> MAPPOAgentHRL instance.
+        shared_critic: The shared DurationAttentionValueNetwork instance.
+        shared_critic_optimizer: Optimizer for the shared critic.
+        epochs: Number of PPO epochs for critic update.
+        tm_window: Truncated BPTT window size.
+        device: Device for tensor operations.
+    
+    Returns:
+        critic_loss_avg: Average critic loss over the update.
     """
-    Train HRL agents with duration-augmented actions.
-
-    At each decision point, the agent selects:
-      (delta_action, duration_k)
-    Then the environment is stepped k times with the same absolute action.
-    The cumulative reward over k steps is stored as a single macro-transition.
-
-    This is the HRL variant of train_on_policy_multi_agent_batch.
-    """
-    if use_wandb and WANDB_AVAILABLE:
-        if wandb.run is None:
-            wandb.init(project="crowd-control-rl", name="ppo-hrl-training")
-
-    return_dict = {agent_id: [] for agent_id in agents.keys()}
-    global_episode = 0
-    global_update = 0
-    best_avg_return = float('-inf')
-
-    debug_episodes = tuple(debug_save_episodes) if debug_save_episodes else None
-
-    # Initialize batch buffers
-    for agent in agents.values():
-        agent.init_batch_buffer()
-
-    # Adjust total_updates for batch training
-    first_agent = next(iter(agents.values()))
-    if hasattr(first_agent, "total_updates"):
-        effective_updates = max(
-            1,
-            int(num_episodes / float(max(1, num_trajectories_per_update)) * 1),
-        )
-        for agent in agents.values():
-            agent.total_updates = effective_updates
-
-    # Tracking
-    batch_returns = {aid: [] for aid in agents.keys()}
-    batch_true_returns = {aid: [] for aid in agents.keys()}
-    batch_policy_mu = {aid: [] for aid in agents.keys()}
-    batch_policy_sigma = {aid: [] for aid in agents.keys()}
-    batch_duration_probs = {aid: [] for aid in agents.keys()}
-    # Track actually sampled durations (integers) for logging
-    batch_sampled_durations = {aid: [] for aid in agents.keys()}
-
-    num_iterations = 10
-    episodes_per_iteration = num_episodes // num_iterations
-
-    for i in range(num_iterations):
-        with tqdm(total=episodes_per_iteration, desc='Iteration %d' % i) as pbar:
-            for i_episode in range(episodes_per_iteration):
-                for agent in agents.values():
-                    agent.reset_buffer()
-
-                # Reset environment
-                if global_episode == 0:
-                    obs, infos = env.reset(options={'randomize': False})
-                else:
-                    obs, infos = env.reset(options={'randomize': randomize})
-
-                # Warm up LSTM hidden states with late-start observations
-                for agent_id, agent in agents.items():
-                    warmup_obs = infos[agent_id].get('warmup_obs', [])
-                    if warmup_obs:
-                        agent.warmup_hidden(warmup_obs)
-
-                episode_returns = {aid: 0.0 for aid in agents.keys()}
-                episode_true_returns = {aid: 0.0 for aid in agents.keys()}
-                done = False
-                step = 0
-
-                # --- Async state trackers (mirrors MAPPO) ---
-                active_durations = {aid: 0 for aid in agents.keys()}
-                chosen_durations = {aid: None for aid in agents.keys()}
-                current_actions = {aid: None for aid in agents.keys()}
-                absolute_actions = {aid: None for aid in agents.keys()}
-                start_obs = {aid: None for aid in agents.keys()}
-                cumul_rewards = {aid: 0.0 for aid in agents.keys()}
-                cumul_true_rewards = {aid: 0.0 for aid in agents.keys()}
-                time_in_macro = {aid: 0 for aid in agents.keys()}
-
-                while not done:
-                    # --- Decision point for agents whose duration has expired ---
-                    for agent_id, agent in agents.items():
-                        if active_durations[agent_id] <= 0:
-                            # Store finished macro-transition
-                            if start_obs[agent_id] is not None:
-                                agent.store_transition(
-                                    state=start_obs[agent_id],
-                                    action=current_actions[agent_id],
-                                    next_state=obs[agent_id].copy(),
-                                    reward=cumul_rewards[agent_id],
-                                    done=False,
-                                    duration=time_in_macro[agent_id],
-                                    chosen_duration=chosen_durations[agent_id],
-                                    true_reward=cumul_true_rewards[agent_id],
-                                )
-                                episode_returns[agent_id] += cumul_rewards[agent_id]
-                                episode_true_returns[agent_id] += cumul_true_rewards[agent_id]
-                                cumul_rewards[agent_id] = 0.0
-                                cumul_true_rewards[agent_id] = 0.0
-                                time_in_macro[agent_id] = 0
-
-                            # Sample new action and duration
-                            action, duration, mu, sigma, dur_probs = agent.take_action(
-                                obs[agent_id], return_distribution=True
-                            )
-                            batch_policy_mu[agent_id].append(np.atleast_1d(mu))
-                            batch_policy_sigma[agent_id].append(np.atleast_1d(sigma))
-                            batch_duration_probs[agent_id].append(dur_probs)
-                            batch_sampled_durations[agent_id].append(duration)
-
-                            if delta_actions:
-                                from rl.rl_utils import extract_current_gate_widths
-                                current_gates = extract_current_gate_widths(obs[agent_id], agents[agent_id].act_dim)
-                                absolute_action = current_gates + action
-                                absolute_action = np.clip(absolute_action, agents[agent_id].act_low, agents[agent_id].act_high)
-                                absolute_actions[agent_id] = absolute_action
-                            else:
-                                absolute_actions[agent_id] = action
-
-                            current_actions[agent_id] = action
-                            active_durations[agent_id] = duration
-                            chosen_durations[agent_id] = duration
-                            start_obs[agent_id] = obs[agent_id].copy()
-
-                    # --- Execute 1 env step ---
-                    next_obs, rewards, terms, truncs, infos = env.step(absolute_actions)
-
-                    for aid in agents.keys():
-                        gamma = agents[aid].gamma
-                        k_step = time_in_macro[aid]
-                        cumul_rewards[aid] += rewards[aid] * (gamma ** k_step)
-                        cumul_true_rewards[aid] += infos[aid].get('true_reward', rewards[aid])
-                        active_durations[aid] -= 1
-                        time_in_macro[aid] += 1
-
-                    obs = next_obs
-                    step += 1
-                    done = any(terms.values()) or any(truncs.values())
-
-                    # --- Handle terminal state ---
-                    if done:
-                        for agent_id, agent in agents.items():
-                            if start_obs[agent_id] is not None:
-                                agent.store_transition(
-                                    state=start_obs[agent_id],
-                                    action=current_actions[agent_id],
-                                    next_state=obs[agent_id].copy(),
-                                    reward=cumul_rewards[agent_id],
-                                    done=done,
-                                    duration=time_in_macro[agent_id],
-                                    chosen_duration=chosen_durations[agent_id],
-                                    true_reward=cumul_true_rewards[agent_id],
-                                )
-                                episode_returns[agent_id] += cumul_rewards[agent_id]
-                                episode_true_returns[agent_id] += cumul_true_rewards[agent_id]
-                        break
-
-                # End of episode
-                for agent_id, agent in agents.items():
-                    agent.store_trajectory()
-                    return_dict[agent_id].append(episode_returns[agent_id])
-                    batch_returns[agent_id].append(episode_returns[agent_id])
-                    batch_true_returns[agent_id].append(episode_true_returns[agent_id])
-
-                global_episode += 1
-
-                # Debug saves
-                if debug_save_dir and debug_episodes and global_episode in debug_episodes:
-                    run_idx = debug_episodes.index(global_episode) + 1
-                    save_path = f"{debug_save_dir}_run{run_idx}"
-                    env.save(save_path)
-                    print(f"[Debug] Saved simulation at episode {global_episode} to {save_path}")
-
-                # Check batch update
-                first_agent = next(iter(agents.values()))
-                if first_agent.get_batch_size() >= num_trajectories_per_update:
-                    for agent_id, agent in agents.items():
-                        if hasattr(env, 'ret_rms') and env.ret_rms is not None:
-                            try:
-                                agent.set_reward_normalizer_var(float(env.ret_rms.var))
-                            except:
-                                pass
-                        agent.update_batch()
-
-                    global_update += 1
-
-                    # WandB logging
-                    if use_wandb and WANDB_AVAILABLE and wandb.run is not None:
-                        log_dict = {
-                            'update': global_update,
-                            'episode': global_episode,
-                            'batch_avg_normalized_return': np.mean(
-                                [np.mean(batch_returns[aid]) for aid in agents.keys()]),
-                            'batch_avg_true_return': np.mean(
-                                [np.mean(batch_true_returns[aid]) for aid in agents.keys()]),
-                            'trajectories_per_update': num_trajectories_per_update,
-                            'episode_steps': step,
-                        }
-                        for agent_id in agents.keys():
-                            log_dict[f'agent_{agent_id}_batch_avg_return'] = np.mean(
-                                batch_returns[agent_id])
-                            log_dict[f'agent_{agent_id}_batch_avg_true_return'] = np.mean(
-                                batch_true_returns[agent_id])
-                        # LR + entropy
-                        first_agent_lr = first_agent.get_current_lr()
-                        log_dict['actor_lr'] = first_agent_lr['actor_lr']
-                        log_dict['critic_lr'] = first_agent_lr['critic_lr']
-                        log_dict['entropy_coef'] = first_agent.entropy_coef
-                        # Policy stats
-                        for agent_id in agents.keys():
-                            if batch_policy_mu[agent_id]:
-                                mu_arr = np.array(batch_policy_mu[agent_id])
-                                sigma_arr = np.array(batch_policy_sigma[agent_id])
-                                avg_mu = np.mean(mu_arr, axis=0)
-                                avg_sigma = np.mean(sigma_arr, axis=0)
-                                for d in range(len(avg_mu)):
-                                    log_dict[f'agent_{agent_id}_policy_mu_{d}'] = float(avg_mu[d])
-                                    log_dict[f'agent_{agent_id}_policy_sigma_{d}'] = float(avg_sigma[d])
-                            # Duration distribution (policy probabilities)
-                            if batch_duration_probs[agent_id]:
-                                dur_arr = np.array(batch_duration_probs[agent_id])
-                                avg_dur = np.mean(dur_arr, axis=0)
-                                for d_idx in range(len(avg_dur)):
-                                    log_dict[f'agent_{agent_id}_dur_prob_{d_idx+1}'] = float(avg_dur[d_idx])
-                            # Mean actually chosen duration (sampled integers)
-                            if batch_sampled_durations[agent_id]:
-                                log_dict[f'agent_{agent_id}_avg_chosen_duration'] = float(
-                                    np.mean(batch_sampled_durations[agent_id]))
-                        wandb.log(log_dict)
-
-                    # Validation
-                    if (agents_saved_dir
-                            and global_update > (num_episodes // num_trajectories_per_update) // 3
-                            and global_update % val_freq == 0):
-                        best_avg_return = validate_and_save_best(
-                            env, agents, agents_saved_dir,
-                            delta_actions=delta_actions,
-                            num_val_episodes=num_val_episodes,
-                            randomize=True,
-                            best_avg_return=best_avg_return,
-                            global_episode=global_episode,
-                            use_wandb=use_wandb and WANDB_AVAILABLE,
-                        )
-
-                    # Reset batch tracking
-                    batch_returns = {aid: [] for aid in agents.keys()}
-                    batch_true_returns = {aid: [] for aid in agents.keys()}
-                    batch_policy_mu = {aid: [] for aid in agents.keys()}
-                    batch_policy_sigma = {aid: [] for aid in agents.keys()}
-                    batch_duration_probs = {aid: [] for aid in agents.keys()}
-                    batch_sampled_durations = {aid: [] for aid in agents.keys()}
-
-                # Progress bar
-                if (i_episode + 1) % 10 == 0:
-                    avg_return = np.mean([np.mean(return_dict[aid][-10:]) for aid in agents.keys()])
-                    avg_true_return = np.mean(list(episode_true_returns.values()))
-                    pbar.set_postfix({
-                        'episode': '%d' % global_episode,
-                        'update': '%d' % global_update,
-                        'norm_ret': '%.3f' % avg_return,
-                        'true_ret': '%.3f' % avg_true_return,
-                        'steps': step
-                    })
-                pbar.update(1)
-
-                for agent_id in agents.keys():
-                    print(f"Agent {agent_id} episode reward: {episode_returns[agent_id].item():.3f}")
-                print(f"All agents episode reward: {sum(episode_returns.values()).item():.3f}")
-
-    final_returns = {aid: return_dict[aid][-1] if return_dict[aid] else 0.0
-                     for aid in agents.keys()}
-    return return_dict, final_returns
+    # Collect all trajectory data from all agents
+    all_trajectory_data = []
+    
+    for agent_id, agent in agents.items():
+        traj_data, _ = agent.precompute_trajectory_data()
+        all_trajectory_data.extend(traj_data)
+    
+    if not all_trajectory_data:
+        return 0.0
+    
+    total_timesteps = sum(d['T'] for d in all_trajectory_data)
+    total_critic_loss = 0.0
+    num_updates = 0
+    
+    for epoch in range(epochs):
+        shared_critic_optimizer.zero_grad()
+        epoch_loss = 0.0
+        
+        for data in all_trajectory_data:
+            global_states_seq = data['global_states_seq']
+            td_target = data['td_target']
+            T_traj = data['T']
+            traj_weight = float(T_traj) / float(total_timesteps)
+            
+            critic_hidden = None
+            
+            for t in range(0, T_traj, tm_window):
+                end_t = min(t + tm_window, T_traj)
+                chunk_len = end_t - t
+                chunk_weight = float(chunk_len) / float(T_traj) * traj_weight
+                
+                gs_chunk = global_states_seq[:, t:end_t, :]
+                tdt_chunk = td_target[t:end_t]
+                
+                if critic_hidden is not None:
+                    critic_hidden = (critic_hidden[0].detach(), critic_hidden[1].detach())
+                
+                curr_val, critic_hidden = shared_critic(gs_chunk, critic_hidden)
+                critic_loss = torch.mean(F.mse_loss(curr_val, tdt_chunk)) * chunk_weight
+                
+                critic_loss.backward()
+                epoch_loss += critic_loss.item()
+        
+        torch.nn.utils.clip_grad_norm_(shared_critic.parameters(), max_norm=0.5)
+        shared_critic_optimizer.step()
+        
+        total_critic_loss += epoch_loss
+        num_updates += 1
+    
+    return total_critic_loss / max(num_updates, 1)

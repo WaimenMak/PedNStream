@@ -15,8 +15,9 @@ Provides multi-agent RL environment with two controller types:
 import numpy as np
 import random
 from typing import Dict, Any, Optional, List, Tuple
+from pathlib import Path
 from pettingzoo import ParallelEnv
-import gymnasium as gym
+
 from gymnasium import spaces
 import functools
 
@@ -30,7 +31,8 @@ from .builders import ObservationBuilder, ActionApplier
 
 import matplotlib.pyplot as plt
 import matplotlib
-from handlers.output_handler import OutputHandler
+# from handlers.output_handler import OutputHandler
+from pednstream.utils import OutputHandler
 from matplotlib.animation import PillowWriter
 import os
 
@@ -43,14 +45,15 @@ class PedNetParallelEnv(ParallelEnv):
     
     Agents:
     - Separators (sep_u_v): control Separator.separator_width for bidirectional corridors
-    - Gaters (gate_n): control Link.front_gate_width for outgoing links at nodes
+    - Gaters (gate_n): control Link.front_gate_width and Link.back_gate_width for outgoing links at nodes
     """
     
     metadata = {"render_modes": ["human", "animate"], "name": "pednet_v0"}
     
     def __init__(self, dataset: str, normalize_obs: bool = False, obs_mode: str = "option1",
                  render_mode: Optional[str] = None, verbose: bool = False, action_gap: int = 1,
-                 seed: Optional[int] = None):
+                 seed: Optional[int] = None,
+                 late_start_prob: float = 0.0, late_start_max_frac: float = 0.5):
         """
         Initialize the PedNet environment.
         
@@ -62,6 +65,9 @@ class PedNetParallelEnv(ParallelEnv):
             verbose: Whether to enable logging output. Default False for RL training.
             action_gap: Number of steps between applying actions. Default 1.
             seed: Random seed for reproducibility. Set once at construction time.
+            late_start_prob: Probability of starting the agent later in the episode (0.0 = always start at t=1).
+                Only use during training to create diverse starting conditions. Default 0.0 (disabled).
+            late_start_max_frac: Maximum fraction of simulation steps to skip when late-starting (default 0.5).
         """
         super().__init__()
         
@@ -113,6 +119,11 @@ class PedNetParallelEnv(ParallelEnv):
         self._action_gap = action_gap
         self.last_actions = None
         self.current_actions = None
+        self.training = True  # Disable early jam termination during eval/validation
+
+        # Late-start parameters (for training diversity)
+        self.late_start_prob = late_start_prob
+        self.late_start_max_frac = late_start_max_frac
 
         # Initialize visualizer
         self.visualizer = None
@@ -188,9 +199,35 @@ class PedNetParallelEnv(ParallelEnv):
         self._prev_delay = {agent: 0.0 for agent in self.possible_agents}
         self._prev_throughput = {agent: 0.0 for agent in self.possible_agents}
         
+        # Late-start: fast-forward the simulation without agent control
+        # This creates diverse starting conditions (system already populated with pedestrians)
+        late_start_prob = options.get('late_start_prob', self.late_start_prob) if options else self.late_start_prob
+        late_start_max_frac = options.get('late_start_max_frac', self.late_start_max_frac) if options else self.late_start_max_frac
+        late_start_step = 1  # default: no late start
+        
+        warmup_observations = []  # observations from skipped steps for LSTM warm-up
+        if late_start_prob > 0.0 and np.random.random() < late_start_prob:
+            max_skip = max(1, int(self.simulation_steps * late_start_max_frac))
+            skip_steps = np.random.randint(1, max_skip + 1)
+            # Run simulation without agent actions, collect observations for LSTM warm-up
+            for t in range(1, skip_steps + 1):
+                self.network.network_loading(t)
+                self.sim_step = t  # update so _get_observations reads correct step
+                warmup_observations.append(self._get_observations())
+            self.sim_step = skip_steps + 1
+            late_start_step = self.sim_step
+        
         # Build initial observations
         observations = self._get_observations()
         infos = self._get_infos()
+        
+        # Record late-start info for tracking
+        for agent_id in self.possible_agents:
+            infos[agent_id]['late_start_step'] = late_start_step
+            # Per-agent warmup observations for LSTM hidden state warm-up
+            infos[agent_id]['warmup_obs'] = [
+                step_obs[agent_id] for step_obs in warmup_observations
+            ]
         
         return observations, infos
 
@@ -226,8 +263,6 @@ class PedNetParallelEnv(ParallelEnv):
         
         for _ in range(self._action_gap): # every action_gap steps, apply the actions
             # Advance the simulation by one step
-            if self.sim_step == 601:
-                pass
             self.network.network_loading(self.sim_step)
             
             # Build new observations
@@ -278,6 +313,7 @@ class PedNetParallelEnv(ParallelEnv):
                 all_densities = []
                 tt_term = 0
                 flow_term = 0
+                demand_term = 0
                 for link in out_links:
                     # link_flow = 0.0
                     # link_travel_time = 0.0
@@ -288,7 +324,12 @@ class PedNetParallelEnv(ParallelEnv):
                     T_ell_reverse = link.reverse_link.travel_time[self.sim_step] if self.sim_step < len(link.reverse_link.travel_time) else link.reverse_link.travel_time[0]
                     link_flow_forward = link.link_flow[self.sim_step] if self.sim_step < len(link.outflow) else 0.0
                     link_flow_reverse = link.reverse_link.link_flow[self.sim_step] if self.sim_step < len(link.reverse_link.outflow) else 0.0
-                    link_flow = link_flow_forward + link_flow_reverse
+                    #whether the flow is moving
+                    # forward_moving = 1 if link.outflow[self.sim_step] > 0 else 0
+                    # reverse_moving = 1 if link.reverse_link.outflow[self.sim_step] > 0 else 0
+                    # link_flow = (link_flow_forward) + (link_flow_reverse)
+                    link_flow = link.outflow[self.sim_step]
+                    demand = link.reverse_link.inflow[self.sim_step]
                     T_free = link.length/link.free_flow_speed
                     # number of pedestrians
                     # num_peds = link.num_pedestrians[self.sim_step] if self.sim_step < len(link.num_pedestrians) else 0.0
@@ -298,29 +339,33 @@ class PedNetParallelEnv(ParallelEnv):
                     
                     # normalize the travel time by the free flow travel time
                     # T_max = 1000
-                    norm_link_travel_time = np.clip(np.log(link_travel_time / 2 / T_free), 0, 2)
-                    norm_link_flow = np.clip((link_flow / 2) / (link.free_flow_speed * link.k_critical), 0, 1)
+                    norm_link_travel_time = np.clip(np.log(link_travel_time / 2 / T_free), 0, 1)
+                    # norm_link_flow = np.clip((link_flow / 2) / (link.free_flow_speed * link.k_critical * link.unit_time * link.width), 0, 1)
+                    norm_link_flow = np.clip((link_flow) / (link.free_flow_speed * link.k_critical * link.unit_time * link.width), 0, 1)
+                    norm_demand = np.clip((demand) / (link.free_flow_speed * link.k_critical * link.unit_time * link.width), 0, 1)
                     # print(norm_link_travel_time, norm_link_flow)
                     # link_rewards -= norm_link_travel_time
                     # link_rewards += norm_link_flow
                     tt_term -= norm_link_travel_time
                     flow_term += norm_link_flow
+                    demand_term += norm_demand
 
                 # Fairness
                 diff_term = 0.0
-                if len(all_densities) > 1 and np.max(all_densities) > 0.6:
-                    # avg_density = np.mean(all_densities)
-                    # diff_term = -np.mean(np.abs(np.array(all_densities) - avg_density))
+                if len(all_densities) > 1 and np.max(all_densities) > 2/6: # critical density / jam density
+                    avg_density = np.mean(all_densities)
+                    diff_term = -np.clip(np.mean(np.abs(np.array(all_densities) - avg_density)), 0, 1)
                     # penalty for norm density larger than 0.6
-                    diff_term = -np.sum(np.maximum(np.array(all_densities) - 0.6, 0))
+                    # diff_term = -np.sum(np.maximum(np.array(all_densities) - 0.6, 0))
                     # diff = np.var(all_densities)
                     # penalty = variance_penalty_weight * diff
                     # link_rewards -= penalty
 
-                w1 = 2.0  # throughput
+                w1 = 1.0  # throughput
                 w2 = 1.0  # delay
-                w3 = 0.0  # fairness
-                agent_rewards = w1*flow_term + w2*tt_term + w3*diff_term
+                w3 = 0.5  # fairness
+                w4 = 2.0  # demand
+                agent_rewards = w1*flow_term + w2*tt_term + w3*diff_term + w4*demand_term
                 # print(f"Agent {agent_id} reward components: flow={flow_term:.3f}, tt={tt_term:.3f}, diff={diff_term:.3f}, total={agent_rewards:.3f}")
                 rewards[agent_id] = agent_rewards
         return rewards
@@ -336,11 +381,11 @@ class PedNetParallelEnv(ParallelEnv):
         # Standard termination: reached simulation end
         terminated = self.sim_step >= self.simulation_steps
         
-        # Early termination on severe jam: Check if any agent has all its links jammed
-        # if not terminated and self.sim_step > 0:
+        # Early termination on severe jam: only during training for exploration efficiency
+        # if not terminated and self.training and self.sim_step > 0:
         #     for agent_id in self.possible_agents:
         #         agent_type = self.agent_manager.get_agent_type(agent_id)
-                
+        #
         #         if agent_type == "sep":
         #             # Separator agent: check both forward and reverse links
         #             forward_link, reverse_link = self.agent_manager.get_separator_links(agent_id)
@@ -350,7 +395,7 @@ class PedNetParallelEnv(ParallelEnv):
         #             links_to_check = self.agent_manager.get_gater_outgoing_links(agent_id)
         #         else:
         #             continue
-                
+        #
         #         # Check if ALL links for this agent are at jam density
         #         all_jammed = True
         #         for link in links_to_check:
@@ -359,7 +404,7 @@ class PedNetParallelEnv(ParallelEnv):
         #             if current_density < 0.99 * link.k_jam:
         #                 all_jammed = False
         #                 break
-                
+        #
         #         if all_jammed:
         #             # This agent's links are all jammed - terminate episode
         #             terminated = True

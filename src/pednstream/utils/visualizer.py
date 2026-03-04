@@ -78,7 +78,8 @@ class NetworkVisualizer:
         :param edge_property: Property to visualize ('density', 'flow', or 'speed')
         """
         # Create figure and axis
-        fig, ax = plt.subplots(figsize=figsize)
+        fig, ax = plt.subplots(figsize=figsize, facecolor='lightgrey')
+        ax.set_facecolor('lightgrey')
         # fix the size of the figure
                 # Calculate fixed axis limits once
         x_coords = [coord[0] for coord in self.pos.values()]
@@ -444,7 +445,7 @@ class NetworkVisualizer:
                 end_time = self.network.simulation_steps
         
         # Create initial figure
-        fig, ax = plt.subplots(figsize=figsize)
+        fig, ax = plt.subplots(figsize=figsize, facecolor='lightgrey')
         # G = nx.DiGraph()
 
         # Initialize the position if not already set
@@ -485,29 +486,42 @@ class NetworkVisualizer:
         def update(frame):
             fig.clear()
             ax = fig.add_subplot(111)
+            ax.set_facecolor('lightgrey')
             
             # Update edge values
             edge_labels = {}  # Dictionary to store edge labels
             if self.from_saved:
                 for link_id, link_info in self.link_data.items():
                     u, v = link_id.split('-')
-                    if edge_property == 'density':
-                        value = link_info['density'][frame]
-                    elif edge_property == 'flow':
-                        value = link_info['link_flow'][frame]
-                    elif edge_property == 'speed':
-                        value = link_info['speed'][frame]
+                    try:
+                        if edge_property == 'density':
+                            value = link_info['density'][frame]
+                        elif edge_property == 'flow':
+                            value = link_info['link_flow'][frame]
+                        elif edge_property == 'speed':
+                            value = link_info['speed'][frame]
+                        else:
+                            value = 0
+                    except (KeyError, IndexError):
+                        value = 0
+                        
                     self.G[u][v]['value'] = value
                     if tag:  # Only create labels if tag is True
                         edge_labels[(u, v)] = f'{value:.2f}'
             else:
                 for (u, v), link in self.network.links.items():
-                    if edge_property == 'density':
-                        value = link.density[frame]
-                    elif edge_property == 'flow':
-                        value = link.link_flow[frame]
-                    elif edge_property == 'speed':
-                        value = link.speed[frame]
+                    try:
+                        if edge_property == 'density':
+                            value = link.density[frame]
+                        elif edge_property == 'flow':
+                            value = link.link_flow[frame]
+                        elif edge_property == 'speed':
+                            value = link.speed[frame]
+                        else:
+                            value = 0
+                    except (KeyError, IndexError, AttributeError):
+                        value = 0
+                        
                     self.G[u][v]['value'] = value
                     if tag:  # Only create labels if tag is True
                         edge_labels[(u, v)] = f'{value:.2f}'
@@ -759,7 +773,8 @@ class NetworkVisualizer:
         y_max += y_padding
 
         # Figure and axes
-        fig, ax = plt.subplots(figsize=figsize)
+        fig, ax = plt.subplots(figsize=figsize, facecolor='lightgrey')
+        ax.set_facecolor('lightgrey')
 
         # Draw base nodes (origins red, destinations pink, others lightblue)
         origin_nodes = set(str(n) for n in getattr(self.network, 'origin_nodes', []))
@@ -866,7 +881,10 @@ class NetworkVisualizer:
             if link_ids is None:
                 link_ids = list(self.link_data.keys())[:3]
             
-            fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(12, 10))
+            fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(12, 10), facecolor='lightgrey')
+            ax1.set_facecolor('lightgrey')
+            ax2.set_facecolor('lightgrey')
+            ax3.set_facecolor('lightgrey')
             
             for link_id in link_ids:
                 link_info = self.link_data[link_id]
@@ -893,7 +911,10 @@ class NetworkVisualizer:
             if link_ids is None:
                 link_ids = list(self.network.links.keys())[:3]
             
-            fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(12, 10))
+            fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(12, 10), facecolor='lightgrey')
+            ax1.set_facecolor('lightgrey')
+            ax2.set_facecolor('lightgrey')
+            ax3.set_facecolor('lightgrey')
             
             for link_id in link_ids:
                 link = self.network.links[link_id]
@@ -918,66 +939,110 @@ class NetworkVisualizer:
 
     def _draw_gate_apertures(self, ax, time_step=None):
         """
-        Draw gate apertures (lines at node-edge junctions representing gate width)
-        Works with both live network objects and saved simulation data
-        :param ax: Matplotlib axis to draw on
-        :param time_step: Current time step (for reference, not used in aperture calculation)
+        Draw gate apertures at each gater-controlled junction.
+        Back gate: Blue solid line (controls outflow from a junction).
+        Front gate: Dark orange dashed line (controls inflow to a junction).
         """
-        # Determine which edges have gate width data
-        edges_with_gates = {}
-        
+        # Collect per-link gate data: {(u, v): (front_gw, back_gw)}
+        # Only for links that have gate control data (outgoing links of gater nodes)
+        link_gate_data = {}
+
         if self.from_saved:
-            # For saved data: collect edges that have back_gate_width
+            # First, identify gater nodes: nodes that are sources of links with back_gate_width
+            gater_nodes = set()
             for link_id, link_info in self.link_data.items():
                 if 'back_gate_width' in link_info:
                     u, v = link_id.split('-')
-                    edges_with_gates[(u, v)] = np.array(link_info['back_gate_width'])[time_step]
+                    gater_nodes.add(u)
+            
+            for link_id, link_info in self.link_data.items():
+                if 'back_gate_width' not in link_info and 'front_gate_width' not in link_info:
+                    continue
+                u, v = link_id.split('-')
+                front_gw = None
+                back_gw = None
+                if 'front_gate_width' in link_info:
+                    front_gw = np.array(link_info['front_gate_width'])[time_step]
+                if 'back_gate_width' in link_info:
+                    back_gw = np.array(link_info['back_gate_width'])[time_step]
+                link_gate_data[(u, v)] = (front_gw, back_gw)
+
+            # Build lookup for front gates of ALL links that have the data
+            # Key is (src, dst) - we need this to find front gate of incoming link (v->u) to gater node u
+            all_front_gates = {}
+            for link_id, link_info in self.link_data.items():
+                if 'front_gate_width' in link_info:
+                    src, dst = link_id.split('-')
+                    all_front_gates[(src, dst)] = np.array(link_info['front_gate_width'])[time_step]
         else:
-            # For live network: collect edges from gater nodes
             if self.network is None:
                 return
-            
+            gater_nodes = set()
+            if hasattr(self.network, 'controller_gaters'):
+                gater_nodes = set(str(n) for n in self.network.controller_gaters)
+
             for (u, v), link in self.network.links.items():
-                # Get gate width from back_gate_width property
-                edges_with_gates[(str(u), str(v))] = link.back_gate_width_data[time_step]
-        
-        # Draw apertures for all edges with gate width data
-        for (u, v), gate_width in edges_with_gates.items():
-            # Get node positions
+                u_str, v_str = str(u), str(v)
+                if u_str in gater_nodes:
+                    front_gw = getattr(link, 'front_gate_width_data', [None] * (time_step + 1))[time_step]
+                    back_gw = getattr(link, 'back_gate_width_data', [None] * (time_step + 1))[time_step]
+                    link_gate_data[(u_str, v_str)] = (front_gw, back_gw)
+
+            # Build lookup for front gates of ALL links
+            # Key is (src, dst) - we need this to find front gate of incoming link (v->u) to gater node u
+            all_front_gates = {}
+            for (src, dst), link in self.network.links.items():
+                if hasattr(link, 'front_gate_width_data'):
+                    all_front_gates[(str(src), str(dst))] = link.front_gate_width_data[time_step]
+
+        # Determine graph coordinate scale to make sizes invariant
+        x_coords = [coord[0] for coord in self.pos.values()]
+        y_coords = [coord[1] for coord in self.pos.values()]
+        graph_range = max(max(x_coords) - min(x_coords), max(y_coords) - min(y_coords))
+        if graph_range == 0:
+            graph_range = 1.0
+
+        scale_factor = 0.005 * graph_range
+        para_offset = 0.005 * graph_range
+
+        for (u, v), (front_gw, back_gw) in link_gate_data.items():
             u_pos = np.array(self.pos[u])
-            v_pos = np.array(self.pos[v])
+            v_pos = np.array(self.pos.get(v, u_pos)) 
             
-            # Calculate direction vector (from u to v)
             direction = v_pos - u_pos
             direction_length = np.linalg.norm(direction)
             if direction_length == 0:
                 continue
-            
-            # Normalize direction and get perpendicular vector
+                
             direction_norm = direction / direction_length
             perpendicular = np.array([-direction_norm[1], direction_norm[0]])
             
-            # Connection point: slightly away from the node (about 3% of edge distance)
-            connection_point = u_pos + 0.08 * direction
+            # Junction point: near the gater node u (source of outgoing link)
+            junction_distance = min(0.15 * direction_length, 0.10 * graph_range)
+            junction = u_pos + junction_distance * direction_norm
             
-            # Scale factor for gate width visualization (adjust for readability)
-            scale_factor = 0.1  # Adjust this to make apertures more/less visible
+            # --- Back gate of link (u->v): outflow gate, BLUE ---
+            if back_gw is not None:
+                bp = junction - direction_norm * para_offset
+                half_w = back_gw * scale_factor / 2
+                ax.plot(
+                    [bp[0] - perpendicular[0] * half_w, bp[0] + perpendicular[0] * half_w],
+                    [bp[1] - perpendicular[1] * half_w, bp[1] + perpendicular[1] * half_w],
+                    color='blue', linewidth=3, alpha=0.9, zorder=5, linestyle='solid'
+                )
             
-            # Calculate aperture endpoints: perpendicular line through connection point
-            half_width = gate_width * scale_factor / 2
-            aperture_start = connection_point - perpendicular * half_width
-            aperture_end = connection_point + perpendicular * half_width
-            
-            # Draw aperture line as a dashed line
-            ax.plot(
-                [aperture_start[0], aperture_end[0]],
-                [aperture_start[1], aperture_end[1]],
-                color='blue',
-                linewidth=2.5,
-                alpha=0.7,
-                zorder=2,  # Draw on top of edges
-                linestyle='-'  # Dashed line
-            )
+            # --- Front gate of incoming link (v->u): inflow gate, DARK ORANGE ---
+            # The incoming link to gater node u is (v, u), so look up its front gate
+            incoming_link_key = (v, u)
+            rev_front_gw = all_front_gates.get(incoming_link_key, None)
+            if rev_front_gw is not None:
+                fp = junction + direction_norm * para_offset
+                half_w = rev_front_gw * scale_factor / 2
+                ax.plot(
+                    [fp[0] - perpendicular[0] * half_w, fp[0] + perpendicular[0] * half_w],
+                    [fp[1] - perpendicular[1] * half_w, fp[1] + perpendicular[1] * half_w],
+                    color='darkorange', linewidth=3, alpha=1.0, zorder=6, linestyle='solid'
+                )
 
 
 def progress_callback(current_frame, total_frames):

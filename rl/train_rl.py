@@ -42,7 +42,7 @@ if __name__ == "__main__":
         option3:inoutflow of the node and other side, gate widths
     """
     algo = "ppo_hrl"  # "ppo", "ppo_dyna", "ppo_tbptt", "pome", "sac"
-    SEED = 77
+    SEED = 66
     NORM = False   # running mean-std normalization for observations
     builder_norm_obs = False  # normalize observations in the environment builder
     STATE_OPTION = "option3"
@@ -64,11 +64,13 @@ if __name__ == "__main__":
     # dataset = "two_coordinators"
     # dataset = "one_intersection_v0"
     # dataset = "small_network"
-    dataset = "butterfly_scB"
-
+    dataset = "butterfly_scG"
+    # dataset = "nine_intersections"
     # Create environment with normalization wrapper
     base_env = PedNetParallelEnv(
-        dataset=dataset, normalize_obs=builder_norm_obs, obs_mode=STATE_OPTION, render_mode="animate", action_gap=action_gap
+        dataset=dataset, normalize_obs=builder_norm_obs,
+        obs_mode=STATE_OPTION, late_start_prob=0.5, late_start_max_frac=0.1,
+        render_mode="animate", action_gap=action_gap
     )
     env = RunningNormalizeWrapper(base_env, norm_obs=NORM, norm_reward=norm_ret)
     env.seed(SEED)
@@ -208,7 +210,7 @@ if __name__ == "__main__":
             use_param_noise=False,
             use_action_noise=False,
             num_episodes=300,
-            tm_window=50,
+            tm_window=20,
             max_duration=7,
             duration_entropy_coef=0.05,
             duration_entropy_coef_min=0.001,

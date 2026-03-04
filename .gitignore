@@ -24,6 +24,12 @@ Tables.xlsx
 #Sphinx build files
 docs/_build
 
+# ignore all checkpoints and all wandb logs
+**/wandb/
+**/checkpoints/
+/rl/analysis/parse_summaries.py
+/rl/outputs/
+
 # Python Chache
 __pycache__/
 

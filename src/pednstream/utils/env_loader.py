@@ -10,7 +10,6 @@ The NetworkEnvGenerator class is used to load the network data and generate the 
 """
 
 import json
-import os
 import numpy as np
 import pickle
 import copy
@@ -24,10 +23,13 @@ class NetworkEnvGenerator:
     """The input of this class is the simulation parameters, and the output is the network environment."""
 
     def __init__(self, data_dir="data"):
-        # TODO: managing files and directories shouldn't be a responsibility of this class
-        project_root = Path(__file__).resolve().parent.parent.parent.parent
-        self.data_dir = project_root / data_dir
-        self.data_dir.mkdir(parents=True, exist_ok=True)
+        # Resolve input data root from working directory by default.
+        # If an absolute path is passed, use it as-is.
+        data_dir_path = Path(data_dir).expanduser()
+        if data_dir_path.is_absolute():
+            self.data_dir = data_dir_path
+        else:
+            self.data_dir = (Path.cwd() / data_dir_path).resolve()
         self.network = None
         self.network_data = None
         self.config = {}
@@ -46,41 +48,41 @@ class NetworkEnvGenerator:
             Dictionary containing network data
         """
 
-        yaml_file_path = os.path.join(self.data_dir, data_path, "sim_params.yaml")
+        data_path_obj = Path(data_path).expanduser()
+        if data_path_obj.is_absolute():
+            dataset_dir = data_path_obj
+        else:
+            dataset_dir = (self.data_dir / data_path_obj).resolve()
 
-        if not os.path.exists(yaml_file_path):
+        yaml_file_path = dataset_dir / "sim_params.yaml"
+
+        if not yaml_file_path.exists():
             raise FileNotFoundError(f"Network data file not found: {yaml_file_path}")
 
         # load the simulation parameters
-        self.config = load_config(yaml_file_path)
+        self.config = load_config(str(yaml_file_path))
         # Store original config for randomization base (only on first load)
         if self._original_config is None:
             self._original_config = copy.deepcopy(self.config)
 
         # if exists, load the edge distances
-        if os.path.exists(os.path.join(self.data_dir, data_path, "edge_distances.pkl")):
-            with open(
-                os.path.join(self.data_dir, data_path, "edge_distances.pkl"), "rb"
-            ) as f:
+        edge_distances_path = dataset_dir / "edge_distances.pkl"
+        if edge_distances_path.exists():
+            with open(edge_distances_path, "rb") as f:
                 edge_distances = pickle.load(f)
         else:
             edge_distances = None
 
         # if not in yaml, load the adjacency matrix
         if "adjacency_matrix" not in self.config:
-            adjacency_matrix = np.load(
-                os.path.join(self.data_dir, data_path, "adj_matrix.npy")
-            )
+            adjacency_matrix = np.load(dataset_dir / "adj_matrix.npy")
         else:
             adjacency_matrix = self.config["adjacency_matrix"]
 
         # load the node positions if it exists
-        if os.path.exists(
-            os.path.join(self.data_dir, data_path, "node_positions.json")
-        ):
-            with open(
-                os.path.join(self.data_dir, data_path, "node_positions.json"), "r"
-            ) as f:
+        node_positions_path = dataset_dir / "node_positions.json"
+        if node_positions_path.exists():
+            with open(node_positions_path, "r") as f:
                 node_positions = {str(node): pos for node, pos in json.load(f).items()}
         else:
             node_positions = None

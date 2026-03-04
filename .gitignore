@@ -23,3 +23,9 @@ Tables.xlsx
 
 #Sphinx build files
 docs/_build
+
+# Python Chache
+__pycache__/
+
+# logs
+src/outputs/

@@ -267,7 +267,6 @@ class Link(BaseLink):
         # TODO: is using length the correct way to calculate receiving flow?
         tau_shockwave = round(self.length / (self.shockwave_speed * self.unit_time))
         reverse_peds = self.reverse_link.num_pedestrians[time_step]
-        reverse_peds_rand = np.random.binomial(n=reverse_peds, p=0.9)
 
         if time_step + 1 - tau_shockwave < 0:
             receiving_flow_boundary = self.k_jam * self.area

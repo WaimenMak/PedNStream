@@ -73,10 +73,12 @@ def validate_config(config: Dict[str, Any]) -> None:
 
     for section, fields in required_fields.items():
         if section not in config:
-            raise RequiredConfigError(f"Missing required section: {section}")
+            raise RequiredConfigError(
+                f"Missing required section in configuration: {section}"
+            )
 
         for field in fields:
             if field not in config[section]:
                 raise RequiredConfigError(
-                    f"Missing required field: {field} in section {section}"
+                    f"Missing required field in configuration: {field} in section {section}"
                 )

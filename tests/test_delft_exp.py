@@ -10,7 +10,7 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, project_root)
 
 from pednstream.utils.env_loader import NetworkEnvGenerator
-from handlers.output_handler import OutputHandler
+from pednstream.utils.output_handler import OutputHandler
 from pednstream.utils.visualizer import NetworkVisualizer
 import matplotlib.pyplot as plt
 import matplotlib

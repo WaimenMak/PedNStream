@@ -15,7 +15,7 @@ matplotlib.use("macosx")
 import numpy as np
 import matplotlib.pyplot as plt
 import pytest
-from handlers.output_handler import OutputHandler
+from pednstream.utils.output_handler import OutputHandler
 
 # Now you can import using the project structure
 from pednstream.utils.visualizer import NetworkVisualizer

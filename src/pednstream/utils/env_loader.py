@@ -645,10 +645,10 @@ class NetworkEnvGenerator:
 
                     if params:
                         link_overrides[link_id] = params
-                        # # Explicitly set reverse link to ensure symmetry regardless of iteration order in create_network
-                        # u, v = link_id.split('_')
-                        # reverse_id = f"{v}_{u}"
-                        # link_overrides[reverse_id] = params.copy()
+                        # Explicitly set reverse link to ensure symmetry regardless of iteration order in create_network
+                        u, v = link_id.split('_')
+                        reverse_id = f"{v}_{u}"
+                        link_overrides[reverse_id] = params.copy()
 
         return link_overrides
 

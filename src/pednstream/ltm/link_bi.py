@@ -222,9 +222,6 @@ class Link(BaseLink):
         if time_step > 200 and self.link_id == "2_3":
             pass
 
-        # get the total density
-        density = self.get_density(time_step)
-
         tau = round(
             self.travel_time[time_step] / self.unit_time
         )  # use real-time travel time to calculate tau
@@ -238,11 +235,6 @@ class Link(BaseLink):
         else:
             """ for the normal stage or the congestion stage """
             idx = max(0, time_step + 1 - tau)
-
-            boundary_congestion = self.num_pedestrians[time_step]
-            boundary_freeflow = max(
-                0, self.cumulative_inflow[idx] - self.cumulative_outflow[time_step]
-            )
 
             """ original method from the paper """
             sending_flow_boundary = max(

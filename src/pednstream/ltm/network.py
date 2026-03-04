@@ -299,13 +299,6 @@ class Network:
                         )
                         # Create a copy of link_params for reverse link and swap front/back gate widths
                         reverse_link_params = link_params.copy()
-                        original_front = reverse_link_params.pop('front_gate_width', None)
-                        original_back = reverse_link_params.pop('back_gate_width', None)
-                        # TODO: Do we need a switch to enable/disable this code?
-                        # if original_front is not None:
-                        #     reverse_link_params['back_gate_width'] = original_front
-                        # if original_back is not None:
-                        #     reverse_link_params['front_gate_width'] = original_back
                         reverse_link = Link(f"{j}_{i}", self.nodes[j], node, 
                                           self.simulation_steps, self.unit_time, **reverse_link_params)
                     else:

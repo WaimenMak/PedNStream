@@ -19,8 +19,7 @@ class Network:
     def setup_logger(log_level=logging.INFO, log_dir=None):
         """Set up and configure logger"""
         if log_dir is None:
-            project_root = Path(__file__).resolve().parent.parent.parent
-            log_dir = project_root / "outputs" / "logs"
+            log_dir = Path.cwd() / "outputs" / "logs"
         else:
             log_dir = Path(log_dir)
 

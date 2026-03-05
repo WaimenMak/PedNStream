@@ -222,9 +222,6 @@ class Link(BaseLink):
         if time_step > 200 and self.link_id == "2_3":
             pass
 
-        # get the total density
-        density = self.get_density(time_step)
-
         tau = round(
             self.travel_time[time_step] / self.unit_time
         )  # use real-time travel time to calculate tau
@@ -239,11 +236,6 @@ class Link(BaseLink):
             """ for the normal stage or the congestion stage """
             idx = max(0, time_step + 1 - tau)
 
-            boundary_congestion = self.num_pedestrians[time_step]
-            boundary_freeflow = max(
-                0, self.cumulative_inflow[idx] - self.cumulative_outflow[time_step]
-            )
-
             """ original method from the paper """
             sending_flow_boundary = max(
                 0, self.cumulative_inflow[idx] - self.cumulative_outflow[time_step]
@@ -257,9 +249,6 @@ class Link(BaseLink):
             )
             sending_flow = min(sending_flow_boundary, sending_flow_max)
             # TODO: fix the flow release logic: if sending flow >0, then use diffusion flow
-
-        """ The purpose is to mitigate the maximum sending flow to avoid unrealistic high flow (Added)"""
-        original_sending_flow = sending_flow
 
         """ Smooth the sending flow to avoid unrealistic high flow (Added) """
         sending_flow = max(0, sending_flow)
@@ -278,7 +267,6 @@ class Link(BaseLink):
         # TODO: is using length the correct way to calculate receiving flow?
         tau_shockwave = round(self.length / (self.shockwave_speed * self.unit_time))
         reverse_peds = self.reverse_link.num_pedestrians[time_step]
-        reverse_peds_rand = np.random.binomial(n=reverse_peds, p=0.9)
 
         if time_step + 1 - tau_shockwave < 0:
             receiving_flow_boundary = self.k_jam * self.area

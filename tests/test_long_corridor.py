@@ -98,7 +98,7 @@ class TestLongCorridor:
         visualizer = NetworkVisualizer(
             simulation_dir=os.path.join(output_dir, f"{sim_name}")
         )
-        anim = visualizer.animate_network(
+        visualizer.animate_network(
             start_time=0,
             end_time=params["simulation_steps"],
             interval=100,

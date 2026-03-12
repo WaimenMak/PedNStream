@@ -598,7 +598,7 @@ class NetworkEnvGenerator:
             valid_links = [f"{u}_{v}" for u, v in zip(rows, cols) if u < v]
 
         defaults = self.config["params"]["default_link"]
-        link_overrides = {}
+        random_link_params = {}
 
         # Select a subset of links to perturb (e.g., 20%)
         if valid_links:
@@ -644,13 +644,13 @@ class NetworkEnvGenerator:
                         )
 
                     if params:
-                        link_overrides[link_id] = params
+                        random_link_params[link_id] = params
                         # Explicitly set reverse link to ensure symmetry regardless of iteration order in create_network
                         u, v = link_id.split('_')
                         reverse_id = f"{v}_{u}"
-                        link_overrides[reverse_id] = params.copy()
+                        random_link_params[reverse_id] = params.copy()
 
-        return link_overrides
+        return random_link_params
 
 
 if __name__ == "__main__":

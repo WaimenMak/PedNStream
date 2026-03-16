@@ -210,11 +210,12 @@ class Link(BaseLink):
 
         F = 1 / (1 + self.gamma * travel_time)
 
+        idx = min(max(0, time_step - tau), len(self.inflow) - 1)
         sending_flow = (
-            F * self.inflow[time_step - tau]
-            + F * (1 - F) * self.inflow[time_step - tau - 1]
-            + F * (1 - F) ** 2 * self.inflow[time_step - tau - 2]
-            + F * (1 - F) ** 3 * self.inflow[time_step - tau - 3]
+            F * self.inflow[idx]
+            + F * (1 - F) * self.inflow[idx - 1]
+            + F * (1 - F) ** 2 * self.inflow[idx - 2]
+            + F * (1 - F) ** 3 * self.inflow[idx - 3]
         )
 
         return max(np.ceil(sending_flow), 0)

@@ -26,7 +26,7 @@ class TestNetworkEnvGenerator:
         assert network_environment._original_config is None
 
     def test_normalize_path(self, network_environment):
-        """Test relative path are converted to absolute paths and normilized"""
+        """Test relative path are converted to absolute paths and normalized"""
 
         result = network_environment._normalize_path("./data/../path")
         assert result.is_absolute()
@@ -40,9 +40,10 @@ class TestNetworkEnvGenerator:
 
         network_environment.load_network_data(data_directory)
         assert network_environment.config == network_environment._original_config
+        assert network_environment.config is not network_environment._original_config
 
     def test_load_network_data_adj_matrix(self, data_directory, network_environment):
-        """Tests adjancency matrix is loaded from a file"""
+        """Tests adjacency matrix is loaded from a file"""
 
         import numpy as np
 
@@ -80,10 +81,9 @@ class TestNetworkEnvGenerator:
     def test_load_network_data_output_structure(
         self, data_directory, network_environment
     ):
-        """Tests ouput is returned in the expected structure"""
+        """Tests output is returned in the expected structure"""
 
         import numpy as np
-        from typing import Dict
 
         loaded_data = network_environment.load_network_data(data_directory)
 
@@ -95,5 +95,5 @@ class TestNetworkEnvGenerator:
 
         # Check data types
         assert isinstance(loaded_data["adjacency_matrix"], np.ndarray)
-        assert isinstance(loaded_data["edge_distances"], Dict)
-        assert isinstance(loaded_data["node_positions"], Dict)
+        assert isinstance(loaded_data["edge_distances"], dict)
+        assert isinstance(loaded_data["node_positions"], dict)

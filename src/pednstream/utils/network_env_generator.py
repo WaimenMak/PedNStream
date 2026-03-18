@@ -13,7 +13,7 @@ import copy
 from pednstream.ltm.network import Network
 from pathlib import Path
 from pednstream.utils.config import load_config
-from typing import List, Callable, Dict
+from typing import List, Callable
 
 
 class NetworkEnvGenerator:
@@ -82,7 +82,7 @@ class NetworkEnvGenerator:
         if edge_distances_path.exists():
             with open(edge_distances_path, "rb") as f:
                 edge_distances = pickle.load(f)
-            if not isinstance(edge_distances, Dict):
+            if not isinstance(edge_distances, dict):
                 raise TypeError(
                     f"Edge Distances. Pickled file must contain a dictionary, got: {type(edge_distances)}"
                 )

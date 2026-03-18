@@ -1,13 +1,10 @@
+"""Code to generate different network environments for the RL environment."""
+
 # -*- coding: utf-8 -*-
 # @Time    : 11/03/2025 17:43
 # @Author  : mmai
 # @FileName: load_network_data
 # @Software: PyCharm
-
-"""
-This file is used to generate different network environments for the RL environment.
-The NetworkEnvGenerator class is used to load the network data and generate the network environment.
-"""
 
 import json
 import numpy as np
@@ -20,16 +17,20 @@ from typing import List, Callable
 
 
 class NetworkEnvGenerator:
-    """The input of this class is the simulation parameters, and the output is the network environment."""
+    """Represents a network environment."""
 
-    def __init__(self, data_dir="data"):
+    # to load the network data and generate the network environment.
+    # The input of this class is the simulation parameters, and the output is the network environment."""
+
+    def __init__(self, data_dir: str = "/data"):
+        """Creates network environment using simulation data files.
+
+        Args:
+            data_dir (str): path to directory containing data files
+        """
         # Resolve input data root from working directory by default.
         # If an absolute path is passed, use it as-is.
-        data_dir_path = Path(data_dir).expanduser()
-        if data_dir_path.is_absolute():
-            self.data_dir = data_dir_path
-        else:
-            self.data_dir = (Path.cwd() / data_dir_path).resolve()
+        self.data_path = self._normalize_path(data_dir)
         self.network = None
         self.network_data = None
         self.config = {}
@@ -37,27 +38,38 @@ class NetworkEnvGenerator:
             None  # Store pristine config from YAML for randomization base
         )
 
-    def load_network_data(self, data_path: str) -> dict:
-        """
-        Load network data from file
+    def _normalize_path(self, directory_path: str):
+        """Normalize a directory path. If path is relative, the path to current directory used in the normalization.
 
         Args:
-            data_path: Path to the network data folder
+            directory_path (str): a path to a directory
 
         Returns:
-            Dictionary containing network data
+            Normalized path, an absolute path
         """
+        _path = Path(directory_path).expanduser()
+        if not _path.is_absolute():
+            current_directory = Path.cwd()
+            _path = current_directory / _path
+        return _path.resolve()
 
-        data_path_obj = Path(data_path).expanduser()
-        if data_path_obj.is_absolute():
-            dataset_dir = data_path_obj
-        else:
-            dataset_dir = (self.data_dir / data_path_obj).resolve()
+    def load_network_data(self, data_dir: str = "") -> dict:
+        """Loads network data from file.
 
-        yaml_file_path = dataset_dir / "sim_params.yaml"
+        Args:
+            data_dir (str): Path to data directory. Enables to load data from a different directory after initialization.
 
+        Returns:
+            Dictionary containing network aggregated data
+        """
+        data_path = self.data_path
+        if data_dir:
+            # overwrites initial data_path for this method
+            data_path = self._normalize_path(data_dir)
+
+        yaml_file_path = data_path / "sim_params.yaml"
         if not yaml_file_path.exists():
-            raise FileNotFoundError(f"Network data file not found: {yaml_file_path}")
+            raise FileNotFoundError(f"'sim_params.yaml' not found in: {str(data_path)}")
 
         # load the simulation parameters
         self.config = load_config(str(yaml_file_path))
@@ -65,22 +77,22 @@ class NetworkEnvGenerator:
         if self._original_config is None:
             self._original_config = copy.deepcopy(self.config)
 
-        # if exists, load the edge distances
-        edge_distances_path = dataset_dir / "edge_distances.pkl"
+        # load edge distances if present in data path
+        edge_distances_path = data_path / "edge_distances.pkl"
         if edge_distances_path.exists():
             with open(edge_distances_path, "rb") as f:
                 edge_distances = pickle.load(f)
         else:
             edge_distances = None
 
-        # if not in yaml, load the adjacency matrix
+        # load the adjacency matrix form configuration or from file
         if "adjacency_matrix" not in self.config:
-            adjacency_matrix = np.load(dataset_dir / "adj_matrix.npy")
+            adjacency_matrix = np.load(data_path / "adj_matrix.npy")
         else:
             adjacency_matrix = self.config["adjacency_matrix"]
 
         # load the node positions if it exists
-        node_positions_path = dataset_dir / "node_positions.json"
+        node_positions_path = data_path / "node_positions.json"
         if node_positions_path.exists():
             with open(node_positions_path, "r") as f:
                 node_positions = {str(node): pos for node, pos in json.load(f).items()}
@@ -173,7 +185,7 @@ class NetworkEnvGenerator:
                     #     reverse_params['back_gate_width'] = original_front
                     # if original_back is not None:
                     #     reverse_params['front_gate_width'] = original_back
-                    self.config['params']['links'][f"{v}_{u}"] = reverse_params
+                    self.config["params"]["links"][f"{v}_{u}"] = reverse_params
 
         # Create network
         self.network = Network(
@@ -245,15 +257,15 @@ class NetworkEnvGenerator:
         origin_nodes = self.config.get("origin_nodes", [])
         original_demand_config = self._original_config["params"].get("demand", {})
         demand_params = {}
-        
+
         available_patterns = [
-          'gaussian_peaks', 
-          'constant', 
-          'sudden_demand', 
-          'multi_peaks', 
-          'single_peak'
+            "gaussian_peaks",
+            "constant",
+            "sudden_demand",
+            "multi_peaks",
+            "single_peak",
         ]
-        
+
         # Default values if not specified in config
         default_base_lambda = 10.0
         default_peak_lambda = 30.0
@@ -304,11 +316,13 @@ class NetworkEnvGenerator:
                 "base_lambda": float(base_lambda),
                 "peak_lambda": float(peak_lambda),
             }
-            
+
             # For single_peak pattern, randomize peak_position (0.1-0.9)
-            if pattern == 'single_peak':
-                demand_params[origin_key]['peak_position'] = float(np.random.uniform(0.1, 0.9))
-        
+            if pattern == "single_peak":
+                demand_params[origin_key]["peak_position"] = float(
+                    np.random.uniform(0.1, 0.9)
+                )
+
         # Optionally shuffle demand profiles across origins for extra diversity
         demand_params = self._shuffle_demand_among_origins(
             demand_params, shuffle_prob=0.5
@@ -550,17 +564,15 @@ class NetworkEnvGenerator:
                 # Randomize back_gate_width from uniform [0, link_width]
                 back_gate = np.random.uniform(0, link_width)
                 rev_back_gate = np.random.uniform(0, link_width)
-                
+
                 # Set back_gate_width for outgoing link
-                gate_width_overrides[link_id] = {
-                    'back_gate_width': back_gate
-                }
-                
+                gate_width_overrides[link_id] = {"back_gate_width": back_gate}
+
                 # Set front_gate_width for reverse link
                 if reverse_link_id not in gate_width_overrides:
                     gate_width_overrides[reverse_link_id] = {}
-                gate_width_overrides[reverse_link_id]['back_gate_width'] = rev_back_gate
-        
+                gate_width_overrides[reverse_link_id]["back_gate_width"] = rev_back_gate
+
         return gate_width_overrides
 
     def generate_random_link_params(self) -> dict:
@@ -646,7 +658,7 @@ class NetworkEnvGenerator:
                     if params:
                         link_overrides[link_id] = params
                         # Explicitly set reverse link to ensure symmetry regardless of iteration order in create_network
-                        u, v = link_id.split('_')
+                        u, v = link_id.split("_")
                         reverse_id = f"{v}_{u}"
                         link_overrides[reverse_id] = params.copy()
 

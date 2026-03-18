@@ -13,7 +13,7 @@ import copy
 from pednstream.ltm.network import Network
 from pathlib import Path
 from pednstream.utils.config import load_config
-from typing import List, Callable
+from typing import List, Callable, Dict
 
 
 class NetworkEnvGenerator:
@@ -22,7 +22,7 @@ class NetworkEnvGenerator:
     # to load the network data and generate the network environment.
     # The input of this class is the simulation parameters, and the output is the network environment."""
 
-    def __init__(self, data_dir: str = "/data"):
+    def __init__(self, data_dir: str = "data/"):
         """Creates network environment using simulation data files.
 
         Args:
@@ -82,8 +82,12 @@ class NetworkEnvGenerator:
         if edge_distances_path.exists():
             with open(edge_distances_path, "rb") as f:
                 edge_distances = pickle.load(f)
+            if not isinstance(edge_distances, Dict):
+                raise TypeError(
+                    f"Edge Distances. Pickled file must contain a dictionary, got: {type(edge_distances)}"
+                )
         else:
-            edge_distances = None
+            edge_distances = {}
 
         # load the adjacency matrix form configuration or from file
         if "adjacency_matrix" not in self.config:
@@ -97,7 +101,7 @@ class NetworkEnvGenerator:
             with open(node_positions_path, "r") as f:
                 node_positions = {str(node): pos for node, pos in json.load(f).items()}
         else:
-            node_positions = None
+            node_positions = {}
 
         # aggregate the data
         data = {

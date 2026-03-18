@@ -46,7 +46,7 @@ class TestNetworkEnvGenerator:
 
         import numpy as np
 
-        file_matrix = np.load(data_directory / "adj_matrix.npy")
+        file_matrix = np.load(data_directory / "adj_matrix.npy")  # independent
 
         loaded_matrix = network_environment.load_network_data(data_directory)
         assert np.array_equal(file_matrix, loaded_matrix["adjacency_matrix"])
@@ -95,7 +95,5 @@ class TestNetworkEnvGenerator:
 
         # Check data types
         assert isinstance(loaded_data["adjacency_matrix"], np.ndarray)
-        assert isinstance(
-            loaded_data["edge_distances"], object
-        )  # this is vague, should be replaced by the datatype expected from the pickle file
+        assert isinstance(loaded_data["edge_distances"], Dict)
         assert isinstance(loaded_data["node_positions"], Dict)

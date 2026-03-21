@@ -74,7 +74,7 @@ class NetworkEnvGenerator:
             edge_distances = None
 
         # if not in yaml, load the adjacency matrix
-        if "adjacency_matrix" not in self.config:
+        if self.config["adjacency_matrix"] is None:
             adjacency_matrix = np.load(dataset_dir / "adj_matrix.npy")
         else:
             adjacency_matrix = self.config["adjacency_matrix"]

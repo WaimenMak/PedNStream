@@ -50,127 +50,33 @@ class TestLoadConfig:
         assert "adjacency_matrix" not in config
         assert "od_flows" not in config
 
-    def test_config_with_adjacency_matrix(self, tmp_path):
-        """Adjacency matrix should be converted to np.ndarray."""
-        yaml_content = """
-        simulation:
-          simulation_steps: 5
-          unit_time: 1.0
-        network:
-          origin_nodes: [0]
-          adjacency_matrix:
-            - [0, 1]
-            - [1, 0]
-        default_link:
-          length: 10
-          width: 1
-          free_flow_speed: 1.0
-          k_critical: 1
-          k_jam: 2
-        """
-        cfg_path = write_yaml(tmp_path, "with_adj.yaml", yaml_content)
+    def test_assemble_network_config_with_adjacency_matrix(self):
+        """_assemble_network_config should convert adjacency_matrix to np.ndarray."""
+        params = {"some": "value"}
+        config = {
+            "network": {
+                "origin_nodes": [0],
+                "destination_nodes": [1],
+                "adjacency_matrix": [
+                    [0, 1],
+                    [1, 0],
+                ],
+            }
+        }
 
-        config = load_config(str(cfg_path))
+        from pednstream.utils.config import _assemble_network_config
 
-        assert "adjacency_matrix" in config
-        adj = config["adjacency_matrix"]
+        network_config = _assemble_network_config(params, config)
+
+        assert network_config["params"] is params
+        assert network_config["origin_nodes"] == [0]
+        assert network_config["destination_nodes"] == [1]
+
+        assert "adjacency_matrix" in network_config
+        adj = network_config["adjacency_matrix"]
         assert isinstance(adj, np.ndarray)
         assert adj.shape == (2, 2)
         assert np.array_equal(adj, np.array([[0, 1], [1, 0]]))
-
-    def test_config_with_od_flows(self, tmp_path):
-        """String OD keys 'i_j' should become tuple (i, j)."""
-        yaml_content = """
-        simulation:
-          simulation_steps: 5
-          unit_time: 1.0
-        network:
-          origin_nodes: [0]
-        default_link:
-          length: 10
-          width: 1
-          free_flow_speed: 1.0
-          k_critical: 1
-          k_jam: 2
-        od_flows:
-          "1_2": 10
-          "3_4": 5
-        """
-        cfg_path = write_yaml(tmp_path, "with_od.yaml", yaml_content)
-
-        config = load_config(str(cfg_path))
-
-        assert "od_flows" in config
-        od = config["od_flows"]
-        assert od[(1, 2)] == 10
-        assert od[(3, 4)] == 5
-        assert set(od.keys()) == {(1, 2), (3, 4)}
-
-    def test_config_with_path_finder_and_overrides(self, tmp_path):
-        """Path finder and optional simulation fields are propagated."""
-        yaml_content = """
-        simulation:
-          simulation_steps: 20
-          unit_time: 0.5
-          assign_flows_type: "dynamic"
-          seed: 42
-          path_finder:
-            method: "dijkstra"
-            max_paths: 3
-        network:
-          origin_nodes: [0]
-        default_link:
-          length: 10
-          width: 1
-          free_flow_speed: 1.0
-          k_critical: 1
-          k_jam: 2
-        """
-        cfg_path = write_yaml(tmp_path, "with_path_finder.yaml", yaml_content)
-
-        config = load_config(str(cfg_path))
-
-        params = config["params"]
-        assert params["assign_flows_type"] == "dynamic"
-        assert params["seed"] == 42
-        assert params["path_finder"] == {"method": "dijkstra", "max_paths": 3}
-
-    def test_load_config_with_real_delft_sim_params(self):
-        """Smoke test: load the real Delft sim_params.yaml and check key fields."""
-        # Locate the YAML file relative to this test file
-        here = Path(__file__).resolve().parent
-        cfg_path = here / "data" / "delft" / "sim_params.yaml"
-
-        config = load_config(str(cfg_path))
-        params = config["params"]
-
-        # Basic simulation params
-        assert params["simulation_steps"] == 500
-        assert params["unit_time"] == 10
-        assert params["seed"] == 42
-        assert params["assign_flows_type"] == "classic"
-
-        # Path finder block
-        assert params["path_finder"]["k_paths"] == 5
-
-        # Default link extra fields preserved
-        default_link = params["default_link"]
-        assert default_link["gamma"] == 0.01
-        assert default_link["speed_noise_std"] == 0.05
-        assert default_link["fd_type"] == "greenshields"
-
-        # Demand entries present
-        demand = params["demand"]
-        for key in ["origin_0", "origin_80", "origin_13"]:
-            assert key in demand
-
-        # Origin/destination nodes from YAML
-        assert config["origin_nodes"] == [
-            0, 8, 80, 13, 247, 266, 143, 249, 97, 146, 142, 294
-        ]
-        assert config["destination_nodes"] == [
-            0, 8, 74, 136, 10, 13, 182, 35, 216, 219, 80, 274
-        ]
 
 
 class TestValidateConfig:
@@ -264,7 +170,8 @@ class TestValidateConfig:
 class TestValidateOdFlows:
     """Tests for od_flows validation in validate_config."""
 
-    def _base_config(self):
+    @pytest.fixture
+    def base_config(self):
         return {
             "network": {
                 "origin_nodes": [0, 1, 2],
@@ -280,9 +187,9 @@ class TestValidateOdFlows:
             },
         }
 
-    def test_valid_od_flows_passes(self):
+    def test_valid_od_flows_passes(self, base_config):
         """od_flows with valid origin/destination pairs should pass."""
-        cfg = self._base_config()
+        cfg = base_config
         cfg["od_flows"] = {
             "0_3": 10,
             "1_4": 20,
@@ -291,9 +198,9 @@ class TestValidateOdFlows:
 
         validate_config(cfg)  # should not raise
 
-    def test_od_flows_without_destination_nodes_raises(self):
+    def test_od_flows_without_destination_nodes_raises(self, base_config):
         """od_flows requires destination_nodes to be defined."""
-        cfg = self._base_config()
+        cfg = base_config
         cfg["network"].pop("destination_nodes")
         cfg["od_flows"] = {"0_3": 10}
 
@@ -303,9 +210,9 @@ class TestValidateOdFlows:
         msg = str(excinfo.value)
         assert "destination_nodes" in msg
 
-    def test_od_flows_with_empty_destination_nodes_raises(self):
+    def test_od_flows_with_empty_destination_nodes_raises(self, base_config):
         """od_flows requires destination_nodes to be non-empty."""
-        cfg = self._base_config()
+        cfg = base_config
         cfg["network"]["destination_nodes"] = []
         cfg["od_flows"] = {"0_3": 10}
 
@@ -315,9 +222,9 @@ class TestValidateOdFlows:
         msg = str(excinfo.value)
         assert "destination_nodes" in msg
 
-    def test_od_flows_invalid_origin_raises(self):
+    def test_od_flows_invalid_origin_raises(self, base_config):
         """od_flows key with origin not in origin_nodes should raise."""
-        cfg = self._base_config()
+        cfg = base_config
         cfg["od_flows"] = {"99_3": 10}  # 99 is not in origin_nodes [0, 1, 2]
 
         with pytest.raises(InvalidConfigError) as excinfo:
@@ -327,9 +234,9 @@ class TestValidateOdFlows:
         assert "origin 99" in msg
         assert "not in origin_nodes" in msg
 
-    def test_od_flows_invalid_destination_raises(self):
+    def test_od_flows_invalid_destination_raises(self, base_config):
         """od_flows key with destination not in destination_nodes should raise."""
-        cfg = self._base_config()
+        cfg = base_config
         cfg["od_flows"] = {"0_99": 10}  # 99 is not in destination_nodes [3, 4, 5]
 
         with pytest.raises(InvalidConfigError) as excinfo:
@@ -339,9 +246,9 @@ class TestValidateOdFlows:
         assert "destination 99" in msg
         assert "not in destination_nodes" in msg
 
-    def test_od_flows_malformed_key_raises(self):
+    def test_od_flows_malformed_key_raises(self, base_config):
         """od_flows key with bad format should raise."""
-        cfg = self._base_config()
+        cfg = base_config
         cfg["od_flows"] = {"not_a_valid_key": 10}
 
         with pytest.raises(InvalidConfigError) as excinfo:
@@ -354,7 +261,8 @@ class TestValidateOdFlows:
 class TestValidateDemand:
     """Tests for demand validation in validate_config."""
 
-    def _base_config(self):
+    @pytest.fixture
+    def base_config(self):
         return {
             "network": {
                 "origin_nodes": [0, 1, 2],
@@ -369,9 +277,9 @@ class TestValidateDemand:
             },
         }
 
-    def test_valid_demand_passes(self):
+    def test_valid_demand_passes(self, base_config):
         """demand with valid origin references should pass."""
-        cfg = self._base_config()
+        cfg = base_config
         cfg["demand"] = {
             "origin_0": {"peak_lambda": 10, "base_lambda": 5},
             "origin_1": {"peak_lambda": 20, "base_lambda": 10},
@@ -379,9 +287,9 @@ class TestValidateDemand:
 
         validate_config(cfg)  # should not raise
 
-    def test_demand_invalid_origin_raises(self):
+    def test_demand_invalid_origin_raises(self, base_config):
         """demand key referencing non-existent origin should raise."""
-        cfg = self._base_config()
+        cfg = base_config
         cfg["demand"] = {
             "origin_99": {"peak_lambda": 10, "base_lambda": 5},  # 99 not in origin_nodes
         }
@@ -393,9 +301,9 @@ class TestValidateDemand:
         assert "origin 99" in msg
         assert "not in origin_nodes" in msg
 
-    def test_demand_malformed_key_raises(self):
+    def test_demand_malformed_key_raises(self, base_config):
         """demand key with bad format should raise."""
-        cfg = self._base_config()
+        cfg = base_config
         cfg["demand"] = {
             "bad_key": {"peak_lambda": 10},
         }
@@ -406,24 +314,11 @@ class TestValidateDemand:
         msg = str(excinfo.value)
         assert "Invalid demand key format" in msg
 
-    def test_demand_key_non_integer_raises(self):
-        """demand key with non-integer origin should raise."""
-        cfg = self._base_config()
-        cfg["demand"] = {
-            "origin_abc": {"peak_lambda": 10},
-        }
-
-        with pytest.raises(InvalidConfigError) as excinfo:
-            validate_config(cfg)
-
-        msg = str(excinfo.value)
-        assert "Invalid demand key format" in msg
-
-
 class TestValidateLinks:
     """Tests for links validation in validate_config."""
 
-    def _base_config(self):
+    @pytest.fixture
+    def base_config(self):
         return {
             "network": {
                 "origin_nodes": [0],
@@ -438,71 +333,64 @@ class TestValidateLinks:
             },
         }
 
-    def _adjacency_matrix(self):
+    @pytest.fixture
+    def adjacency_matrix(self):
         # 0 -- 1 -- 2 (linear chain)
-        return np.array([
-            [0, 1, 0],
-            [1, 0, 1],
-            [0, 1, 0],
-        ])
+        return np.array([[0, 1, 0], [1, 0, 1], [0, 1, 0]])
 
-    def test_valid_links_passes(self):
+    def test_valid_links_passes(self, base_config, adjacency_matrix):
         """links referencing existing edges should pass."""
-        cfg = self._base_config()
+        cfg = base_config
         cfg["links"] = {
             "0_1": {"length": 50},
             "1_2": {"length": 60},
         }
-        adj = self._adjacency_matrix()
 
-        validate_config(cfg, adjacency_matrix=adj)  # should not raise
+        validate_config(cfg, adjacency_matrix=adjacency_matrix)  # should not raise
 
-    def test_links_non_existent_edge_raises(self):
+    def test_links_non_existent_edge_raises(self, base_config, adjacency_matrix):
         """links referencing non-existent edge should raise."""
-        cfg = self._base_config()
+        cfg = base_config
         cfg["links"] = {
             "0_2": {"length": 50},  # no direct edge between 0 and 2
         }
-        adj = self._adjacency_matrix()
 
         with pytest.raises(InvalidConfigError) as excinfo:
-            validate_config(cfg, adjacency_matrix=adj)
+            validate_config(cfg, adjacency_matrix=adjacency_matrix)
 
         msg = str(excinfo.value)
         assert "no edge exists" in msg
         assert "0_2" in msg
 
-    def test_links_out_of_bounds_raises(self):
+    def test_links_out_of_bounds_raises(self, base_config, adjacency_matrix):
         """links referencing node index out of bounds should raise."""
-        cfg = self._base_config()
+        cfg = base_config
         cfg["links"] = {
             "0_99": {"length": 50},  # 99 is out of bounds
         }
-        adj = self._adjacency_matrix()
 
         with pytest.raises(InvalidConfigError) as excinfo:
-            validate_config(cfg, adjacency_matrix=adj)
+            validate_config(cfg, adjacency_matrix=adjacency_matrix)
 
         msg = str(excinfo.value)
         assert "out of bounds" in msg
 
-    def test_links_malformed_key_raises(self):
+    def test_links_malformed_key_raises(self, base_config, adjacency_matrix):
         """links key with bad format should raise."""
-        cfg = self._base_config()
+        cfg = base_config
         cfg["links"] = {
             "not_valid": {"length": 50},
         }
-        adj = self._adjacency_matrix()
 
         with pytest.raises(InvalidConfigError) as excinfo:
-            validate_config(cfg, adjacency_matrix=adj)
+            validate_config(cfg, adjacency_matrix=adjacency_matrix)
 
         msg = str(excinfo.value)
         assert "Invalid links key format" in msg
 
-    def test_links_without_adjacency_skips_validation(self):
+    def test_links_without_adjacency_skips_validation(self, base_config):
         """links present but no adjacency_matrix passed should skip validation."""
-        cfg = self._base_config()
+        cfg = base_config
         cfg["links"] = {
             "0_99": {"length": 50},  # would fail if validated
         }

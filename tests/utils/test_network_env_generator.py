@@ -28,7 +28,7 @@ class TestNetworkEnvGenerator:
         assert network_environment.network is None
         assert network_environment.network_data is None
         assert network_environment.config == {}
-        assert network_environment._original_config is None
+        assert network_environment._original_config == {}
 
     def test_normalize_path(self, network_environment):
         """Test relative path are converted to absolute paths and normalized"""

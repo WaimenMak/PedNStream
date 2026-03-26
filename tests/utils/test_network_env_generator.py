@@ -130,3 +130,79 @@ class TestNetworkEnvGenerator:
         mock_load.assert_called_once_with(other_data_directory)
         assert network_environment.network is not None
         assert isinstance(network_environment.network, Network)
+
+    def test_build_link_params(self, network_environment):
+        """Test link parameters are build and return in the correct format"""
+        edge_distances = {(0, 1): 100.0, (2, 3): 200.0}
+        default_link_params = {"width": 2.0, "free_flow_speed": 1.34}
+        existing_link_configs = {}
+
+        result = network_environment._build_link_params(
+            edge_distances, default_link_params, existing_link_configs
+        )
+
+        # Forward and reverse links created for each edge
+        assert "0_1" in result
+        assert "1_0" in result
+        assert "2_3" in result
+        assert "3_2" in result
+        assert len(result) == 4
+
+        # Length set from edge distance
+        assert result["0_1"]["length"] == 100.0
+        assert result["1_0"]["length"] == 100.0
+        assert result["2_3"]["length"] == 200.0
+
+        # Default params applied
+        assert result["0_1"]["width"] == 2.0
+        assert result["0_1"]["free_flow_speed"] == 1.34
+
+    def test_build_link_params_existing_override(self, network_environment):
+        """Test existing link configs override defaults."""
+        edge_distances = {(0, 1): 50.0}
+        default_link_params = {"width": 2.0, "free_flow_speed": 1.34}
+        existing_link_configs = {"0_1": {"width": 5.0, "k_jam": 3.0}}
+
+        result = network_environment._build_link_params(
+            edge_distances, default_link_params, existing_link_configs
+        )
+
+        # Existing config overrides default for forward link
+        assert result["0_1"]["width"] == 5.0
+        assert result["0_1"]["k_jam"] == 3.0
+        assert result["0_1"]["free_flow_speed"] == 1.34
+        assert result["0_1"]["length"] == 50.0
+
+        # Reverse link gets a copy of the forward link's merged params
+        assert result["1_0"]["width"] == 5.0
+        assert result["1_0"]["k_jam"] == 3.0
+        assert result["1_0"]["length"] == 50.0
+
+    def test_build_link_params_no_reverse_if_existing(self, network_environment):
+        """Test reverse link is not auto-created when it has its own existing config."""
+        edge_distances = {(0, 1): 75.0}
+        default_link_params = {"width": 2.0}
+        existing_link_configs = {"1_0": {"width": 9.0}}
+
+        result = network_environment._build_link_params(
+            edge_distances, default_link_params, existing_link_configs
+        )
+
+        # Forward link created normally
+        assert result["0_1"]["length"] == 75.0
+        # Reverse link NOT auto-created because it's in existing_link_configs
+        assert "1_0" not in result
+
+    def test_build_link_params_reverse_not_duplicated(self, network_environment):
+        """Test reverse link is not overwritten when both directions appear in edge_distances."""
+        edge_distances = {(0, 1): 60.0, (1, 0): 80.0}
+        default_link_params = {"width": 2.0}
+        existing_link_configs = {}
+
+        result = network_environment._build_link_params(
+            edge_distances, default_link_params, existing_link_configs
+        )
+
+        # Both forward links created from their own edge entry
+        assert result["0_1"]["length"] == 60.0
+        assert result["1_0"]["length"] == 80.0

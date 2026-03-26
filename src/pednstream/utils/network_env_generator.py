@@ -34,9 +34,7 @@ class NetworkEnvGenerator:
         self.network = None
         self.network_data = None
         self.config = {}
-        self._original_config = (
-            None  # Store pristine config from YAML for randomization base
-        )
+        self._original_config = {}
 
     def _normalize_path(self, directory_path: str):
         """Normalize a directory path. If path is relative, the path to current directory used in the normalization.
@@ -45,7 +43,7 @@ class NetworkEnvGenerator:
             directory_path (str): a path to a directory
 
         Returns:
-            Normalized path, an absolute path
+            Path: Normalized path, an absolute path
         """
         _path = Path(directory_path).expanduser()
         if not _path.is_absolute():
@@ -59,7 +57,16 @@ class NetworkEnvGenerator:
         default_link_params: dict,
         existing_link_configs: dict,
     ) -> dict:
-        """Returns a complete links config dictionary built from edge distances and defaults."""
+        """Builds links for edge distances.
+
+        Args:
+            edge_distances (dict): edge ditances.
+            default_link_params (dict): default link parameters.
+            existing_link_configs (dict): configuraitons for existing links.
+
+        Returns:
+            dict: complete links config dictionary built from edge distances and defaults.
+        """
         links = {}
         for (u, v), distance in edge_distances.items():
             link_id = f"{u}_{v}"
@@ -83,7 +90,7 @@ class NetworkEnvGenerator:
             data_dir (str): Path to data directory. Enables to load data from a different directory after initialization.
 
         Returns:
-            Dictionary containing network aggregated data
+            dict: Dictionary containing network aggregated data
         """
         data_path = self.data_path
         if data_dir:
@@ -97,7 +104,7 @@ class NetworkEnvGenerator:
         # load the simulation parameters
         self.config = load_config(str(yaml_file_path))
         # Store original config for randomization base (only on first load)
-        if self._original_config is None:
+        if not self._original_config:
             self._original_config = copy.deepcopy(self.config)
 
         # load edge distances if present in data path
@@ -143,7 +150,7 @@ class NetworkEnvGenerator:
         link_params_overrides: dict = {},
         demand_params_overrides: dict = {},
         verbose: bool = True,
-    ):
+    ) -> Network:
         """Create network from data directory. Data directory can be overwritten by using `data_path`.
 
         Args:
@@ -153,6 +160,9 @@ class NetworkEnvGenerator:
             link_params_overrides (dict): TODO
             demand_params_overrides (dict): TODO
             verbose: If True, enable logging output. Default True for backward compatibility.
+
+        Returns:
+            Network: Instance of PedNStream Network.
         """
         # Overwrites default data path when data_path is set
         if data_path:
@@ -218,58 +228,61 @@ class NetworkEnvGenerator:
 
     def randomize_network(
         self,
-        data_path: str,
-        seed: int = None,
-        randomize_params: dict = None,
+        seed: int,
+        data_path: str = "",
         verbose: bool = True,
-    ):
-        """
-        Randomize network parameters
+    ) -> Network:
+        """Create network using ramdomized parameters.
+
         Args:
-            data_path: Name of the folder in the data directory (e.g., 'butterfly_scC', 'delft')
-            seed: Random seed for reproducibility, not used in RL
-            randomize_params: Dictionary containing randomization parameters
-            verbose: If True, enable logging output. Default True for backward compatibility.
+            seed (int): Random seed for reproducibility, not used in RL. By defualt a random number will be picked.
+            data_path (str): Path to data directory that will overwrite default data directory.
+            verbose (bool): If True, enable logging output. Default True for backward compatibility.
+
+        Returns:
+            Network: Instance of PedNStream Network with ramdomized parameters.
         """
         # Set random seed for reproducibility BEFORE any random operations
-        if seed is not None:
-            np.random.seed(seed)
-            import random
+        np.random.seed(seed)
+        import random
 
-            random.seed(seed)
+        random.seed(seed)
 
-        # reset_od_nodes = self.generate_random_od_nodes()
-        # reset_link_params = self.generate_random_link_params()
         reset_od_flows = self.generate_random_od_flows()
         reset_demand_params = self.generate_random_demand_params()
-        # reset_gate_widths = self.generate_random_gate_widths()
+
+        if data_path:
+            network_data_path = data_path
+        else:
+            network_data_path = str(self.data_path)
 
         # Create network with overrides
         network = self.create_network(
-            data_path,
+            network_data_path,
             od_flows=reset_od_flows,
-            # link_params_overrides=reset_link_params,
-            # link_params_overrides=reset_gate_widths,
             demand_params_overrides=reset_demand_params,
             verbose=verbose,
         )
         return network
 
-    # COTINUE HERE:
     def generate_random_demand_params(self) -> dict:
-        """
-        Generate randomized demand  parameters (patterns, lambdas).
+        """Generate randomized demand  parameters (patterns, lambdas).
+
         Uses original YAML config values as base and applies perturbation.
         For new origins not in original config, randomly picks params from an existing origin.
 
-        Args:
-
         Returns:
-            Dictionary {origin_key: {param: value}}
+            dict: Dictionary {origin_key: {param: value}}
         """
         # Use randomized origin nodes, but original YAML demand config as perturbation base
         origin_nodes = self.config.get("origin_nodes", [])
         original_demand_config = self._original_config["params"].get("demand", {})
+
+        # Raise error when _original_config hasn't been set or returns an empty dictionary.
+        if not original_demand_config:
+            raise ValueError(
+                f"Attribute `_original_config` doesn't contain demand parameters. Current values: '{self._original_config}'"
+            )
         demand_params = {}
 
         available_patterns = [
@@ -347,8 +360,8 @@ class NetworkEnvGenerator:
     def _shuffle_demand_among_origins(
         self, demand_params: dict, shuffle_prob: float = 0.3
     ) -> dict:
-        """
-        Shuffle demand configurations among origins with some probability.
+        """Shuffle demand configurations among origins with some probability.
+
         When triggered, randomly permutes the demand profiles (pattern + lambdas)
         across origin nodes, so that e.g. a typically low-demand origin may receive
         a high-demand profile and vice versa.
@@ -357,12 +370,12 @@ class NetworkEnvGenerator:
         their original spatial assignment.
 
         Args:
-            demand_params: Dictionary {origin_key: {pattern, base_lambda, peak_lambda}}
-                           as produced by generate_random_demand_params.
-            shuffle_prob: Probability of performing the shuffle (default 0.3).
+            demand_params (dict): Dictionary {origin_key: {pattern, base_lambda, peak_lambda}}
+            as produced by generate_random_demand_params.
+            shuffle_prob (float): Probability of performing the shuffle (default 0.3).
 
         Returns:
-            demand_params with profiles potentially reassigned across origins.
+            dict: demand_params with profiles potentially reassigned across origins.
         """
         origin_keys = list(demand_params.keys())
         if len(origin_keys) < 2 or np.random.random() >= shuffle_prob:
@@ -379,14 +392,12 @@ class NetworkEnvGenerator:
         return shuffled_params
 
     def generate_random_od_flows(self) -> dict:
-        """
-        Generate randomized OD flows ratio for the network.
+        """Generate randomized OD flows ratio for the network.
+
         The values represent the relative weight/preference for each destination, not absolute flow.
 
-        Args:
-
         Returns:
-            Dictionary {(o,d): weight_array} where weight_array is numpy array of size simulation_steps+1
+            dict: Dictionary {(o,d): weight_array} where weight_array is numpy array of size simulation_steps + 1
         """
         origin_nodes = self.config.get("origin_nodes", [])
         destination_nodes = self.config.get("destination_nodes", [])
@@ -446,16 +457,13 @@ class NetworkEnvGenerator:
         return od_flows
 
     def generate_random_od_nodes(self) -> dict:
-        """
-        Add 1-2 random origin nodes to the existing configuration.
-        Keeps original origins and destinations unchanged, only adds new origins.
+        """Add 1-2 random origin nodes to the existing configuration.
 
+        Keeps original origins and destinations unchanged, only adds new origins.
         Constraint: Controller nodes cannot be origins or destinations.
 
-        Args:
-
         Returns:
-            Dictionary {'origin_nodes': [...], 'destination_nodes': [...]}
+            dict: Dictionary {'origin_nodes': [...], 'destination_nodes': [...]}
         """
         # Start from predefined ODs in original YAML config (not modified config)
         original_origins = self._original_config.get("origin_nodes", []).copy()
@@ -467,7 +475,7 @@ class NetworkEnvGenerator:
         adj_matrix = self.network_data["adjacency_matrix"]
 
         def get_neighbors(node_list, hop=1):
-            """Get k-hop neighbors of nodes in node_list"""
+            """Get k-hop neighbors of nodes in node_list."""
             neighbors = set()
             for node in node_list:
                 # For symmetric adjacency matrix, only need to check one direction
@@ -525,20 +533,18 @@ class NetworkEnvGenerator:
         self.config["destination_nodes"] = new_destinations
         return {"origin_nodes": new_origins, "destination_nodes": new_destinations}
 
-    def generate_random_gate_widths(self, seed: int = None) -> dict:
-        """
-        Generate randomized initial back_gate_width for outgoing links of controller nodes (gaters).
+    def generate_random_gate_widths(self, seed: int) -> dict:
+        """Generate randomized initial back_gate_width for outgoing links of controller nodes (gaters).
 
         The back_gate_width is randomly initialized from uniform distribution [0, link_width].
 
         Args:
-            seed: Random seed for reproducibility
+            seed (int): Random seed for reproducibility
 
         Returns:
-            Dictionary {link_id: {'back_gate_width': value}}
+            dict: Dictionary {link_id: {'back_gate_width': value}}
         """
-        if seed is not None:
-            np.random.seed(seed)
+        np.random.seed(seed)
 
         gate_width_overrides = {}
 
@@ -590,12 +596,16 @@ class NetworkEnvGenerator:
         return gate_width_overrides
 
     def generate_random_link_params(self) -> dict:
-        """
-        Generate randomized parameters for specific links.
+        """Generate randomized parameters for specific links.
+
         This focuses on local perturbations (incidents, bottlenecks) rather than global shifts.
+
+        Returns:
+            dict: randomized parameters
         """
         # Get all valid links from the dataset
         # We access the data directly to know the topology
+        # TODO: review the purpose of checking for names of data directories.
         if not self.network_data:
             self.network_data = self.load_network_data(
                 self.data_dir.name if self.data_dir.name != "data" else "delft"

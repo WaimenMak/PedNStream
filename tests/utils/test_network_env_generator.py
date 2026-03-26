@@ -10,6 +10,11 @@ def data_directory(shared_datadir):
 
 
 @pytest.fixture
+def other_data_directory(shared_datadir):
+    return shared_datadir / "delft"
+
+
+@pytest.fixture
 def network_environment(data_directory):
     return NetworkEnvGenerator(data_directory)
 
@@ -97,3 +102,31 @@ class TestNetworkEnvGenerator:
         assert isinstance(loaded_data["adjacency_matrix"], np.ndarray)
         assert isinstance(loaded_data["edge_distances"], dict)
         assert isinstance(loaded_data["node_positions"], dict)
+
+    def test_create_network_default_dir(self, network_environment):
+        """Test a Network is created using the default data directory"""
+
+        from pednstream.ltm.network import Network
+
+        assert network_environment.network is None  # must be None before operation
+        network_environment.create_network()
+        assert network_environment.network is not None
+        assert isinstance(network_environment.network, Network)
+
+    def test_create_network_overwrite_dir(
+        self, network_environment, other_data_directory, mocker
+    ):
+        """Test a Network is created using using a different data directory"""
+        from pednstream.ltm.network import Network
+
+        mock_load = mocker.patch.object(
+            network_environment,
+            "load_network_data",
+            wraps=network_environment.load_network_data,
+        )
+
+        assert network_environment.network is None
+        network_environment.create_network(data_path=other_data_directory)
+        mock_load.assert_called_once_with(other_data_directory)
+        assert network_environment.network is not None
+        assert isinstance(network_environment.network, Network)

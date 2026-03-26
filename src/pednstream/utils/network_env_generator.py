@@ -53,6 +53,29 @@ class NetworkEnvGenerator:
             _path = current_directory / _path
         return _path.resolve()
 
+    def _build_link_params(
+        self,
+        edge_distances: dict,
+        default_link_params: dict,
+        existing_link_configs: dict,
+    ) -> dict:
+        """Returns a complete links config dictionary built from edge distances and defaults."""
+        links = {}
+        for (u, v), distance in edge_distances.items():
+            link_id = f"{u}_{v}"
+            final_params = {
+                **default_link_params,
+                **existing_link_configs.get(link_id, {}),
+            }
+            final_params["length"] = distance
+            links[link_id] = final_params
+
+            reverse_id = f"{v}_{u}"
+            if reverse_id not in existing_link_configs and reverse_id not in links:
+                links[reverse_id] = final_params.copy()
+
+        return links
+
     def load_network_data(self, data_dir: str = "") -> dict:
         """Loads network data from file.
 
@@ -114,21 +137,30 @@ class NetworkEnvGenerator:
 
     def create_network(
         self,
-        data_path: str,
+        data_path: str = "",
         custom_demand_functions: List[Callable] = [],
         od_flows: dict = {},
         link_params_overrides: dict = {},
         demand_params_overrides: dict = {},
         verbose: bool = True,
     ):
-        """Create network from saved data, simulation_params is the config dict of the yaml file
+        """Create network from data directory. Data directory can be overwritten by using `data_path`.
 
         Args:
-            data_path: Name of the folder in the data directory (e.g., 'butterfly_scC', 'delft')
+            data_path (str): Path to data directory that will overwrite default data directory.
+            custom_demand_functions (list): Custom demand funtions
+            od_flows (dict): TODO
+            link_params_overrides (dict): TODO
+            demand_params_overrides (dict): TODO
             verbose: If True, enable logging output. Default True for backward compatibility.
         """
+        # Overwrites default data path when data_path is set
+        if data_path:
+            network_data_path = data_path
+        else:
+            network_data_path = str(self.data_path)
         if self.network_data is None:
-            self.network_data = self.load_network_data(data_path)
+            self.network_data = self.load_network_data(network_data_path)
 
         # Set up the simulation params, Add link-specific parameters using edge distances
         default_link_params = self.config["params"]["default_link"]
@@ -163,33 +195,11 @@ class NetworkEnvGenerator:
             self.config["params"]["links"] = {}
 
         if self.network_data["edge_distances"]:
-            for (u, v), distance in self.network_data["edge_distances"].items():
-                link_id = f"{u}_{v}"
-
-                # Get existing link-specific params, or an empty dict if none
-                link_specific_params = self.config["params"]["links"].get(link_id, {})
-
-                # Build the parameters for the link, starting with defaults and overriding
-                final_params = default_link_params.copy()
-                final_params.update(link_specific_params)
-
-                # Explicitly set length from distance data and ensure width uses the default
-                final_params["length"] = distance
-                # final_params['width'] = default_link_params['width']
-
-                self.config["params"]["links"][link_id] = final_params
-                # if reverse link not in the config, add it
-                if f"{v}_{u}" not in self.config["params"]["links"]:
-                    # Create a copy of final_params for reverse link and swap front/back gate widths
-                    reverse_params = final_params.copy()
-                    # TODO: Do we need the code below at all?
-                    # original_front = reverse_params.pop('front_gate_width', None)
-                    # original_back = reverse_params.pop('back_gate_width', None)
-                    # if original_front is not None:
-                    #     reverse_params['back_gate_width'] = original_front
-                    # if original_back is not None:
-                    #     reverse_params['front_gate_width'] = original_back
-                    self.config["params"]["links"][f"{v}_{u}"] = reverse_params
+            self.config["params"]["links"] = self._build_link_params(
+                self.network_data["edge_distances"],
+                default_link_params,
+                self.config["params"]["links"],
+            )
 
         # Create network
         self.network = Network(
@@ -199,8 +209,8 @@ class NetworkEnvGenerator:
             destination_nodes=self.config.get("destination_nodes", []),
             # demand_pattern=self.config.get('demand_pattern', None),
             demand_pattern=custom_demand_functions,
-            od_flows=self.config.get("od_flows", None),
-            pos=self.network_data.get("node_positions"),
+            od_flows=self.config.get("od_flows", {}),
+            pos=self.network_data.get("node_positions", {}),
             verbose=verbose,
         )
 

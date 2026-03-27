@@ -71,12 +71,18 @@ class NetworkVisualizer:
         if os.path.exists(time_series_path):
             self.time_series = pd.read_csv(time_series_path)
 
-    def _visualize_network_nx(self, time_step, edge_property='density', with_colorbar=False, set_title=True, figsize=(10, 8)):
+    def _visualize_network_nx(self, time_step, edge_property='density', with_colorbar=False, 
+                               set_title=True, figsize=(10, 8), style='classic', with_legend=True):
         """
         Visualize network state at a specific time step using networkx, for the small network
         :param time_step: Time step to visualize
         :param edge_property: Property to visualize ('density', 'flow', or 'speed')
+        :param style: 'classic' for original style, 'paper' for publication-ready style
+        :param with_legend: Whether to show the legend (default True)
         """
+        if style == 'paper':
+            return self._visualize_network_paper_style(time_step, edge_property, with_colorbar, set_title, figsize, with_legend)
+        
         # Create figure and axis
         fig, ax = plt.subplots(figsize=figsize, facecolor='lightgrey')
         ax.set_facecolor('lightgrey')
@@ -252,13 +258,260 @@ class NetworkVisualizer:
         
         return fig, ax
 
-    def visualize_network_state(self, time_step, edge_property='density', use_folium=False, with_colorbar=True, set_title=True, figsize=(10, 8)):
+    def _visualize_network_paper_style(self, time_step, edge_property='density', 
+                                        with_colorbar=True, set_title=True, figsize=(12, 10),
+                                        with_legend=True):
+        """
+        Publication-ready network visualization with realistic road-like styling.
+        Features:
+        - Clean white background
+        - Road-like edges with borders and rounded caps
+        - Clear node labels with white background boxes
+        - Professional color scheme
+        - Parallel offset for bidirectional links
+        :param with_legend: Whether to show the legend (default True)
+        """
+        from matplotlib.patches import FancyArrowPatch, Circle
+        from matplotlib.colors import Normalize
+        import matplotlib.patheffects as path_effects
+        
+        # Create figure with clean white background
+        fig, ax = plt.subplots(figsize=figsize, facecolor='white')
+        ax.set_facecolor('#f8f9fa')  # Very light grey background
+        
+        # Calculate axis limits
+        x_coords = [coord[0] for coord in self.pos.values()]
+        y_coords = [coord[1] for coord in self.pos.values()]
+        x_min, x_max = min(x_coords), max(x_coords)
+        y_min, y_max = min(y_coords), max(y_coords)
+        
+        x_padding = (x_max - x_min) * 0.15
+        y_padding = (y_max - y_min) * 0.15
+        x_min -= x_padding
+        x_max += x_padding
+        y_min -= y_padding
+        y_max += y_padding
+        
+        # Build graph with edge values
+        G = nx.DiGraph()
+        
+        if self.from_saved:
+            for node_id, node_info in self.node_data.items():
+                if hasattr(self, 'time_series'):
+                    total_flow = self.time_series[
+                        (self.time_series['time_step'] == time_step) &
+                        (self.time_series['link_id'].isin([f"{link}" for link in node_info['incoming_links']]))
+                    ]['inflow'].sum()
+                else:
+                    total_flow = 0
+                G.add_node(node_id, size=total_flow)
+            
+            for link_id, link_info in self.link_data.items():
+                u, v = link_id.split('-')
+                if edge_property == 'density':
+                    value = link_info['density'][time_step]
+                elif edge_property == 'flow':
+                    value = link_info['link_flow'][time_step]
+                elif edge_property == 'speed':
+                    value = link_info['speed'][time_step]
+                elif edge_property == 'num_pedestrians':
+                    value = link_info['num_pedestrians'][time_step]
+                G.add_edge(u, v, value=value)
+        else:
+            for node in self.network.nodes:
+                total_flow = sum(link.cumulative_inflow[time_step] 
+                               for link in node.incoming_links)
+                G.add_node(node.node_id, size=total_flow)
+            
+            for (u, v), link in self.network.links.items():
+                if edge_property == 'density':
+                    value = link.density[time_step]
+                elif edge_property == 'flow':
+                    value = link.link_flow[time_step]
+                elif edge_property == 'speed':
+                    value = link.speed[time_step]
+                elif edge_property == 'num_pedestrians':
+                    value = link.num_pedestrians[time_step]
+                G.add_edge(u, v, value=value)
+        
+        # Set value range based on property type
+        if edge_property == 'density':
+            vmin, vmax = 0, 8
+        elif edge_property == 'flow':
+            vmin, vmax = 0, 3
+        elif edge_property == 'speed':
+            vmin, vmax = 0, 3
+        elif edge_property == 'num_pedestrians':
+            vmin, vmax = 0, 100
+        
+        norm = Normalize(vmin=vmin, vmax=vmax)
+        cmap = plt.cm.RdYlGn_r
+        
+        edges = list(G.edges())
+        
+        # Draw edges as road-like paths
+        for u, v in edges:
+            value = G[u][v]['value']
+            color = cmap(norm(value))
+            
+            u_pos = np.array(self.pos[str(u)] if str(u) in self.pos else self.pos[u])
+            v_pos = np.array(self.pos[str(v)] if str(v) in self.pos else self.pos[v])
+            
+            # Check if bidirectional
+            is_bidirectional = (v, u) in edges or (str(v), str(u)) in edges
+            
+            # Calculate perpendicular offset for bidirectional links
+            direction = v_pos - u_pos
+            length = np.linalg.norm(direction)
+            if length > 0:
+                direction = direction / length
+            perp = np.array([-direction[1], direction[0]])
+            
+            # Offset amount (proportional to figure scale)
+            offset_amount = (x_max - x_min) * 0.015 if is_bidirectional else 0
+            
+            # Apply offset
+            u_offset = u_pos + perp * offset_amount
+            v_offset = v_pos + perp * offset_amount
+            
+            # Base width for roads
+            base_width = 6
+            density_width = base_width + value * 2
+            
+            # Draw road border (darker outline)
+            ax.plot([u_offset[0], v_offset[0]], [u_offset[1], v_offset[1]],
+                   color='#2c3e50', linewidth=density_width + 2, 
+                   solid_capstyle='round', zorder=1, alpha=0.8)
+            
+            # Draw main road with density color
+            ax.plot([u_offset[0], v_offset[0]], [u_offset[1], v_offset[1]],
+                   color=color, linewidth=density_width, 
+                   solid_capstyle='round', zorder=2)
+            
+            # Draw direction arrow
+            mid_point = (u_offset + v_offset) / 2
+            arrow_start = mid_point - direction * length * 0.08
+            arrow_end = mid_point + direction * length * 0.08
+            
+            ax.annotate('', xy=arrow_end, xytext=arrow_start,
+                       arrowprops=dict(arrowstyle='->', color='white', 
+                                      lw=1.5, mutation_scale=12),
+                       zorder=3)
+        
+        # Get origin and destination nodes
+        if self.from_saved:
+            origin_nodes = self.network_params['origin_nodes']
+            dest_nodes = self.network_params['destination_nodes']
+        else:
+            origin_nodes = self.network.origin_nodes
+            dest_nodes = self.network.destination_nodes
+        
+        # Draw nodes
+        for node in G.nodes():
+            node_key = str(node) if str(node) in self.pos else node
+            pos = self.pos[node_key]
+            node_int = int(node)
+            
+            # Determine node type and styling
+            if node_int in origin_nodes:
+                node_color = '#e74c3c'  # Red for origins
+                node_size = 800
+                edge_color = '#c0392b'
+            elif node_int in dest_nodes:
+                node_color = '#9b59b6'  # Purple for destinations
+                node_size = 800
+                edge_color = '#8e44ad'
+            else:
+                node_color = '#3498db'  # Blue for intermediate
+                node_size = 500
+                edge_color = '#2980b9'
+            
+            # Draw node with border
+            circle = Circle(pos, radius=(x_max - x_min) * 0.025, 
+                          facecolor=node_color, edgecolor=edge_color, 
+                          linewidth=2, zorder=5)
+            ax.add_patch(circle)
+        
+        # Draw node labels with white background for clarity
+        for node in G.nodes():
+            node_key = str(node) if str(node) in self.pos else node
+            pos = self.pos[node_key]
+            
+            # Create label with white background box
+            txt = ax.text(pos[0], pos[1], str(node),
+                         fontsize=14, fontweight='bold',
+                         ha='center', va='center',
+                         color='white', zorder=6)
+            
+            # Add outline effect for better readability
+            txt.set_path_effects([
+                path_effects.Stroke(linewidth=3, foreground='black'),
+                path_effects.Normal()
+            ])
+        
+        # Add title
+        if set_title:
+            ax.set_title(f'Network State at Time Step {time_step}', 
+                        fontdict={'fontsize': 16, 'fontweight': 'bold'},
+                        pad=20)
+        
+        # Add colorbar
+        if with_colorbar:
+            sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+            sm.set_array([])
+            cbar = plt.colorbar(sm, ax=ax, shrink=0.8, aspect=30, pad=0.02)
+            cbar.ax.tick_params(labelsize=11)
+            
+            # Format colorbar label
+            label_map = {
+                'density': 'Density (ped/m²)',
+                'flow': 'Flow (ped/s)',
+                'speed': 'Speed (m/s)',
+                'num_pedestrians': 'Number of Pedestrians'
+            }
+            cbar.set_label(label_map.get(edge_property, edge_property.capitalize()), 
+                          size=12, fontweight='bold')
+        
+        # Add legend for node types (optional)
+        if with_legend:
+            from matplotlib.lines import Line2D
+            legend_elements = [
+                Line2D([0], [0], marker='o', color='w', markerfacecolor='#e74c3c', 
+                       markersize=14, label='Origin', markeredgecolor='#c0392b', markeredgewidth=2),
+                Line2D([0], [0], marker='o', color='w', markerfacecolor='#9b59b6', 
+                       markersize=14, label='Destination', markeredgecolor='#8e44ad', markeredgewidth=2),
+                Line2D([0], [0], marker='o', color='w', markerfacecolor='#3498db', 
+                       markersize=12, label='Intermediate', markeredgecolor='#2980b9', markeredgewidth=2),
+            ]
+            ax.legend(handles=legend_elements, loc='upper left', fontsize=13, 
+                     framealpha=0.95, edgecolor='grey', borderpad=1.0, labelspacing=0.8)
+        
+        # Clean up axes
+        ax.set_xlim(x_min, x_max)
+        ax.set_ylim(y_min, y_max)
+        ax.set_aspect('equal')
+        ax.axis('off')
+        
+        plt.tight_layout()
+        
+        # Draw gate apertures if applicable
+        self._draw_gate_apertures(ax, time_step=time_step)
+        
+        plt.show()
+        
+        return fig, ax
+
+    def visualize_network_state(self, time_step, edge_property='density', use_folium=False, 
+                                 with_colorbar=True, set_title=True, figsize=(10, 8), style='classic',
+                                 with_legend=True):
         """
         Visualize network state at a specific time step using either networkx or folium
+        :param style: 'classic' for original style, 'paper' for publication-ready style (matplotlib only)
+        :param with_legend: Whether to show the legend (default True, only applies to 'paper' style)
         """
         if not use_folium:
             # Original networkx visualization code
-            return self._visualize_network_nx(time_step, edge_property, with_colorbar, set_title, figsize)
+            return self._visualize_network_nx(time_step, edge_property, with_colorbar, set_title, figsize, style, with_legend)
 
         # Folium visualization
         import folium

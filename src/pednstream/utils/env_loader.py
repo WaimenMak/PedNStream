@@ -103,6 +103,7 @@ class NetworkEnvGenerator:
         od_flows: dict = {},
         link_params_overrides: dict = {},
         demand_params_overrides: dict = {},
+        od_nodes_overrides: dict = {},
         verbose: bool = True,
     ):
         """Create network from saved data, simulation_params is the config dict of the yaml file
@@ -129,6 +130,12 @@ class NetworkEnvGenerator:
 
         if od_flows:  # override the od flows
             self.config["od_flows"] = od_flows
+
+        if od_nodes_overrides:  # override origin/destination nodes for randomization
+            if "origin_nodes" in od_nodes_overrides:
+                self.config["origin_nodes"] = od_nodes_overrides["origin_nodes"]
+            if "destination_nodes" in od_nodes_overrides:
+                self.config["destination_nodes"] = od_nodes_overrides["destination_nodes"]
 
         if (
             demand_params_overrides
@@ -194,15 +201,23 @@ class NetworkEnvGenerator:
         self,
         data_path: str,
         seed: int = None,
-        randomize_params: dict = None,
+        randomize_od_nodes: bool = False,
+        randomize_link_params: bool = False,
+        randomize_gate_widths: bool = False,
         verbose: bool = True,
     ):
         """
-        Randomize network parameters
+        Randomize network parameters.
+
+        By default, only OD flows and demand params are randomized.
+        Other randomizations can be enabled via boolean flags.
+
         Args:
             data_path: Name of the folder in the data directory (e.g., 'butterfly_scC', 'delft')
             seed: Random seed for reproducibility, not used in RL
-            randomize_params: Dictionary containing randomization parameters
+            randomize_od_nodes: If True, randomize origin/destination nodes. Default False.
+            randomize_link_params: If True, randomize link parameters (k_critical, k_jam, free_flow_speed). Default False.
+            randomize_gate_widths: If True, randomize initial gate widths for controller nodes. Default False.
             verbose: If True, enable logging output. Default True for backward compatibility.
         """
         # Set random seed for reproducibility BEFORE any random operations
@@ -212,19 +227,32 @@ class NetworkEnvGenerator:
 
             random.seed(seed)
 
-        # reset_od_nodes = self.generate_random_od_nodes()
-        # reset_link_params = self.generate_random_link_params()
+        # Randomize OD nodes FIRST (if enabled) so other functions use updated config
+        reset_od_nodes = self.generate_random_od_nodes() if randomize_od_nodes else {}
+
+        # Always randomize OD flows and demand params (uses updated origin_nodes if randomized)
         reset_od_flows = self.generate_random_od_flows()
         reset_demand_params = self.generate_random_demand_params()
-        # reset_gate_widths = self.generate_random_gate_widths()
+
+        # Optional randomizations
+        reset_link_params = self.generate_random_link_params() if randomize_link_params else {}
+        reset_gate_widths = self.generate_random_gate_widths() if randomize_gate_widths else {}
+
+        # Merge link_params and gate_widths overrides
+        combined_link_overrides = {**reset_link_params}
+        for link_id, params in reset_gate_widths.items():
+            if link_id in combined_link_overrides:
+                combined_link_overrides[link_id].update(params)
+            else:
+                combined_link_overrides[link_id] = params
 
         # Create network with overrides
         network = self.create_network(
             data_path,
             od_flows=reset_od_flows,
-            # link_params_overrides=reset_link_params,
-            # link_params_overrides=reset_gate_widths,
+            link_params_overrides=combined_link_overrides,
             demand_params_overrides=reset_demand_params,
+            od_nodes_overrides=reset_od_nodes,
             verbose=verbose,
         )
         return network
@@ -457,14 +485,18 @@ class NetworkEnvGenerator:
         # Add 1-2 new origins: randomly choose from neighbors or from destinations
         new_origins = original_origins.copy()
 
-        if np.random.random() < 0:
+        # Get controller nodes from config (not self.network which may be None)
+        controller_config = self._original_config.get("params", {}).get("controllers", {})
+        controller_nodes = set(map(int, controller_config.get("nodes", [])))
+
+        if np.random.random() < 0.5:
             # Option 1: Add from spatial neighbors of existing origins
             neighbor_candidates = get_neighbors(new_origins, hop=2)
             candidates = [
                 n
                 for n in neighbor_candidates
                 if n not in new_origins
-                and n not in self.network.controller_nodes
+                and n not in controller_nodes
                 and n not in original_destinations
             ]
         else:
@@ -472,7 +504,7 @@ class NetworkEnvGenerator:
             candidates = [
                 n
                 for n in original_destinations
-                if n not in new_origins and n not in self.network.controller_nodes
+                if n not in new_origins and n not in controller_nodes
             ]
 
         if candidates:

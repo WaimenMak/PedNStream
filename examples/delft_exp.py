@@ -9,9 +9,9 @@ This example use the real street network of Delft, Netherlands.
 """
 
 
-from src.utils.env_loader import NetworkEnvGenerator
-from handlers.output_handler import OutputHandler
-from src.utils.visualizer import NetworkVisualizer, progress_callback
+from pednstream.utils.env_loader import NetworkEnvGenerator
+from pednstream.utils.output_handler import OutputHandler
+from pednstream.utils.visualizer import NetworkVisualizer, progress_callback
 import matplotlib.pyplot as plt
 import matplotlib
 import os
@@ -22,7 +22,9 @@ from pathlib import Path
 
 
 if __name__ == "__main__":
-    env_generator = NetworkEnvGenerator()
+    # absolute path to the project root
+    project_root = Path(__file__).resolve().parent.parent
+    env_generator = NetworkEnvGenerator(data_dir=project_root / "data")
     network_env = env_generator.create_network("delft") # delft is the name of the file in the data folder including the .yaml config file, edge distances, adjacency matrix, node positions
     # visualize od paths
     # with open(Path("..") / "data" / "delft" / "node_positions.json", 'r') as f:
@@ -49,7 +51,7 @@ if __name__ == "__main__":
     # Create animation
     visualizer = NetworkVisualizer(simulation_dir=os.path.join(output_dir, "delft_paths"), pos=pos)
     # # visualize the OD paths
-    visualizer.plot_od_paths(figsize=(22, 18), show_legend=False)
+    # visualizer.plot_od_paths(figsize=(22, 18), show_legend=False)
     matplotlib.use('macosx')
     anim = visualizer.animate_network(start_time=0,
                                     end_time=env_generator.config['params']['simulation_steps'],

@@ -149,6 +149,7 @@ class NetworkEnvGenerator:
         od_flows: dict = {},
         link_params_overrides: dict = {},
         demand_params_overrides: dict = {},
+        od_nodes_overrides: dict = {},
         verbose: bool = True,
     ) -> Network:
         """Create network from data directory. Data directory can be overwritten by using `data_path`.
@@ -187,6 +188,14 @@ class NetworkEnvGenerator:
 
         if od_flows:  # override the od flows
             self.config["od_flows"] = od_flows
+
+        if od_nodes_overrides:  # override origin/destination nodes for randomization
+            if "origin_nodes" in od_nodes_overrides:
+                self.config["origin_nodes"] = od_nodes_overrides["origin_nodes"]
+            if "destination_nodes" in od_nodes_overrides:
+                self.config["destination_nodes"] = od_nodes_overrides[
+                    "destination_nodes"
+                ]
 
         if (
             demand_params_overrides
@@ -261,6 +270,7 @@ class NetworkEnvGenerator:
             network_data_path,
             od_flows=reset_od_flows,
             demand_params_overrides=reset_demand_params,
+            od_nodes_overrides=reset_od_nodes,
             verbose=verbose,
         )
         return network
@@ -493,14 +503,20 @@ class NetworkEnvGenerator:
         # Add 1-2 new origins: randomly choose from neighbors or from destinations
         new_origins = original_origins.copy()
 
-        if np.random.random() < 0:
+        # Get controller nodes from config (not self.network which may be None)
+        controller_config = self._original_config.get("params", {}).get(
+            "controllers", {}
+        )
+        controller_nodes = set(map(int, controller_config.get("nodes", [])))
+
+        if np.random.random() < 0.5:
             # Option 1: Add from spatial neighbors of existing origins
             neighbor_candidates = get_neighbors(new_origins, hop=2)
             candidates = [
                 n
                 for n in neighbor_candidates
                 if n not in new_origins
-                and n not in self.network.controller_nodes
+                and n not in controller_nodes
                 and n not in original_destinations
             ]
         else:
@@ -508,7 +524,7 @@ class NetworkEnvGenerator:
             candidates = [
                 n
                 for n in original_destinations
-                if n not in new_origins and n not in self.network.controller_nodes
+                if n not in new_origins and n not in controller_nodes
             ]
 
         if candidates:
@@ -634,7 +650,7 @@ class NetworkEnvGenerator:
             valid_links = [f"{u}_{v}" for u, v in zip(rows, cols) if u < v]
 
         defaults = self.config["params"]["default_link"]
-        link_overrides = {}
+        random_link_params = {}
 
         # Select a subset of links to perturb (e.g., 20%)
         if valid_links:
@@ -680,13 +696,13 @@ class NetworkEnvGenerator:
                         )
 
                     if params:
-                        link_overrides[link_id] = params
+                        random_link_params[link_id] = params
                         # Explicitly set reverse link to ensure symmetry regardless of iteration order in create_network
                         u, v = link_id.split("_")
                         reverse_id = f"{v}_{u}"
-                        link_overrides[reverse_id] = params.copy()
+                        random_link_params[reverse_id] = params.copy()
 
-        return link_overrides
+        return random_link_params
 
 
 if __name__ == "__main__":

@@ -3,11 +3,11 @@ import sys
 from pathlib import Path
 import matplotlib.pyplot as plt
 import matplotlib
-from handlers.output_handler import OutputHandler
-from src.utils.visualizer import NetworkVisualizer, progress_callback
-from src.LTM.network import Network
-# from src.utils.config import load_config
-from src.utils.env_loader import NetworkEnvGenerator
+from pednstream.utils.output_handler import OutputHandler
+from pednstream.utils.visualizer import NetworkVisualizer, progress_callback
+from pednstream.ltm.network import Network
+# from pednstream.utils.config import load_config
+from pednstream.utils.env_loader import NetworkEnvGenerator
 
 def main():
 

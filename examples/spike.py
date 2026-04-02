@@ -13,11 +13,11 @@ sys.path.append(project_root)
 import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
-from handlers.output_handler import OutputHandler
+from pednstream.utils.output_handler import OutputHandler
 
 # Now you can import using the project structure
-from src.utils.visualizer import NetworkVisualizer, progress_callback
-from src.LTM.network import Network
+from pednstream.utils.visualizer import NetworkVisualizer, progress_callback
+from pednstream.ltm.network import Network
 
 if __name__ == "__main__":
     # Network configuration

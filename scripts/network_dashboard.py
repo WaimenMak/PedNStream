@@ -525,7 +525,7 @@ def run_visualization(link_data_path, pos):
 
 
 if __name__ == "__main__":
-    # Command line: streamlit run network_Dashboard.py -- --name delft --pos data/delft/node_positions.json
+    # Command line: streamlit run network_Dashboard.py -- --name ../outputs/delft_paths --pos ../data/delft/node_positions.json
     parser = argparse.ArgumentParser(description="Network Dashboard Visualization")
     parser.add_argument(
         "--name", type=str, default="delft_directions", help="Name of the simulation"
@@ -538,11 +538,13 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
-    path_to_pos = os.path.join(".", args.pos)
+    # path_to_pos = os.path.join(".", args.pos)
+    path_to_pos = args.pos
     # Load node positions
     with open(path_to_pos, "r") as f:
         pos = {str(k): tuple(v) for k, v in json.load(f).items()}
 
-    path_to_data = os.path.join(".", "outputs", args.name)
+    # path_to_data = os.path.join(".", "outputs", args.name)
+    path_to_data = args.name
     # Run visualization with parsed arguments
     run_visualization(path_to_data, pos)

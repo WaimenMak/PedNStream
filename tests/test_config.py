@@ -47,7 +47,7 @@ class TestLoadConfig:
 
         assert config["origin_nodes"] == [0, 1]
         assert config["destination_nodes"] == []
-        assert "adjacency_matrix" not in config
+        assert config["adjacency_matrix"] is None  # present but None when not in YAML
         assert "od_flows" not in config
 
     def test_assemble_network_config_with_adjacency_matrix(self):

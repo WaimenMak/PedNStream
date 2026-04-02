@@ -12,16 +12,17 @@ sys.path.append(project_root)
 
 import numpy as np
 import matplotlib.pyplot as plt
-from handlers.output_handler import OutputHandler
+from pednstream.utils.output_handler import OutputHandler
 
 # Now you can import using the project structure
-from src.utils.visualizer import NetworkVisualizer, progress_callback
-from src.LTM.network import Network
+from pednstream.utils.visualizer import NetworkVisualizer, progress_callback
+from pednstream.ltm.network import Network
 from pathlib import Path
 
 if __name__ == "__main__":
     # Network configuration
-
+    # set seed
+    np.random.seed(42)
     adj = np.array([[0, 1, 0, 0, 0, 0],
                     [1, 0, 1, 0, 0, 0],
                     [0, 1, 0, 1, 0, 0],
@@ -67,7 +68,7 @@ if __name__ == "__main__":
     # ''' Scenario 2 '''
     # params = {
     #     'unit_time': 10,
-    #     'simulation_steps': 1200,
+    #     'simulation_steps': 800,
     #     'assign_flows_type': 'classic',
     #     'default_link': {
     #         'length': 50,  # make it to 50 to see spillback
@@ -97,11 +98,11 @@ if __name__ == "__main__":
     #     },
     #     'demand': {
     #         "origin_3": {
-    #             "peak_lambda": 20,
+    #             "peak_lambda": 50,
     #             "base_lambda": 8,
     #         },
     #         "origin_2": {
-    #             "peak_lambda": 20,
+    #             "peak_lambda": 50,
     #             "base_lambda": 8,
     #         }
     #     }
@@ -112,12 +113,12 @@ if __name__ == "__main__":
     #                                                       new_turning_fractions=np.array([[0, 1, 0.5, 0.5, 0, 1],
     #                                                                                       [1, 0, 0, 1, 0.5, 0.5]]))
     # Set demand for nodes to zero after a certain time step
-    # network_env.nodes[2].demand[0:10] = np.zeros(10)
-    # network_env.nodes[3].demand[40:] = np.zeros(1200 - 40)
+    # network_env.nodes[2].demand[0:30] = np.zeros(30)
+    # network_env.nodes[3].demand[0:40] = np.zeros(40)
     # network_env.nodes[2].demand[80:100] = np.zeros(20)
     # network_env.nodes[3].demand[30:] = np.zeros(600 - 30)
 
-    network_env.visualize()
+    # network_env.visualize()
 
 
     # Run simulation
@@ -126,8 +127,8 @@ if __name__ == "__main__":
     for t in range(1, params['simulation_steps']):
         network_env.network_loading(t)
         # if t == 120:
-            # network_env.links[(3,4)].back_gate_width = 1
-            # network_env.links[(2,1)].back_gate_width = 0
+        #     network_env.links[(3,4)].back_gate_width = 1
+        #     network_env.links[(2,1)].back_gate_width = 0
         # if t == 32:
         #     network_env.links[(3,4)].back_gate_width = 0
         #     network_env.links[(2,1)].back_gate_width = 0

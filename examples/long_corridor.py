@@ -123,7 +123,7 @@ if __name__ == "__main__":
 
     # Run simulation
     # network_env.links[(3,4)].back_gate_width = 0
-    network_env.links[(2,1)].back_gate_width = 0
+    # network_env.links[(2,1)].back_gate_width = 0
     for t in range(1, params['simulation_steps']):
         network_env.network_loading(t)
         # if t == 120:

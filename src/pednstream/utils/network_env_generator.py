@@ -120,7 +120,10 @@ class NetworkEnvGenerator:
             edge_distances = {}
 
         # load the adjacency matrix form configuration or from file
-        if "adjacency_matrix" not in self.config:
+        if (
+            "adjacency_matrix" not in self.config
+            or self.config.get("adjacency_matrix") is None
+        ):
             adjacency_matrix = np.load(data_path / "adj_matrix.npy")
         else:
             adjacency_matrix = self.config["adjacency_matrix"]

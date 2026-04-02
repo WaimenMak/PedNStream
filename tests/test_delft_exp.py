@@ -11,12 +11,6 @@ sys.path.insert(0, project_root)
 
 from pednstream.utils.network_env_generator import NetworkEnvGenerator
 from pednstream.utils.output_handler import OutputHandler
-from pednstream.utils.visualizer import NetworkVisualizer
-import matplotlib.pyplot as plt
-import matplotlib
-
-import json
-import numpy as np
 import pytest
 
 

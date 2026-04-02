@@ -54,7 +54,7 @@ class TestNetworkEnvGenerator:
 
         file_matrix = np.load(data_directory / "adj_matrix.npy")  # independent
 
-        loaded_matrix = network_environment.load_network_data(data_directory)
+        loaded_matrix = network_environment.load_network_data()
         assert np.array_equal(file_matrix, loaded_matrix["adjacency_matrix"])
 
     def test_load_network_data_edge_distances(
@@ -67,7 +67,7 @@ class TestNetworkEnvGenerator:
         with open(data_directory / "edge_distances.pkl", "rb") as f:
             file_edges = pickle.load(f)
 
-        loaded_edges = network_environment.load_network_data(data_directory)
+        loaded_edges = network_environment.load_network_data()
         assert file_edges == loaded_edges["edge_distances"]
 
     def test_load_network_data_node_positions(
@@ -80,7 +80,7 @@ class TestNetworkEnvGenerator:
         with open(data_directory / "node_positions.json") as f:
             file_positions = {str(node): pos for node, pos in json.load(f).items()}
 
-        loaded_positions = network_environment.load_network_data(data_directory)
+        loaded_positions = network_environment.load_network_data()
         assert loaded_positions["node_positions"] == file_positions
 
     def test_load_network_data_output_structure(
@@ -90,7 +90,7 @@ class TestNetworkEnvGenerator:
 
         import numpy as np
 
-        loaded_data = network_environment.load_network_data(data_directory)
+        loaded_data = network_environment.load_network_data()
 
         assert set(loaded_data.keys()) == {
             "adjacency_matrix",

@@ -154,7 +154,7 @@ if __name__ == "__main__":
     project_root = Path(__file__).resolve().parent.parent
     output_dir = project_root / "outputs"
 
-    sim_name = "long_corridor_bi2"
+    sim_name = "long_corridor"
     # Use the constructed paths
     output_handler = OutputHandler(base_dir=str(output_dir), simulation_dir=f"{sim_name}")
     output_handler.save_network_state(network_env)

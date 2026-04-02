@@ -72,7 +72,7 @@ class NetworkVisualizer:
             self.time_series = pd.read_csv(time_series_path)
 
     def _visualize_network_nx(self, time_step, edge_property='density', with_colorbar=False, 
-                               set_title=True, figsize=(10, 8), style='classic', with_legend=True):
+                               set_title=True, figsize=(10, 8), style='classic', with_legend=True, vis_actions=False):
         """
         Visualize network state at a specific time step using networkx, for the small network
         :param time_step: Time step to visualize
@@ -252,7 +252,8 @@ class NetworkVisualizer:
         plt.tight_layout()
         
         # Draw gate apertures
-        self._draw_gate_apertures(ax, time_step=time_step)
+        if vis_actions: 
+            self._draw_gate_apertures(ax, time_step=time_step)
         
         plt.show()
         

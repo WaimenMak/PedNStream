@@ -1,9 +1,10 @@
 import numpy as np
 from scipy.optimize import linprog
 from .link import BaseLink
+from abc import ABC, abstractmethod
 
 
-class Node:
+class Node(ABC):
     def __init__(self, node_id):
         self.node_id = node_id
         self.incoming_links = []
@@ -48,6 +49,145 @@ class Node:
         self.edge_num = self.dest_num * self.source_num - self.source_num
         self.mask = np.ones([self.source_num, self.source_num], dtype=bool)
         np.fill_diagonal(self.mask, False)
+
+
+    @abstractmethod
+    def solve(self, s, r, type="classic"):
+        return
+
+
+class NodeSolver:
+    """
+    Interface class that mediates between Node and Link classes.
+    Handles flow gathering from links, delegates solving to Node, and updates links with results.
+    One NodeSolver instance per Node.
+    """
+
+    def __init__(self, node: Node, solve_type: str = "classic"):
+        self.node = node
+        self.solve_type = solve_type
+
+    @property
+    def incoming_links(self):
+        return self.node.incoming_links
+
+    @property
+    def outgoing_links(self):
+        return self.node.outgoing_links
+
+    def gather_flows(self, time_step: int):
+        """
+        Gather sending and receiving flows from connected links.
+        
+        Args:
+            time_step: Current simulation time step (starts from 1)
+            
+        Returns:
+            tuple: (s, r) where s is sending flows array, r is receiving flows array
+        """
+        s = np.zeros(self.node.source_num)
+        r = np.zeros(self.node.dest_num)
+
+        # Calculate sending flows from incoming links
+        for i, link in enumerate(self.incoming_links):
+            if (
+                hasattr(self.node, "virtual_incoming_link")
+                and link == self.node.virtual_incoming_link
+            ):
+                s[i] = self.node.demand[time_step - 1]
+            else:
+                s[i] = link.cal_sending_flow(time_step - 1)
+
+        # Calculate receiving flows from outgoing links
+        for j, link in enumerate(self.outgoing_links):
+            if (
+                hasattr(self.node, "virtual_outgoing_link")
+                and link == self.node.virtual_outgoing_link
+            ):
+                r[j] = self.node.M
+            else:
+                reverse_sending_flow = link.reverse_link.sending_flow[time_step - 1].copy()
+                if reverse_sending_flow < 0:
+                    print(reverse_sending_flow)
+                    raise Warning(
+                        f"Negative reverse sending flow detected at time step {time_step}: {reverse_sending_flow}"
+                    )
+
+                r[j] = link.cal_receiving_flow_with_reverse(
+                    time_step - 1, reverse_sending_flow
+                )
+                link.receiving_flow[time_step - 1] = r[j]
+
+        return s, r
+
+    def update_links(self, time_step: int):
+        """
+        Update connected links with the solved flow values from node.q.
+        q format: [S1, S2, ..., R1, R2, ...] - flows summed per link.
+        
+        Args:
+            time_step: Current simulation time step
+        """
+        q = self.node.q
+        assert q is not None
+        assert len(q) == self.node.source_num + self.node.dest_num
+
+        for idx, link in enumerate(self.incoming_links):
+            # From node's perspective: inflow to node = outflow from link
+            link.update_cum_outflow(q[idx], time_step)
+
+        for idx, link in enumerate(self.outgoing_links):
+            # From node's perspective: outflow from node = inflow to link
+            link.update_cum_inflow(q[self.node.source_num + idx], time_step)
+
+    def assign_flows(self, time_step: int, solve_type: str = None):
+        """
+        Main method: gather flows, solve node, update links.
+        
+        Args:
+            time_step: Current simulation time step (starts from 1)
+            solve_type: Override solve type ("classic" or "optimal"), uses default if None
+        """
+        if solve_type is None:
+            solve_type = self.solve_type
+
+        s, r = self.gather_flows(time_step)
+
+        if np.any(s < 0) or np.any(r < 0):
+            raise Warning(
+                f"Negative flows detected at time step {time_step}: s={s}, r={r}"
+            )
+
+        self.node.solve(s, r, type=solve_type)
+        self.update_links(time_step)
+
+
+
+class OneToOneNode(Node):
+    def __init__(self, node_id):
+        super().__init__(node_id)
+
+    def solve(self, s, r, type="classic"):
+        """
+        q = [S0, S1, R0, R1], S1 and R1 are virtual links
+        """
+        # Ensure non-negative flows by using maximum of 0 and the minimum flow
+        self.q = np.array(
+            [
+                np.min([s[0], r[1]]),
+                np.min([s[1], r[0]]),
+                np.min([s[1], r[0]]),
+                np.min([s[0], r[1]]),
+            ]
+        )
+        if np.any(self.q < 0):
+            raise Warning(f"Negative flows detected: {self.q}")
+        return
+
+
+class RegularNode(Node):
+    def __init__(self, node_id):
+        super().__init__(node_id)
 
     def get_matrix_A(self):
         """
@@ -105,100 +245,6 @@ class Node:
             self.A_eq[i, self.edge_num + i * 2 : self.edge_num + (i + 1) * 2] = (
                 np.array([1, -1])
             )  # the penalty term
-
-    def update_links(self, time_step):
-        """Update the upstream link's downstream cumulative outflow
-        q -->> [S1, S2, R1, R2, R3], already sum up the flows from/to the same link
-        """
-        assert self.q is not None
-        # whether length of q is number of edges
-        assert len(self.q) == self.source_num + self.dest_num
-
-        for l, link in enumerate(self.incoming_links):
-            inflow = self.q[
-                l
-            ]  # here inflow is from the perspective of the node, which is the outflow of the link
-            link.update_cum_outflow(inflow, time_step)
-
-        for m, link in enumerate(self.outgoing_links):
-            outflow = self.q[self.source_num + m]
-            link.update_cum_inflow(outflow, time_step)
-
-    def assign_flows(self, time_step: int, type="classic"):
-        """
-        Get the sending and receiving flows constraints. time_step starts from 1.
-        """
-        s = np.zeros(self.source_num)
-        r = np.zeros(self.dest_num)
-
-        # Calculate sending flows
-        for i, l in enumerate(self.incoming_links):
-            if (
-                hasattr(self, "virtual_incoming_link")
-                and l == self.virtual_incoming_link
-            ):
-                s[i] = self.demand[time_step - 1]
-            else:
-                s[i] = l.cal_sending_flow(time_step - 1)
-
-        # Calculate receiving flows
-        for j, l in enumerate(self.outgoing_links):
-            if (
-                hasattr(self, "virtual_outgoing_link")
-                and l == self.virtual_outgoing_link
-            ):
-                r[j] = self.M
-            else:
-                reverse_sending_flow = l.reverse_link.sending_flow[time_step - 1].copy()
-                # raise Warning if reverse_sending_flow is negative
-                if reverse_sending_flow < 0:
-                    print(reverse_sending_flow)
-                    raise Warning(
-                        f"Negative reverse sending flow detected at time step {time_step}: {reverse_sending_flow}"
-                    )
-
-                r[j] = l.cal_receiving_flow_with_reverse(
-                    time_step - 1, reverse_sending_flow
-                )
-                l.receiving_flow[time_step - 1] = r[j]
-
-        # raise Warining if s and r has negative values
-        if np.any(s < 0) or np.any(r < 0):
-            raise Warning(
-                f"Negative flows detected at time step {time_step}: s={s}, r={r}"
-            )
-        self.solve(s, r, type=type)
-        self.update_links(time_step)
-
-    def solve(self, s, r, type="classic"):
-        return
-
-
-class OneToOneNode(Node):
-    def __init__(self, node_id):
-        super().__init__(node_id)
-
-    def solve(self, s, r, type="classic"):
-        """
-        q = [S0, S1, R0, R1], S1 and R1 are virtual links
-        """
-        # Ensure non-negative flows by using maximum of 0 and the minimum flow
-        self.q = np.array(
-            [
-                np.min([s[0], r[1]]),
-                np.min([s[1], r[0]]),
-                np.min([s[1], r[0]]),
-                np.min([s[0], r[1]]),
-            ]
-        )
-        if np.any(self.q < 0):
-            raise Warning(f"Negative flows detected: {self.q}")
-        return
-
-
-class RegularNode(Node):
-    def __init__(self, node_id):
-        super().__init__(node_id)
 
     def solve(self, s, r, type="classic"):
         if type == "optimal":

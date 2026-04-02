@@ -2,7 +2,7 @@ import numpy as np
 import networkx as nx
 import matplotlib.pyplot as plt
 import logging
-from .node import Node, OneToOneNode, RegularNode
+from .node import Node, OneToOneNode, RegularNode, NodeSolver
 from .link import Link, Separator
 from .od_manager import ODManager, DemandGenerator
 from .path_finder import PathFinder
@@ -74,6 +74,7 @@ class Network:
 
         self.adjacency_matrix = adjacency_matrix
         self.nodes = {}
+        self.node_solvers = {}  # key is node_id, value is NodeSolver instance
         self.links = {}  # key is tuple(start_node_id, end_node_id)
         self.params = params  # already contains default link parameters, simulation steps, unit time, link specific params and demand params
         self.simulation_steps = params["simulation_steps"]
@@ -317,6 +318,8 @@ class Network:
                     reverse_link.reverse_link = forward_link
 
             node.init_node()
+            # Create NodeSolver for this node
+            self.node_solvers[i] = NodeSolver(node, solve_type=self.assign_flows_type)
 
     def update_turning_fractions_per_node(
         self,
@@ -348,17 +351,15 @@ class Network:
                 self.path_finder.calculate_node_turning_fractions(
                     time_step=time_step, od_manager=self.od_manager, node=node
                 )
-            # node flow assignment
+            # node flow assignment via NodeSolver
             if (
                 self.path_finder is None
                 or node.node_id in self.path_finder.nodes_in_paths
             ):
-                if isinstance(node, OneToOneNode):
-                    node.assign_flows(time_step)
-                else:  # regular node
-                    if node.A_ub is None:
-                        node.get_matrix_A()
-                    node.assign_flows(time_step, type=self.assign_flows_type)
+                solver = self.node_solvers[node_id]
+                if not isinstance(node, OneToOneNode) and node.A_ub is None:
+                    node.get_matrix_A()
+                solver.assign_flows(time_step)
 
         self.update_link_states(time_step)
 

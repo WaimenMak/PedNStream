@@ -2,6 +2,8 @@ import numpy as np
 from pednstream.utils.functions import BiDirectionalFd, cal_link_flow_kv
 
 
+# TODO: refactor Link.py
+# declare commong attibutes for links and its subtypes
 class BaseLink:
     """Base class for all link types"""
 
@@ -32,6 +34,7 @@ class BaseLink:
         return
 
 
+# A network uses this class as an alternative link type.
 class Link(BaseLink):
     """Physical link with full traffic dynamics"""
 
@@ -70,13 +73,19 @@ class Link(BaseLink):
         if kwargs.get("front_gate_width", None) is not None:
             self._front_gate_width = kwargs["front_gate_width"]
         else:
-            self._front_gate_width = self.width  # width of the gate, for gate control in the head
-        self.back_gate_width_data = self._back_gate_width * np.ones(simulation_steps + 1)
-        self.front_gate_width_data = self._front_gate_width * np.ones(simulation_steps + 1)
-        self.free_flow_speed = kwargs['free_flow_speed']
-        self.capacity = self.free_flow_speed * kwargs['k_critical']
-        self.k_jam = kwargs['k_jam']
-        self.k_critical = kwargs['k_critical']
+            self._front_gate_width = (
+                self.width
+            )  # width of the gate, for gate control in the head
+        self.back_gate_width_data = self._back_gate_width * np.ones(
+            simulation_steps + 1
+        )
+        self.front_gate_width_data = self._front_gate_width * np.ones(
+            simulation_steps + 1
+        )
+        self.free_flow_speed = kwargs["free_flow_speed"]
+        self.capacity = self.free_flow_speed * kwargs["k_critical"]
+        self.k_jam = kwargs["k_jam"]
+        self.k_critical = kwargs["k_critical"]
         self.shockwave_speed = self.capacity / (self.k_jam - self.k_critical)
         self.current_speed = self.free_flow_speed
         self.max_travel_time = (
@@ -106,7 +115,9 @@ class Link(BaseLink):
 
         # For efficient moving average calculation
         self.avg_travel_time_window = round(100 / self.unit_time)
-        self.avg_travel_time = np.ones(simulation_steps + 1, dtype=np.float32) * self.travel_time[0]
+        self.avg_travel_time = (
+            np.ones(simulation_steps + 1, dtype=np.float32) * self.travel_time[0]
+        )
 
         # Additional dynamic attributes
         self.num_pedestrians = np.zeros(simulation_steps + 1, dtype=np.float32)
@@ -210,15 +221,11 @@ class Link(BaseLink):
 
         F = 1 / (1 + self.gamma * travel_time)
 
-        idx = min(max(0, time_step + 1 - tau), len(self.inflow) - 1)
-        idx1 = max(0, idx - 1)
-        idx2 = max(0, idx - 2)
-        idx3 = max(0, idx - 3)
         sending_flow = (
-            F * self.inflow[idx]
-            + F * (1 - F) * self.inflow[idx1]
-            + F * (1 - F) ** 2 * self.inflow[idx2]
-            + F * (1 - F) ** 3 * self.inflow[idx3]
+            F * self.inflow[time_step - tau]
+            + F * (1 - F) * self.inflow[time_step - tau - 1]
+            + F * (1 - F) ** 2 * self.inflow[time_step - tau - 2]
+            + F * (1 - F) ** 3 * self.inflow[time_step - tau - 3]
         )
 
         return max(np.ceil(sending_flow), 0)
@@ -238,22 +245,24 @@ class Link(BaseLink):
 
         """ for the initial stage """
         # if time_step - tau < 0:
-        if time_step <= self.free_flow_tau:
+        if time_step < self.free_flow_tau:
             self.sending_flow[time_step] = 0
             return self.sending_flow[time_step]
 
         else:
             # if time_step - tau + 1 < 0: # congestion stage
-            ''' for the normal stage or the congestion stage '''
-           
+            """ for the normal stage or the congestion stage """
+
             idx = min(max(0, time_step + 1 - tau), len(self.cumulative_inflow) - 1)
-          
+
             # congestion_factor = np.clip(self.density[time_step] / self.k_jam, 0, 1)
             congestion_factor = np.clip(
-              (self.density[time_step] - self.k_critical) / (self.k_jam - self.k_critical),
-              0, 1
-            ) # this one is theoratically more realistic for unidirectional condition
-            
+                (self.density[time_step] - self.k_critical)
+                / (self.k_jam - self.k_critical),
+                0,
+                1,
+            )  # this one is theoratically more realistic for unidirectional condition
+
             boundary_congestion = self.num_pedestrians[time_step]
             boundary_freeflow = max(
                 0, self.cumulative_inflow[idx] - self.cumulative_outflow[time_step]
@@ -390,8 +399,18 @@ class Link(BaseLink):
         return max(receiving_flow, 0)
 
 
+# other types of links should be possible.
+
+
+class Gate(Link):
+    """A link that represents a road where traffic is not influenced by physical structures"""
+
+    pass
+
+
 class Separator(Link):
-    """Separator: control object in the network, it adjust the width of the bidirection link"""
+    """A link that represents a road where traffic is divided by a physical structure longitudinally.
+    It controls objects in the network, it adjust the width of the bidirection link"""
 
     def __init__(
         self, link_id, start_node, end_node, simulation_steps, unit_time, **kwargs

@@ -57,8 +57,7 @@ class Node(ABC):
 
 
 class NodeSolver:
-    """
-    Interface class that mediates between Node and Link classes.
+    """Interface class that mediates between Node and Link classes.
     Handles flow gathering from links, delegates solving to Node, and updates links with results.
     One NodeSolver instance per Node.
     """
@@ -76,8 +75,7 @@ class NodeSolver:
         return self.node.outgoing_links
 
     def gather_flows(self, time_step: int):
-        """
-        Gather sending and receiving flows from connected links.
+        """Gather sending and receiving flows from connected links.
         
         Args:
             time_step: Current simulation time step (starts from 1)
@@ -121,8 +119,7 @@ class NodeSolver:
         return s, r
 
     def update_links(self, time_step: int):
-        """
-        Update connected links with the solved flow values from node.q.
+        """Update connected links with the solved flow values from node.q.
         q format: [S1, S2, ..., R1, R2, ...] - flows summed per link.
         
         Args:
@@ -141,8 +138,7 @@ class NodeSolver:
             link.update_cum_inflow(q[self.node.source_num + idx], time_step)
 
     def assign_flows(self, time_step: int, solve_type: str = None):
-        """
-        Main method: gather flows, solve node, update links.
+        """Main method: gather flows, solve node, update links.
         
         Args:
             time_step: Current simulation time step (starts from 1)
@@ -168,8 +164,7 @@ class OneToOneNode(Node):
         super().__init__(node_id)
 
     def solve(self, s, r, type="classic"):
-        """
-        q = [S0, S1, R0, R1], S1 and R1 are virtual links
+        """Q = [S0, S1, R0, R1], S1 and R1 are virtual links
         """
         # Ensure non-negative flows by using maximum of 0 and the minimum flow
         self.q = np.array(
@@ -190,8 +185,7 @@ class RegularNode(Node):
         super().__init__(node_id)
 
     def get_matrix_A(self):
-        """
-        Get the matrix A_ub for the linear programming problem
+        """Get the matrix A_ub for the linear programming problem
         """
         row_num = self.source_num + self.dest_num
         # - source_num for the link from the same source-destination pair, now it is included in the source_num
@@ -220,8 +214,7 @@ class RegularNode(Node):
         self.A_ub = np.delete(self.A_ub, start_idx, axis=1)
 
     def update_matrix_A_eq(self, turning_fractions: np.array):
-        """
-        Update the turning fractions matrix A_eq more efficiently
+        """Update the turning fractions matrix A_eq more efficiently
 
         Args:
             turning_fractions: Array of turning fraction values

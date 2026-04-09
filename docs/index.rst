@@ -13,7 +13,25 @@ documentation for details.
 
 .. toctree::
    :maxdepth: 2
-   :caption: Contents:
+   :caption: Overview
 
-   ./usage
+   ./overview
+
+.. toctree::
+   :maxdepth: 2
+   :caption: User's Documentation
+
+   ./user/ltm
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Developer's Documentation
+
+   ./developer/scope
+
+.. toctree::
+   :maxdepth: 2
+   :caption: API Reference:
+
+   
 

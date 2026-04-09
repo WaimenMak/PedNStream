@@ -273,7 +273,7 @@ class NetworkEnvGenerator:
             network_data_path,
             od_flows=reset_od_flows,
             demand_params_overrides=reset_demand_params,
-            od_nodes_overrides=reset_od_nodes,
+            # od_nodes_overrides=reset_od_nodes,
             verbose=verbose,
         )
         return network

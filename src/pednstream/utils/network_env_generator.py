@@ -254,11 +254,11 @@ class NetworkEnvGenerator:
         Returns:
             Network: Instance of PedNStream Network with ramdomized parameters.
         """
-        # Set random seed for reproducibility BEFORE any random operations
-        np.random.seed(seed)
-        import random
+        # TODO:Set random seed for reproducibility BEFORE any random operations
+        # np.random.seed(seed)
+        # import random
 
-        random.seed(seed)
+        # random.seed(seed)
 
         reset_od_flows = self.generate_random_od_flows()
         reset_demand_params = self.generate_random_demand_params()

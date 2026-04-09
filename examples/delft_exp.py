@@ -9,7 +9,7 @@ This example use the real street network of Delft, Netherlands.
 """
 
 
-from pednstream.utils.env_loader import NetworkEnvGenerator
+from pednstream.utils.network_env_generator import NetworkEnvGenerator
 from pednstream.utils.output_handler import OutputHandler
 from pednstream.utils.visualizer import NetworkVisualizer, progress_callback
 import matplotlib.pyplot as plt
@@ -24,8 +24,8 @@ from pathlib import Path
 if __name__ == "__main__":
     # absolute path to the project root
     project_root = Path(__file__).resolve().parent.parent
-    env_generator = NetworkEnvGenerator(data_dir=project_root / "data")
-    network_env = env_generator.create_network("delft") # delft is the name of the file in the data folder including the .yaml config file, edge distances, adjacency matrix, node positions
+    env_generator = NetworkEnvGenerator(data_dir=project_root / "data / delft")
+    network_env = env_generator.create_network() # delft is the name of the file in the data folder including the .yaml config file, edge distances, adjacency matrix, node positions
     # visualize od paths
     # with open(Path("..") / "data" / "delft" / "node_positions.json", 'r') as f:
     #     pos = {int(k): np.array(v) for k, v in json.load(f).items()}

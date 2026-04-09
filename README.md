@@ -1,3 +1,4 @@
+![Coverage Badge](badges/coverage.svg)
 # PedNStream: Pedestrian Network Flow Simulator
 
 PedNStream is a light-weight/Python-native pedestrian traffic simulation tool based on the Link Transmission Model (LTM). It enables modeling and simulation of pedestrian movements through complex networks, providing insights into crowd dynamics and flow behaviors.

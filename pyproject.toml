@@ -31,6 +31,7 @@ classifiers = [
 [project.optional-dependencies]
 dev = [
   "pytest",
+  "coverage>=7.13.0",
   "ruff",
   "sphinx",
   "myst-parser",
@@ -43,6 +44,7 @@ dev = [
   "ray[rllib]>=2.9.0",
   "torch-geometric>=2.3.0",
   "pytest-datadir >=1.8.0",
+  "pytest-mock>=3.15.0",
 ]
 video = [
   "selenium>=4.0.0",
@@ -68,3 +70,11 @@ packages = ["src/pednstream"]
 [tool.pytest.ini_options]
 pythonpath = "src"
 addopts = ["--import-mode=importlib"]
+
+[tool.coverage.run]
+source = ["src"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false

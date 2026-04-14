@@ -24,7 +24,7 @@ from pathlib import Path
 if __name__ == "__main__":
     # absolute path to the project root
     project_root = Path(__file__).resolve().parent.parent
-    env_generator = NetworkEnvGenerator(data_dir=project_root / "data / delft")
+    env_generator = NetworkEnvGenerator(data_dir=project_root / "data/delft")
     network_env = env_generator.create_network() # delft is the name of the file in the data folder including the .yaml config file, edge distances, adjacency matrix, node positions
     # visualize od paths
     # with open(Path("..") / "data" / "delft" / "node_positions.json", 'r') as f:

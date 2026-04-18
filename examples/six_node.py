@@ -19,7 +19,7 @@ def main():
     # config_path = os.path.join(project_root, 'sim_params.yaml')
     # config = load_config(config_path)
     env_generator = NetworkEnvGenerator()
-    network_env = env_generator.create_network('od_flow_example')
+    network_env = env_generator.create_network('../data/od_flow_example')
     
     # Initialize network and run simulation
     # network_env = Network(**config)

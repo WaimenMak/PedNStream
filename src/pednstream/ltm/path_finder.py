@@ -521,7 +521,7 @@ class PathFinder:
         return new_paths
 
     def calculate_turn_probabilities(self, current_node):
-        """Calculate turn probabilities including special cases for origin/destination nodes"""
+        """Calculate turn probabilities including special cases for origin/destination nodes, this function is called only once at the initialization of the simulation"""
         # node = self.graph.nodes[current_node]
         current_node_id = current_node.node_id
         relevant_od_pairs = self.node_to_od_pairs.get(current_node_id, set())
@@ -611,6 +611,14 @@ class PathFinder:
 
     def update_node_turn_probs(self, node, od_pair, time_step):
         """Update the turn probabilities for the node, P(down|up,od)"""
+        if not hasattr(node, "current_turn_probs_step"):
+            node.current_turn_probs_step = {}
+
+        # Reuse the probabilities within the same timestep so one choice set
+        # is generated from one consistent utility/noise realization.
+        if node.current_turn_probs_step.get(od_pair) == time_step:
+            return node.node_turn_probs
+
         for up_node, down_nodes in node.turns_distances[od_pair].items():
             if down_nodes:
                 turns = list(
@@ -626,12 +634,12 @@ class PathFinder:
 
                         densities.append(
                             np.maximum(
-                                link.get_density(time_step - 1) - link.k_critical, 0
+                                link.get_density(max(0, time_step - 1)) - link.k_critical, 0
                             )
                             / (link.k_jam - link.k_critical)
                         )
                         capacity = link.receiving_flow[
-                            time_step - 2
+                            max(0, time_step - 2)
                         ]  # -2 steps is the most recent, the capacity of -1 step is -1 by default
                         capacities.append(
                             capacity
@@ -649,15 +657,20 @@ class PathFinder:
                         )  # set a high capacity for origin/destination nodes
 
                 norm_densities = np.array(densities)
+                if self.std_dev == 0:
+                    time_variation = 0
+                else:   # time variation noise in the utility function
+                    time_variation = np.random.normal(0, self.std_dev, len(turns))
                 utilities = (
                     self.alpha * np.array(distances) / (np.sum(distances) + 1e-6)
                     + self.beta * norm_densities
                     - self.omega * np.array(capacities) / (np.sum(capacities) + 1e-6)
-                ) + self.epsilon
+                ) + time_variation
                 exp_utilities = np.exp(-self.temp * utilities)
                 probs = exp_utilities / np.sum(exp_utilities)
                 node.node_turn_probs[od_pair].update(dict(zip(turns, probs)))
 
+        node.current_turn_probs_step[od_pair] = time_step
         return node.node_turn_probs
 
     def update_turning_fractions(self, node, time_step: int, od_manager):
@@ -683,6 +696,8 @@ class PathFinder:
                 n_pairs = len(od_pairs)
                 for od_pair in od_pairs:
                     od_pairs[od_pair] = 1.0 / n_pairs if n_pairs > 0 else 0
+
+        # Calculate final turning fractions
         upstream_nodes = [
             link.start_node.node_id if link.start_node is not None else -1
             for link in node.incoming_links
@@ -692,7 +707,6 @@ class PathFinder:
             for link in node.outgoing_links
         ]
 
-        # Calculate final turning fractions
         idx = 0
         for up in upstream_nodes:
             for down in downstream_nodes:

@@ -34,7 +34,7 @@ if __name__ == "__main__":
     demand_function = create_demand_function(data, sensor_node_df)
     env_generator = NetworkEnvGenerator()
     network_env = env_generator.create_network(data_path='../data/melbourne', custom_demand_functions=[demand_function])
-
+    np.random.seed(42)
 
     # Run simulation
     import time

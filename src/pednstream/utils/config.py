@@ -1,5 +1,7 @@
+import csv
 import yaml
 import numpy as np
+from pathlib import Path
 from typing import Dict, Any, Optional
 from pednstream.exceptions import RequiredConfigError, InvalidConfigError
 
@@ -66,6 +68,60 @@ def _validate_od_flows(config: Dict[str, Any]) -> None:
             raise InvalidConfigError(
                 f"od_flows key '{od_pair}': destination {dest} is not in destination_nodes {destination_nodes}"
             )
+
+
+def _validate_od_flows_csv(config: Dict[str, Any]) -> None:
+    """Validate that od_flows_csv is not used together with od_flows and
+    that destination_nodes is defined."""
+    if "od_flows_csv" not in config:
+        return
+
+    if "od_flows" in config:
+        raise InvalidConfigError(
+            "Cannot specify both 'od_flows' and 'od_flows_csv'; pick one"
+        )
+
+    destination_nodes = config["network"].get("destination_nodes", [])
+    if not destination_nodes:
+        raise InvalidConfigError(
+            "od_flows_csv requires destination_nodes to be defined and non-empty"
+        )
+
+
+def _load_od_flows_from_csv(
+    csv_path: Path,
+    origin_nodes: list,
+    destination_nodes: list,
+) -> Dict[tuple, float]:
+    """Load OD flows from a long-format CSV with columns: origin, destination, weight.
+
+    Pairs whose origin/destination are not in the declared node lists are
+    silently filtered out. Zero weights are preserved.
+    """
+    if not csv_path.exists():
+        raise FileNotFoundError(f"od_flows_csv file not found: {csv_path}")
+
+    origin_set = set(origin_nodes)
+    destination_set = set(destination_nodes)
+    od_flows: Dict[tuple, float] = {}
+
+    with open(csv_path, "r") as f:
+        reader = csv.DictReader(f)
+        required_cols = {"origin", "destination", "weight"}
+        if reader.fieldnames is None or not required_cols.issubset(reader.fieldnames):
+            raise InvalidConfigError(
+                f"od_flows_csv '{csv_path}' must have columns: "
+                f"{sorted(required_cols)}; got {reader.fieldnames}"
+            )
+
+        for row in reader:
+            o = int(row["origin"])
+            d = int(row["destination"])
+            if o not in origin_set or d not in destination_set:
+                continue
+            od_flows[(o, d)] = float(row["weight"])
+
+    return od_flows
 
 
 def _validate_demand(config: Dict[str, Any]) -> None:
@@ -145,13 +201,25 @@ def load_config(config_path: str) -> dict:
     # 2. Assemble the config dictionary
     network_config = _assemble_network_config(params, config)
 
-    # 4. Handle optional 'od_flows'
+    # 4. Handle optional 'od_flows' (inline YAML dict) or 'od_flows_csv' (CSV file)
+    if "od_flows" in config and "od_flows_csv" in config:
+        raise InvalidConfigError(
+            "Cannot specify both 'od_flows' and 'od_flows_csv'; pick one"
+        )
+
     if "od_flows" in config:
         od_flows = {}
         for od_pair, flow in config["od_flows"].items():
             origin, dest = map(int, od_pair.split("_"))
             od_flows[(origin, dest)] = flow
         network_config["od_flows"] = od_flows
+    elif "od_flows_csv" in config:
+        csv_path = Path(config_path).parent / config["od_flows_csv"]
+        network_config["od_flows"] = _load_od_flows_from_csv(
+            csv_path,
+            origin_nodes=config["network"].get("origin_nodes", []),
+            destination_nodes=config["network"].get("destination_nodes", []),
+        )
 
     return network_config
 
@@ -188,5 +256,6 @@ def validate_config(
                     f"Missing required field in configuration: {field} in section {section}"
                 )
     _validate_od_flows(config)
+    _validate_od_flows_csv(config)
     _validate_demand(config)
     _validate_links(config, adjacency_matrix=adjacency_matrix)

@@ -2,7 +2,7 @@
 
 import numpy as np
 from pednstream.utils.functions import BiDirectionalFd, cal_link_flow_kv
-from typing import Any,
+from typing import Any
 from numpy import ndarray
 
 
@@ -46,9 +46,7 @@ class Link:
         self.density = np.zeros(simulation_steps + 1, dtype=np.float32)
         self.speed = np.zeros(simulation_steps + 1, dtype=np.float32)
         self.link_flow = np.zeros(simulation_steps + 1, dtype=np.float32)
-        self.gamma = kwargs.get(
-            "gamma", 2e-3
-        )  # Defaults to diffusion coefficient
+        self.gamma = kwargs.get("gamma", 2e-3)  # Defaults to diffusion coefficient
         self.reverse_link = None
         self.activity_probability = kwargs.get("activity_probability", 0.0)
         # Physical attributes
@@ -93,26 +91,24 @@ class Link:
 
     @property
     def avg_travel_time_window(self) -> int:
-        """Average travel time window""" 
+        """Average travel time window"""
         # Using moving average for efficiency
         return round(100 / self.unit_time)
-        
-    @property    
+
+    @property
     def avg_travel_time(self) -> ndarray:
         """Average travel time"""
         avg = np.ones(self.simulation_steps + 1, dtype=np.float32) * self.travel_time[0]
         return avg
-        
+
     @property
     def travel_time(self) -> ndarray:
         """Travel time."""
         _time = np.zeros(self.simulation_steps + 1, dtype=np.float32)
-        
-        _time[0] = min(
-            self.length / self.free_flow_speed, self.max_travel_time
-        )
+
+        _time[0] = min(self.length / self.free_flow_speed, self.max_travel_time)
         return _time
-    
+
     @property
     def width(self):
         """Width of the link."""
@@ -178,7 +174,7 @@ class Link:
         """Updates the link density flow.
         Args:
             time_step (int): time step
-        
+
         Returns:
             None
         """
@@ -186,12 +182,12 @@ class Link:
         self.num_pedestrians[time_step] = self.num_pedestrians[time_step - 1] + num_peds
         self.density[time_step] = self.num_pedestrians[time_step] / self.area
         return None
-    
+
     def update_speeds(self, time_step: int) -> None:
         """Update the speeds of the link based on the density.
         Args:
             time_step (int): current time step + 1, is the future time step
-        
+
         Returns:
             None
         """
@@ -228,10 +224,10 @@ class Link:
 
     def get_density(self, time_step: int) -> float:
         """Get the density of the link.
-        
+
         Args:
             time_step (int): time step
-        
+
         Returns:
             float: density value
         """
@@ -242,11 +238,11 @@ class Link:
 
     def get_outflow(self, time_step: int, tau: int) -> int:
         """Get outflow with diffusion behavior.
-        
+
         Args:
-            time_step (int): time step 
+            time_step (int): time step
             tau (int):
-        
+
         Returns:
             int: outflow value
         """
@@ -274,7 +270,7 @@ class Link:
 
         Args:
             time_step (int): Current time step (t - 1)
-        
+
         Returns:
             float: sending flow
         """
@@ -393,7 +389,7 @@ class Link:
 
         Args:
             time_step (int): Current time step - 1
-        
+
         Returns:
             float: recieving flow
         """
@@ -434,16 +430,16 @@ class Link:
                 receiving_flow,
             )
         return receiving_flow
-    
+
     def calculate_receiving_flow_with_reverse(
         self, time_step: int, reverse_sending_flow: float
     ) -> float:
         """Calculate receiving flow considering reverse link interaction.
-        
+
         Args:
             time_step (int): time step
             reverse_sending_flow (float): reverse sending flow
-        
+
         Returns:
             float: recieving flow for reverse nodes
         """
@@ -451,7 +447,6 @@ class Link:
 
         receiving_flow = forward_receiving_flow - reverse_sending_flow
         return max(receiving_flow, 0)
-    
 
 
 @DeprecationWarning

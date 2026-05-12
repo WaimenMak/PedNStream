@@ -2,7 +2,7 @@ import numpy as np
 import networkx as nx
 import matplotlib.pyplot as plt
 import logging
-from .node import Node, OneToOneNode, RegularNode
+from .node import Node
 from .link import Link, Separator
 from .od_manager import ODManager, DemandGenerator
 from .path_finder import PathFinder
@@ -192,15 +192,15 @@ class Network:
 
         if incoming_count == 2 and outgoing_count == 2:
             if node_id in self.origin_nodes or node_id in self.destination_nodes:
-                node = RegularNode(node_id=node_id)
+                node = Node(node_id=node_id, node_type="regular")
                 self._create_origin_destination(node)
             else:
-                node = OneToOneNode(node_id=node_id)
+                node = Node(node_id=node_id, node_type="onetoone")
         elif incoming_count == 1 and outgoing_count == 1:
-            node = OneToOneNode(node_id=node_id)
+            node = Node(node_id=node_id, node_type="onetoone")
             self._create_origin_destination(node)
         else:
-            node = RegularNode(node_id=node_id)
+            node = Node(node_id=node_id, node_type="regular")
             if node_id in self.origin_nodes or node_id in self.destination_nodes:
                 self._create_origin_destination(node)
         return node
@@ -326,7 +326,7 @@ class Network:
         """Update turning fractions for specified nodes"""
         for i, n in enumerate(node_ids):
             node = self.nodes[n]
-            node.update_matrix_A_eq(new_turning_fractions[i])
+            node.turning_fractions = new_turning_fractions[i]
 
     def update_link_states(self, time_step: int):
         """Update link states for the current time step"""
@@ -353,7 +353,7 @@ class Network:
                 self.path_finder is None
                 or node.node_id in self.path_finder.nodes_in_paths
             ):
-                if isinstance(node, OneToOneNode):
+                if node.node_type == "onetoone":
                     node.assign_flows(time_step)
                 else:  # regular node
                     if node.A_ub is None:

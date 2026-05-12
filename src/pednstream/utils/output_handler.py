@@ -90,6 +90,11 @@ class OutputHandler:
                 'incoming_links': [link.link_id for link in node.incoming_links],
                 'outgoing_links': [link.link_id for link in node.outgoing_links]
             }
+            # save the total demand of origin and total outflow of destination
+            if node_id in network.origin_nodes:
+                node_data[node_id]['total_demand'] = network.nodes[node_id].virtual_incoming_link.cumulative_outflow[-1]
+            if node_id in network.destination_nodes:
+                node_data[node_id]['total_outflow'] = network.nodes[node_id].virtual_outgoing_link.cumulative_inflow[-1]
         
         # Save network parameters
         network_params = {

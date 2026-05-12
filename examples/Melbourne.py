@@ -4,9 +4,9 @@
 # @FileName: Melbourne
 # @Software: PyCharm
 
-from src.utils.env_loader import NetworkEnvGenerator
-from handlers.output_handler import OutputHandler
-from src.utils.visualizer import NetworkVisualizer, progress_callback
+from pednstream.utils.network_env_generator import NetworkEnvGenerator
+from pednstream.utils.output_handler import OutputHandler
+from pednstream.utils.visualizer import NetworkVisualizer, progress_callback
 import matplotlib.pyplot as plt
 import matplotlib
 import os
@@ -33,8 +33,8 @@ if __name__ == "__main__":
     
     demand_function = create_demand_function(data, sensor_node_df)
     env_generator = NetworkEnvGenerator()
-    network_env = env_generator.create_network('melbourne', [demand_function])
-
+    network_env = env_generator.create_network(data_path='../data/melbourne', custom_demand_functions=[demand_function])
+    np.random.seed(42)
 
     # Run simulation
     import time

@@ -1,0 +1,13 @@
+{
+  "step": 20,
+  "num_nodes": 298,
+  "num_links": 818,
+  "origin_nodes_count": 12,
+  "destination_nodes_count": 12,
+  "origin_demand_sum_upto_step": 1579.0,
+  "total_cumulative_inflow_at_step": 2346.0,
+  "total_cumulative_outflow_at_step": 1121.0,
+  "total_num_pedestrians_at_step": 1225.0,
+  "mean_density_at_step": 0.01932768151164055,
+  "mean_speed_at_step": 1.0983375310897827
+}

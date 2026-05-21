@@ -4,10 +4,217 @@ import numpy as np
 from pednstream.utils.functions import BiDirectionalFd, cal_link_flow_kv
 from typing import Any
 from numpy import ndarray
+from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
+from typing import 
 
 
-class Link:
-    """Representa a physical link in a transportation network with full traffic dynamics."""
+@dataclass
+class LinkConfig:
+
+    link_id: int 
+    start_node: int | None 
+    end_node : int | None 
+    simulation_steps : int 
+    unit_time = None
+    kwargs: dict[str, Any] = field(default_factory=dict)
+
+
+class LinkCreator(ABC):
+
+    @abstractmethod
+    def create_link(self, config: LinkConfig) -> Link:
+        """Creates a network link"""
+        pass
+
+
+
+class SeparatorCreator(LinkCreator):
+    """Creator for the Separator link type"""
+
+    def create_link(self, config) -> Link:
+        return Separator(config)
+    
+
+class RegularCreator(LinkCreator):
+    """Creator for the Regular link type"""
+
+    def create_link(self, config: LinkConfig) -> Link:
+        return Regular(config)
+    
+
+class Link(ABC):
+    """Interface for different Link types"""
+
+    def __init__(self, config: LinkConfig) -> None:
+        self.config = self.config
+
+        self.link_id = config.link_id
+        self.start_node = config.start_node
+        self.end_node = config.end_node
+        self.simulation_steps = config.simulation_steps
+        self._is_controller: bool = False 
+        # Dynamic attributes
+        self.inflow = np.zeros(self.simulation_steps + 1)  # adjust index
+        self.outflow = np.zeros(self.simulation_steps + 1)
+        self.cumulative_inflow = np.zeros(self.simulation_steps + 1)
+        self.cumulative_outflow = np.zeros(self.simulation_steps + 1)
+        self.sending_flow = -1 * np.ones(self.simulation_steps + 1)
+        self.receiving_flow = -1 * np.ones(self.simulation_steps + 1)
+        self.num_pedestrians = np.zeros(self.simulation_steps + 1, dtype=np.float32)
+        self.density = np.zeros(self.simulation_steps + 1, dtype=np.float32)
+        self.speed = np.zeros(self.simulation_steps + 1, dtype=np.float32)
+        self.link_flow = np.zeros(self.simulation_steps + 1, dtype=np.float32)
+        self.gamma = config.kwargs.get("gamma", 2e-3)  # Defaults to diffusion coefficient
+        self.reverse_link = None
+        self.activity_probability = config.kwargs.get("activity_probability", 0.0)
+        # Physical attributes
+        self.length = config.kwargs["length"]
+        self._width = config.kwargs["width"]  # width of link
+        self.free_flow_speed = config.kwargs["free_flow_speed"]
+        self.capacity = self.free_flow_speed * config.kwargs["k_critical"]
+        self.k_jam = config.kwargs["k_jam"]
+        self.k_critical = config.kwargs["k_critical"]
+        self.shockwave_speed = self.capacity / (self.k_jam - self.k_critical)
+        self.current_speed = self.free_flow_speed
+        self.max_travel_time = (
+            self.length / 0.05
+        )  # Jam threshold, equivalent to speed of 0.01 m/s
+        #
+        self._front_gate_width = self._set_conditional_param(
+            config.kwargs, "front_gate_width", self.width
+        )
+        self._back_gate_width = self._set_conditional_param(
+            config.kwargs, "back_gate_width", self.width
+        )
+        self.back_gate_width_data = self._back_gate_width * np.ones(
+            self.simulation_steps + 1
+        )
+        self.front_gate_width_data = self._front_gate_width * np.ones(
+            self.simulation_steps + 1
+        )
+
+        self.speed_density_fd = BiDirectionalFd(
+            v_f=self.free_flow_speed,
+            k_critical=self.k_critical,
+            k_jam=self.k_jam,
+            bi_factor=config.kwargs.get("bi_factor", 1),
+            model_type=config.kwargs.get("fd_type", "yperman"),
+            noise_std=config.kwargs.get("speed_noise_std", 0),
+        )
+        self._exponent = (
+            0.8  # private attribute for the releasing factor exponent, default is 1
+        )
+        self._travel_time_running_sum = self.travel_time[0]
+        self.unit_time = unit_time
+        self.free_flow_tau = round(self.travel_time[0] / self.unit_time)
+
+    @property
+    def is_controller(self) -> bool:
+        """If link is a controller"""
+        return self._is_controller
+    
+    @is_controller.setter
+    def is_controller(self, value: bool) -> None:
+        """Sets the value for is_controller"""
+        self._is_controller = value
+
+    @property
+    def avg_travel_time_window(self) -> int:
+        """Average travel time window"""
+        # Using moving average for efficiency
+        return round(100 / self.unit_time)
+
+    @property
+    def avg_travel_time(self) -> ndarray:
+        """Average travel time"""
+        avg = np.ones(self.simulation_steps + 1, dtype=np.float32) * self.travel_time[0]
+        return avg
+
+    @property
+    def travel_time(self) -> ndarray:
+        """Travel time."""
+        _time = np.zeros(self.simulation_steps + 1, dtype=np.float32)
+
+        _time[0] = min(self.length / self.free_flow_speed, self.max_travel_time)
+        return _time
+
+    @property
+    def width(self):
+        """Width of the link."""
+        return self._width
+
+    @property
+    def front_gate_width(self):
+        """Width of the front gate."""
+        return self._back_gate_width
+
+    @front_gate_width.setter
+    def front_gate_width(self, value: float):
+        self._front_gate_width = value
+
+    @property
+    def back_gate_width(self):
+        """Width of the back gate."""
+        return self._back_gate_width
+
+    @back_gate_width.setter
+    def back_gate_width(self, value: float):
+        self._back_gate_width = value
+
+    @property
+    def area(self):
+        """Area of the link."""
+        return self.length * self.width
+
+    def _set_conditional_param(self, source: dict, param: str, default) -> Any:
+        """Extracts the value of a parameter from a source.
+
+        Args:
+            source (dict): a flat keyword:value set of parameters
+            param: name of the paramter to extract
+            default: value to default if a parameter's value is None or parameter doesn't exist in source.
+
+        Returns:
+            (Any): parameter's value
+        """
+        if not isinstance(param, str):
+            raise ValueError("Parameter name must be a string")
+
+        value = source.get(param)
+        if value is None:
+            value = default
+        return value
+
+    
+
+    @abstractmethod
+    def operations(self)-> str:
+        pass
+
+    def set_conditional_param(self, source: dict, param: str, default):
+
+        return None
+
+
+
+
+class Separator(Link):
+    
+    def operations(self):
+        return "a separtor link"
+    
+
+class Regular(Link):
+
+    def operations(self):
+        return "a regular link"
+
+
+
+
+class Link1:
+    """Represents a generic link in a transportation network """
 
     def __init__(
         self, link_id, start_node, end_node, simulation_steps, unit_time, **kwargs
@@ -35,6 +242,7 @@ class Link:
         self.start_node = start_node
         self.end_node = end_node
         self.simulation_steps = simulation_steps
+        self._is_controller: bool = False 
         # Dynamic attributes
         self.inflow = np.zeros(self.simulation_steps + 1)  # adjust index
         self.outflow = np.zeros(self.simulation_steps + 1)
@@ -88,6 +296,16 @@ class Link:
         self._travel_time_running_sum = self.travel_time[0]
         self.unit_time = unit_time
         self.free_flow_tau = round(self.travel_time[0] / self.unit_time)
+
+    @property
+    def is_controller(self) -> bool:
+        """If link is a controller"""
+        return self._is_controller
+    
+    @is_controller.setter
+    def is_controller(self, value: bool) -> None:
+        """Sets the value for is_controller"""
+        self._is_controller = value
 
     @property
     def avg_travel_time_window(self) -> int:
@@ -222,8 +440,8 @@ class Link:
         self.front_gate_width_data[time_step] = self.front_gate_width
         return None
 
-    def get_density(self, time_step: int) -> float:
-        """Get the density of the link.
+    def compute_density(self, time_step: int) -> float:
+        """Computes the density of the link for the current time step.
 
         Args:
             time_step (int): time step
@@ -236,8 +454,8 @@ class Link:
             reverse_num_peds = self.reverse_link.num_pedestrians[time_step]
         return (self.num_pedestrians[time_step] + reverse_num_peds) / self.area
 
-    def get_outflow(self, time_step: int, tau: int) -> int:
-        """Get outflow with diffusion behavior.
+    def compute_outflow(self, time_step: int, tau: int) -> int:
+        """Computes outflow with diffusion behavior for the current time step.
 
         Args:
             time_step (int): time step
@@ -275,7 +493,7 @@ class Link:
             float: sending flow
         """
         # get the total density
-        density = self.get_density(time_step)
+        density = self.compute_density(time_step)
 
         tau = round(
             self.avg_travel_time[time_step] / self.unit_time
@@ -329,7 +547,7 @@ class Link:
 
             # free flow stage
             if density <= self.k_critical:
-                diffusion_flow = self.get_outflow(time_step, tau)
+                diffusion_flow = self.compute_density(time_step, tau)
                 #     # If diffusion flow is active, it represents the arrival of a platoon.
                 if diffusion_flow > 0:
                     weight = 0.8
@@ -806,7 +1024,7 @@ class OldLink:
         return max(receiving_flow, 0)
 
 
-class Separator(Link):
+class Separator2(Link):
     """Separator: control object in the network, it adjust the width of the bidirection link"""
 
     def __init__(
@@ -931,3 +1149,6 @@ class Separator(Link):
         """Calculate receiving flow for separator (no reverse link interaction)"""
         forward_receiving_flow = self.cal_receiving_flow(time_step)
         return max(forward_receiving_flow, 0)
+
+
+    

@@ -80,9 +80,10 @@ class NodeFlowSolver:
                 A_eq=A_eq,
                 b_ub=b_ub,
                 b_eq=np.zeros(node.edge_num),
+                method="highs",
             )
         else:
-            res = linprog(c, A_ub=node.A_ub, b_ub=b_ub)
+            res = linprog(c, A_ub=node.A_ub, b_ub=b_ub, method="highs")
         if res.success:
             flows = node.A_ub @ np.floor(res.x)
             # Ensure non-negative flows and round down to nearest integer

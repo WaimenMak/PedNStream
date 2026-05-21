@@ -5,9 +5,9 @@
   "origin_nodes_count": 12,
   "destination_nodes_count": 12,
   "origin_demand_sum_upto_step": 1579.0,
-  "total_cumulative_inflow_at_step": 2154.0,
-  "total_cumulative_outflow_at_step": 969.0,
-  "total_num_pedestrians_at_step": 1185.0,
-  "mean_density_at_step": 0.01829032599925995,
+  "total_cumulative_inflow_at_step": 2358.0,
+  "total_cumulative_outflow_at_step": 1133.0,
+  "total_num_pedestrians_at_step": 1225.0,
+  "mean_density_at_step": 0.019362449645996094,
   "mean_speed_at_step": 1.0983375310897827
 }

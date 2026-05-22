@@ -5,19 +5,44 @@ from pednstream.utils.functions import BiDirectionalFd, cal_link_flow_kv
 from typing import Any
 from numpy import ndarray
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
-from typing import 
+from dataclasses import dataclass
 
 
 @dataclass
 class LinkConfig:
 
     link_id: int 
-    start_node: int | None 
-    end_node : int | None 
+    start_node: int  
+    end_node : int  
     simulation_steps : int 
-    unit_time = None
-    kwargs: dict[str, Any] = field(default_factory=dict)
+    unit_time: int
+    length: float
+    width: float
+    free_flow_speed: float
+    k_critical: float
+    k_jam: float
+    is_controller: bool = False
+    activity_probability: float = 0.0
+    gamma: float = 2e-3 # Defaults to diffusion coefficient
+    bi_factor: float = 1
+    fd_type: str = "yperman"
+    speed_noise_std: float = 0
+    front_gate_width: float | None = None
+    back_gate_width: float | None = None
+    reverse_link: int | None = None
+
+    def __post_init__(self) -> None:
+        """Applies conditional defaults"""
+
+        if self.front_gate_width is None:
+            self.front_gate_width = self.width    
+
+        if self.back_gate_width is None:
+            self.back_gate_width = self.width
+
+        # Makes sure this values are never none after instance creation
+        if self.back_gate_width is None or self.front_gate_width is None:
+            raise ValueError
 
 
 class LinkCreator(ABC):
@@ -53,7 +78,7 @@ class Link(ABC):
         self.start_node = config.start_node
         self.end_node = config.end_node
         self.simulation_steps = config.simulation_steps
-        self._is_controller: bool = False 
+        self._is_controller: config.is_controller
         # Dynamic attributes
         self.inflow = np.zeros(self.simulation_steps + 1)  # adjust index
         self.outflow = np.zeros(self.simulation_steps + 1)
@@ -65,48 +90,41 @@ class Link(ABC):
         self.density = np.zeros(self.simulation_steps + 1, dtype=np.float32)
         self.speed = np.zeros(self.simulation_steps + 1, dtype=np.float32)
         self.link_flow = np.zeros(self.simulation_steps + 1, dtype=np.float32)
-        self.gamma = config.kwargs.get("gamma", 2e-3)  # Defaults to diffusion coefficient
-        self.reverse_link = None
-        self.activity_probability = config.kwargs.get("activity_probability", 0.0)
+        self.gamma = config.gamma  
+        self.reverse_link = config.reverse_link
+        self.activity_probability = config.activity_probability
         # Physical attributes
-        self.length = config.kwargs["length"]
-        self._width = config.kwargs["width"]  # width of link
-        self.free_flow_speed = config.kwargs["free_flow_speed"]
-        self.capacity = self.free_flow_speed * config.kwargs["k_critical"]
-        self.k_jam = config.kwargs["k_jam"]
-        self.k_critical = config.kwargs["k_critical"]
+        self.length = config.length
+        self._width = config.width  # width of link
+        self.free_flow_speed = config.free_flow_speed
+        self.capacity = self.free_flow_speed * config.k_critical
+        self.k_jam = config.k_jam
+        self.k_critical = config.k_critical
         self.shockwave_speed = self.capacity / (self.k_jam - self.k_critical)
         self.current_speed = self.free_flow_speed
         self.max_travel_time = (
             self.length / 0.05
         )  # Jam threshold, equivalent to speed of 0.01 m/s
-        #
-        self._front_gate_width = self._set_conditional_param(
-            config.kwargs, "front_gate_width", self.width
-        )
-        self._back_gate_width = self._set_conditional_param(
-            config.kwargs, "back_gate_width", self.width
-        )
+        self._front_gate_width = config.front_gate_width
+        self._back_gate_width = config.back_gate_width
         self.back_gate_width_data = self._back_gate_width * np.ones(
             self.simulation_steps + 1
         )
         self.front_gate_width_data = self._front_gate_width * np.ones(
             self.simulation_steps + 1
         )
-
         self.speed_density_fd = BiDirectionalFd(
             v_f=self.free_flow_speed,
             k_critical=self.k_critical,
             k_jam=self.k_jam,
-            bi_factor=config.kwargs.get("bi_factor", 1),
-            model_type=config.kwargs.get("fd_type", "yperman"),
-            noise_std=config.kwargs.get("speed_noise_std", 0),
-        )
+            bi_factor=config.bi_factor
+            model_type=config.fd_type,
+            noise_std=config.speed_noise_std)
         self._exponent = (
             0.8  # private attribute for the releasing factor exponent, default is 1
         )
         self._travel_time_running_sum = self.travel_time[0]
-        self.unit_time = unit_time
+        self.unit_time = config.unit_time
         self.free_flow_tau = round(self.travel_time[0] / self.unit_time)
 
     @property
@@ -167,7 +185,8 @@ class Link(ABC):
         """Area of the link."""
         return self.length * self.width
 
-    def _set_conditional_param(self, source: dict, param: str, default) -> Any:
+    @staticmethod # TODO: why do we need this method, we already have dict.get, which does the same
+    def _set_conditional_param(source: dict, param: str, default) -> Any:
         """Extracts the value of a parameter from a source.
 
         Args:
@@ -187,7 +206,6 @@ class Link(ABC):
         return value
 
     
-
     @abstractmethod
     def operations(self)-> str:
         pass

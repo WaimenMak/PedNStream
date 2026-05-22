@@ -1,4 +1,4 @@
-"""Representation for links in a transportation network"""
+"""Representation for links in a transportation network."""
 
 import numpy as np
 from pednstream.utils.functions import BiDirectionalFd, cal_link_flow_kv
@@ -10,6 +10,7 @@ from dataclasses import dataclass
 
 @dataclass
 class LinkConfig:
+    """Configuration dataclass for Link parameters."""
 
     link_id: int 
     start_node: int  
@@ -26,14 +27,13 @@ class LinkConfig:
     gamma: float = 2e-3 # Defaults to diffusion coefficient
     bi_factor: float = 1
     fd_type: str = "yperman"
-    speed_noise_std: float = 0
+    speed_noise_std: int = 0
     front_gate_width: float | None = None
     back_gate_width: float | None = None
     reverse_link: int | None = None
 
     def __post_init__(self) -> None:
-        """Applies conditional defaults"""
-
+        """Applies conditional defaults."""
         if self.front_gate_width is None:
             self.front_gate_width = self.width    
 
@@ -42,7 +42,12 @@ class LinkConfig:
 
         # Makes sure this values are never none after instance creation
         if self.back_gate_width is None or self.front_gate_width is None:
-            raise ValueError
+            raise ValueError("Gate widths must be provided or default to link width. " \
+            "Please provide valid values for front_gate_width and back_gate_width.")
+        
+        if self.k_jam - self.k_critical <= 0:
+            raise ValueError("k_jam must be greater than k_critical " \
+            "to avoid division by zero")
 
 
 class LinkCreator(ABC):
@@ -69,16 +74,16 @@ class RegularCreator(LinkCreator):
     
 
 class Link(ABC):
-    """Interface for different Link types"""
+    """Interface for different Link types."""
 
     def __init__(self, config: LinkConfig) -> None:
-        self.config = self.config
+        self.config = config
 
         self.link_id = config.link_id
         self.start_node = config.start_node
         self.end_node = config.end_node
         self.simulation_steps = config.simulation_steps
-        self._is_controller: config.is_controller
+        self._is_controller = config.is_controller
         # Dynamic attributes
         self.inflow = np.zeros(self.simulation_steps + 1)  # adjust index
         self.outflow = np.zeros(self.simulation_steps + 1)
@@ -117,7 +122,7 @@ class Link(ABC):
             v_f=self.free_flow_speed,
             k_critical=self.k_critical,
             k_jam=self.k_jam,
-            bi_factor=config.bi_factor
+            bi_factor=config.bi_factor,
             model_type=config.fd_type,
             noise_std=config.speed_noise_std)
         self._exponent = (
@@ -1167,6 +1172,10 @@ class Separator2(Link):
         """Calculate receiving flow for separator (no reverse link interaction)"""
         forward_receiving_flow = self.cal_receiving_flow(time_step)
         return max(forward_receiving_flow, 0)
+
+
+# Backward compatibility alias used by node.py virtual-link creation.
+BaseLink = Link1
 
 
     

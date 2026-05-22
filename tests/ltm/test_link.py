@@ -43,7 +43,7 @@ class TestLinkConfig:
         assert link_config.front_gate_width  == link_config.width
         assert link_config.back_gate_width == link_config.width
 
-    def test_value_error_on_gates_width(self, link_config):
+    def test_value_error_on_gates_width(self):
         """Test that ValueError is raised when gate widths are not provided and width is None"""
 
         with pytest.raises(ValueError):
@@ -68,7 +68,7 @@ class TestLinkConfig:
                 back_gate_width=None
             )
 
-    def test_value_error_on_k_values(self, link_config):
+    def test_value_error_on_k_values(self):
         """Test that ValueError is raised when k_jam is not greater than k_critical"""
 
         # Create a LinkConfig with k_jam less than or equal to k_critical

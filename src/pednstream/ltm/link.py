@@ -324,7 +324,7 @@ class Link(ABC):
             # if time_step - tau + 1 < 0: # congestion stage
             """ for the normal stage or the congestion stage """
 
-            idx = min(max(0, time_step - tau), len(self.cumulative_inflow) - 1)
+            idx = min(max(0, PREVIOUS_STEP - tau), len(self.cumulative_inflow) - 1)
 
             # congestion_factor = np.clip(self.density[time_step] / self.k_jam, 0, 1)
             congestion_factor = np.clip(
@@ -362,7 +362,7 @@ class Link(ABC):
 
             # free flow stage
             if density <= self.k_critical:
-                diffusion_flow = self.compute_density(time_step, tau)
+                diffusion_flow = self.compute_outflow(time_step, tau)
                 #     # If diffusion flow is active, it represents the arrival of a platoon.
                 if diffusion_flow > 0:
                     weight = 0.8

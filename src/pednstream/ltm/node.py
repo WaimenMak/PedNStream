@@ -1,28 +1,66 @@
 import numpy as np
 from .link import BaseLink
 from .solver import NodeFlowSolver
+from dataclasses import dataclass
+from typing import Optional, List
 
+@dataclass
+class NodeConfig:
+    """Static configuration for a Node. Only holds values known before simulation starts.
+
+    Dynamic/runtime state (q, A_ub, mask, source_num, dest_num, edge_num,
+    virtual links, ods_in_turns) lives on Node itself.
+    """
+    node_id: str
+    node_type: str = "regular"          # "regular" or "onetoone"
+    gate_width: Optional[float] = None
+    turning_fractions: Optional[np.ndarray] = None
+    demand: Optional[np.ndarray] = None  # demand profile for origin node
+    M: Optional[float] = 1e6            # penalty term for destination node
+    w: Optional[float] = 1e-2           # penalty term for turning fractions
 
 class Node:
-    def __init__(self, node_id, node_type: str = "regular"):
-        self.node_id = node_id
-        self.node_type = node_type  # "onetoone" or "regular"
-        self.incoming_links = []
-        self.outgoing_links = []
-        self.turning_fractions = None  # 1D array, the length is the number of edges
-        self.mask = None
-        self.q = None
-        self.w = 1e-2  # penalty term for turning fractions
-        self.source_num = None
-        self.dest_num = None
-        self.edge_num = None
-        self.A_ub = None
+    def __init__(self, node_config: NodeConfig):
+        # --- Static config (from NodeConfig) ---
+        self.node_id = node_config.node_id
+        self.node_type = node_config.node_type        # "onetoone" or "regular"
+        self.turning_fractions = node_config.turning_fractions  # 1D array, length = edge_num
+        self.demand = node_config.demand              # demand profile for origin node
+        self.M = node_config.M                        # penalty for destination node
+        self.w = node_config.w                        # penalty for turning fractions
+        self.gate_width = node_config.gate_width
+
+        # --- Link containers (populated externally by Network) ---
+        self.incoming_links: list = []
+        self.outgoing_links: list = []
         self.virtual_incoming_link = None
         self.virtual_outgoing_link = None
-        self.M = 1e6  # for destination node, large constant for receiving flow
-        self.demand = None  # for origin node
-        self.mask = None  # for regular node, classic update method
-        self.ods_in_turns = {}  # for recording the turns in which od pairs
+
+        # --- Runtime state (computed during simulation) ---
+        self.q = None           # flows for each edge, set in assign_flows
+        self.A_ub = None        # LP constraint matrix, built in get_matrix_A
+        self.mask = None        # boolean mask, built in init_mask
+        self.ods_in_turns = {}  # populated on-the-fly during path-finding/flow assignment
+
+    # ------------------------------------------------------------------
+    # Properties: always in sync with the actual link lists — no stale
+    # state and no need to call init_node() just to read these values.
+    # ------------------------------------------------------------------
+
+    @property
+    def source_num(self) -> int:
+        """Number of incoming links (sources at this node)."""
+        return len(self.incoming_links)
+
+    @property
+    def dest_num(self) -> int:
+        """Number of outgoing links (destinations at this node)."""
+        return len(self.outgoing_links)
+
+    @property
+    def edge_num(self) -> int:
+        """Number of turning edges (excludes U-turn from each source)."""
+        return self.dest_num * self.source_num - self.source_num
 
     def _create_virtual_link(self, node_id, direction, is_incoming, params: dict):
         """Helper method to create virtual links for origin and destination nodes"""
@@ -40,18 +78,19 @@ class Node:
             self.virtual_outgoing_link = link
         return link
 
-    def init_node(self):
-        """Initializes node-specific attributes based on the type."""
-        # source number is the number of incoming links
-        self.source_num = len(self.incoming_links)
-        self.dest_num = len(self.outgoing_links)
-        self.edge_num = self.dest_num * self.source_num - self.source_num
+    def init_mask(self):
+        """Build the boolean mask for optimal flow assignment once all links are attached.
+
+        Must be called after incoming/outgoing links are fully populated.
+        source_num / dest_num / edge_num are live properties, so this is
+        the only one-time computation that still needs an explicit trigger.
+        """
         self.mask = np.ones([self.source_num, self.source_num], dtype=bool)
         np.fill_diagonal(self.mask, False)
 
     def get_matrix_A(self):
         """
-        Get the matrix A_ub for the linear programming problem
+        Get the matrix A_ub for the linear programming problem, only computed once.
         """
         row_num = self.source_num + self.dest_num
         # - source_num for the link from the same source-destination pair, now it is included in the source_num

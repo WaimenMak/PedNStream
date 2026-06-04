@@ -316,7 +316,7 @@ class Network:
                     forward_link.reverse_link = reverse_link
                     reverse_link.reverse_link = forward_link
 
-            node.init_node()
+            node.init_mask()
 
     def update_turning_fractions_per_node(
         self,

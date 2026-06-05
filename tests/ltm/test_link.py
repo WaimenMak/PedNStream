@@ -22,7 +22,6 @@ def link_config():
     speed_noise_std  = 0
     front_gate_width = None
     back_gate_width = None
-    reverse_link = None
 
     return LinkConfig(link_id, start_node, end_node, 
                       simulation_steps, unit_time, 
@@ -31,7 +30,7 @@ def link_config():
                       k_jam, is_controller, activity_probability, 
                       gamma, bi_factor, fd_type, 
                       speed_noise_std, front_gate_width, 
-                      back_gate_width, reverse_link)
+                      back_gate_width)
 
 
 class TestLinkConfig:
@@ -108,4 +107,18 @@ class TestLink:
         assert isinstance(regular, Link)
         assert separator.back_gate_width is not None
         assert separator.front_gate_width is not None
+    
+    def test_invalid_reverse_link(self, link_config):
+        """Test that ValueError is raised when reserse link is self-referential"""
+        from pednstream.ltm.link import Separator
+        # revrese_link is a property of any Link
+        link = Separator(link_config)
+        with pytest.raises(ValueError):
+            link.reverse_link = link  # Setting reverse link to itself should raise ValueError
+        
 
+    def test_is_controller_true(self, link_config):
+        """Test that a Separtor is created when is_controller is True"""
+        from pednstream.ltm.link import Separator
+        link = Separator(link_config)
+        assert link.is_controller  # Should always True for Separator

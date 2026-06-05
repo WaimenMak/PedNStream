@@ -181,6 +181,7 @@ class PathFinder:
             0, self.std_dev
         )  # random variable in the utility function follow the normal distribution
         self.k_paths = path_params.get("k_paths", 3)
+        self.controller_k_paths = path_params.get("controller_k_paths", 100) # default to 100 paths
         self.verbose = path_params.get("verbose", True)  # Control path finding logging
 
         # Controller configuration
@@ -251,13 +252,19 @@ class PathFinder:
         # expand the paths at controller nodes
         if not self._initialized and self.controllers_enabled:
             for node in self.controller_nodes:
+                total_paths_added = 0
                 for od_pair in self.node_to_od_pairs[node]:
+                    remaining_budget = self.controller_k_paths - total_paths_added
+                    if remaining_budget <= 0:
+                        break  # Reached limit for this controller node
                     num_paths_before = len(self.od_paths[od_pair])
-                    self.expand_controller_paths(nodes[node], od_pair)
+                    self.expand_controller_paths(nodes[node], od_pair, max_paths=remaining_budget)
                     num_paths_after = len(self.od_paths[od_pair])
+                    paths_added = num_paths_after - num_paths_before
+                    total_paths_added += paths_added
                     if self.logger and self.verbose:
                         self.logger.info(
-                            f"Controller node {node}: Added {num_paths_after - num_paths_before} detour path(s) for OD {od_pair}"
+                            f"Controller node {node}: Added {paths_added} detour path(s) for OD {od_pair} (total: {total_paths_added}/{self.controller_k_paths})"
                         )
         self.check_if_paths_are_different(self.od_paths, self.logger, self.verbose)
         # Calculate and store turn probabilities for all nodes in paths
@@ -325,7 +332,7 @@ class PathFinder:
                 distance += link["weight"]
         return distance
 
-    def expand_controller_paths(self, current_node: Node, od_pair):
+    def expand_controller_paths(self, current_node: Node, od_pair, max_paths=None):
         """
         Expand paths at controller nodes by adding detours through non-path neighbors. If path
         already exist in original routes skip it.
@@ -333,6 +340,7 @@ class PathFinder:
         Args:
             current_node: The controller node
             od_pair: (origin, destination) tuple
+            max_paths: Maximum number of new paths to add (defaults to controller_k_paths)
 
         Returns:
             list: New paths added for this OD pair
@@ -341,6 +349,12 @@ class PathFinder:
         origin, dest = od_pair
         paths = self.od_paths[od_pair]
         new_paths = []
+
+        if max_paths is None:
+            max_paths = self.controller_k_paths
+
+        if max_paths <= 0:
+            return new_paths
 
         # Get all outgoing neighbors of current node
         all_outgoing_neighbors = set()
@@ -475,14 +489,22 @@ class PathFinder:
 
                             if new_path_tuple not in existing_paths_tuples:
                                 new_paths.append(new_path)
+                                if len(new_paths) >= max_paths:
+                                    break  # Reached limit for this OD pair
 
                     except Exception:
                         # Neighbor cannot reach destination or other error, skip
                         continue
 
+                    if len(new_paths) >= max_paths:
+                        break  # Reached limit, stop exploring neighbors
+
             except ValueError:
                 # Current node not in this path
                 continue
+
+            if len(new_paths) >= max_paths:
+                break  # Reached limit, stop processing paths
 
         # Add new paths to od_paths and update bookkeeping
         if new_paths:
@@ -499,7 +521,7 @@ class PathFinder:
         return new_paths
 
     def calculate_turn_probabilities(self, current_node):
-        """Calculate turn probabilities including special cases for origin/destination nodes"""
+        """Calculate turn probabilities including special cases for origin/destination nodes, this function is called only once at the initialization of the simulation"""
         # node = self.graph.nodes[current_node]
         current_node_id = current_node.node_id
         relevant_od_pairs = self.node_to_od_pairs.get(current_node_id, set())
@@ -589,6 +611,14 @@ class PathFinder:
 
     def update_node_turn_probs(self, node, od_pair, time_step):
         """Update the turn probabilities for the node, P(down|up,od)"""
+        if not hasattr(node, "current_turn_probs_step"):
+            node.current_turn_probs_step = {}
+
+        # Reuse the probabilities within the same timestep so one choice set
+        # is generated from one consistent utility/noise realization.
+        if node.current_turn_probs_step.get(od_pair) == time_step:
+            return node.node_turn_probs
+
         for up_node, down_nodes in node.turns_distances[od_pair].items():
             if down_nodes:
                 turns = list(
@@ -604,12 +634,12 @@ class PathFinder:
 
                         densities.append(
                             np.maximum(
-                                link.get_density(time_step - 1) - link.k_critical, 0
+                                link.get_density(max(0, time_step - 1)) - link.k_critical, 0
                             )
                             / (link.k_jam - link.k_critical)
                         )
                         capacity = link.receiving_flow[
-                            time_step - 2
+                            max(0, time_step - 2)
                         ]  # -2 steps is the most recent, the capacity of -1 step is -1 by default
                         capacities.append(
                             capacity
@@ -627,15 +657,20 @@ class PathFinder:
                         )  # set a high capacity for origin/destination nodes
 
                 norm_densities = np.array(densities)
+                if self.std_dev == 0:
+                    time_variation = 0
+                else:   # time variation noise in the utility function
+                    time_variation = np.random.normal(0, self.std_dev, len(turns))
                 utilities = (
                     self.alpha * np.array(distances) / (np.sum(distances) + 1e-6)
                     + self.beta * norm_densities
                     - self.omega * np.array(capacities) / (np.sum(capacities) + 1e-6)
-                ) + self.epsilon
+                ) + time_variation
                 exp_utilities = np.exp(-self.temp * utilities)
                 probs = exp_utilities / np.sum(exp_utilities)
                 node.node_turn_probs[od_pair].update(dict(zip(turns, probs)))
 
+        node.current_turn_probs_step[od_pair] = time_step
         return node.node_turn_probs
 
     def update_turning_fractions(self, node, time_step: int, od_manager):
@@ -661,6 +696,8 @@ class PathFinder:
                 n_pairs = len(od_pairs)
                 for od_pair in od_pairs:
                     od_pairs[od_pair] = 1.0 / n_pairs if n_pairs > 0 else 0
+
+        # Calculate final turning fractions
         upstream_nodes = [
             link.start_node.node_id if link.start_node is not None else -1
             for link in node.incoming_links
@@ -670,7 +707,6 @@ class PathFinder:
             for link in node.outgoing_links
         ]
 
-        # Calculate final turning fractions
         idx = 0
         for up in upstream_nodes:
             for down in downstream_nodes:

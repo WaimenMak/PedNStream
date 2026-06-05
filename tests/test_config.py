@@ -258,6 +258,179 @@ class TestValidateOdFlows:
         assert "Invalid od_flows key format" in msg
 
 
+class TestOdFlowsCsv:
+    """Tests for od_flows_csv loading (in load_config) and validation (in validate_config)."""
+
+    YAML_BODY = """
+    simulation:
+      simulation_steps: 10
+      unit_time: 1.0
+    network:
+      origin_nodes: [0, 1, 2]
+      destination_nodes: [3, 4, 5]
+    default_link:
+      length: 100
+      width: 2
+      free_flow_speed: 1.1
+      k_critical: 2
+      k_jam: 6
+    od_flows_csv: "od_flows.csv"
+    """
+
+    @pytest.fixture
+    def base_validate_config(self):
+        return {
+            "network": {
+                "origin_nodes": [0, 1, 2],
+                "destination_nodes": [3, 4, 5],
+            },
+            "simulation": {"simulation_steps": 10, "unit_time": 1.0},
+            "default_link": {
+                "length": 10,
+                "width": 1,
+                "free_flow_speed": 1.0,
+                "k_critical": 1,
+                "k_jam": 2,
+            },
+        }
+
+    @staticmethod
+    def write_csv(tmp_path: Path, name: str, rows: list[str]) -> Path:
+        csv_path = tmp_path / name
+        csv_path.write_text("\n".join(rows) + "\n")
+        return csv_path
+
+    def test_load_config_with_valid_od_flows_csv(self, tmp_path):
+        """od_flows_csv should be parsed into {(o, d): float} entries."""
+        self.write_csv(
+            tmp_path,
+            "od_flows.csv",
+            ["origin,destination,weight", "0,3,10.5", "1,4,20", "2,5,0"],
+        )
+        cfg_path = write_yaml(tmp_path, "sim.yaml", self.YAML_BODY)
+
+        config = load_config(str(cfg_path))
+
+        assert "od_flows" in config
+        od_flows = config["od_flows"]
+        assert od_flows == {(0, 3): 10.5, (1, 4): 20.0, (2, 5): 0.0}
+        for (o, d), v in od_flows.items():
+            assert isinstance(o, int) and isinstance(d, int)
+            assert isinstance(v, float)
+
+    def test_load_config_csv_silently_filters_unknown_pairs(self, tmp_path):
+        """Rows with origin/destination not in the declared nodes should be dropped."""
+        self.write_csv(
+            tmp_path,
+            "od_flows.csv",
+            [
+                "origin,destination,weight",
+                "0,3,10",      # valid
+                "99,3,5",      # origin not in origin_nodes -> filtered
+                "0,99,7",      # destination not in destination_nodes -> filtered
+                "1,4,15",      # valid
+            ],
+        )
+        cfg_path = write_yaml(tmp_path, "sim.yaml", self.YAML_BODY)
+
+        config = load_config(str(cfg_path))
+
+        assert config["od_flows"] == {(0, 3): 10.0, (1, 4): 15.0}
+
+    def test_load_config_csv_missing_file_raises(self, tmp_path):
+        """Referenced CSV file that does not exist should raise FileNotFoundError."""
+        cfg_path = write_yaml(tmp_path, "sim.yaml", self.YAML_BODY)
+
+        with pytest.raises(FileNotFoundError) as excinfo:
+            load_config(str(cfg_path))
+
+        assert "od_flows_csv" in str(excinfo.value)
+
+    def test_load_config_csv_missing_required_columns_raises(self, tmp_path):
+        """CSV without the required columns should raise InvalidConfigError."""
+        self.write_csv(
+            tmp_path,
+            "od_flows.csv",
+            ["from,to,value", "0,3,10"],  # wrong column names
+        )
+        cfg_path = write_yaml(tmp_path, "sim.yaml", self.YAML_BODY)
+
+        with pytest.raises(InvalidConfigError) as excinfo:
+            load_config(str(cfg_path))
+
+        assert "must have columns" in str(excinfo.value)
+
+    def test_load_config_both_od_flows_and_csv_raises(self, tmp_path):
+        """Specifying both od_flows and od_flows_csv should raise InvalidConfigError."""
+        self.write_csv(
+            tmp_path,
+            "od_flows.csv",
+            ["origin,destination,weight", "0,3,10"],
+        )
+        yaml_body = """
+        simulation:
+          simulation_steps: 10
+          unit_time: 1.0
+        network:
+          origin_nodes: [0, 1, 2]
+          destination_nodes: [3, 4, 5]
+        default_link:
+          length: 100
+          width: 2
+          free_flow_speed: 1.1
+          k_critical: 2
+          k_jam: 6
+        od_flows_csv: "od_flows.csv"
+        od_flows:
+          "0_3": 10
+        """
+        cfg_path = write_yaml(tmp_path, "sim.yaml", yaml_body)
+
+        with pytest.raises(InvalidConfigError) as excinfo:
+            load_config(str(cfg_path))
+
+        assert "od_flows" in str(excinfo.value)
+        assert "od_flows_csv" in str(excinfo.value)
+
+    def test_validate_config_csv_without_destination_nodes_raises(
+        self, base_validate_config
+    ):
+        """od_flows_csv requires destination_nodes to be defined."""
+        cfg = base_validate_config
+        cfg["network"].pop("destination_nodes")
+        cfg["od_flows_csv"] = "od_flows.csv"
+
+        with pytest.raises(InvalidConfigError) as excinfo:
+            validate_config(cfg)
+
+        assert "destination_nodes" in str(excinfo.value)
+
+    def test_validate_config_csv_with_empty_destination_nodes_raises(
+        self, base_validate_config
+    ):
+        """od_flows_csv requires destination_nodes to be non-empty."""
+        cfg = base_validate_config
+        cfg["network"]["destination_nodes"] = []
+        cfg["od_flows_csv"] = "od_flows.csv"
+
+        with pytest.raises(InvalidConfigError) as excinfo:
+            validate_config(cfg)
+
+        assert "destination_nodes" in str(excinfo.value)
+
+    def test_validate_config_both_od_flows_and_csv_raises(self, base_validate_config):
+        """validate_config should reject specifying both od_flows and od_flows_csv."""
+        cfg = base_validate_config
+        cfg["od_flows"] = {"0_3": 10}
+        cfg["od_flows_csv"] = "od_flows.csv"
+
+        with pytest.raises(InvalidConfigError) as excinfo:
+            validate_config(cfg)
+
+        msg = str(excinfo.value)
+        assert "od_flows" in msg and "od_flows_csv" in msg
+
+
 class TestValidateDemand:
     """Tests for demand validation in validate_config."""
 

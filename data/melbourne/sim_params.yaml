@@ -1,17 +1,17 @@
 # Network Configuration
-#network:
-#  origin_nodes: [265]
-#  destination_nodes: [286]
-
 network:
-  origin_nodes: [289]
-  destination_nodes: [300]
+  origin_nodes: [265]
+  destination_nodes: [286]
+
+#network:
+#  origin_nodes: [289]
+#  destination_nodes: [300]
 
 # Simulation Parameters
 simulation:
-#  simulation_steps: 1692
+  simulation_steps: 1692
   seed: 42
-  simulation_steps: 500
+#  simulation_steps: 500
   unit_time: 10
 #  path_finder:
 #    k_paths: 1
@@ -41,8 +41,8 @@ default_link:
   k_jam: 6
   fd_type: "yperman"
   activity_probability: 0.5
-  gamma: 0.01
-  speed_noise_std: 0.05
+  gamma: 0.1
+  speed_noise_std: 0.01
 
 # Link-specific Overrides (optional)
 #links:
@@ -66,33 +66,33 @@ demand:
 #  origin_1:
 #    pattern: "constant"
 #    value: 8
-#  origin_265:
-#    pattern: "node_demand_from_data"
+  origin_265:
+    pattern: "node_demand_from_data"
+
+#  origin_8172:
+#    pattern: "gaussian_peaks"
+#    peak_lambda: 30
+#    base_lambda: 10
+##
+#  origin_188:
+#    pattern: "sudden_demand"
+#    peak_lambda: 30
+#    base_lambda: 10
 #
-  origin_8172:
-    pattern: "gaussian_peaks"
-    peak_lambda: 30
-    base_lambda: 10
+#  origin_88:
+#    pattern: "gaussian_peaks"
+#    peak_lambda: 30
+#    base_lambda: 10
 #
-  origin_188:
-    pattern: "sudden_demand"
-    peak_lambda: 30
-    base_lambda: 10
-
-  origin_88:
-    pattern: "gaussian_peaks"
-    peak_lambda: 30
-    base_lambda: 10
-
-  origin_31:
-    pattern: "gaussian_peaks"
-    peak_lambda: 30
-    base_lambda: 10
-
-  origin_203:
-    pattern: "gaussian_peaks"
-    peak_lambda: 30
-    base_lambda: 5
+#  origin_31:
+#    pattern: "gaussian_peaks"
+#    peak_lambda: 30
+#    base_lambda: 10
+#
+#  origin_203:
+#    pattern: "gaussian_peaks"
+#    peak_lambda: 30
+#    base_lambda: 5
 
 #OD Flow Configuration
 #od_flows:

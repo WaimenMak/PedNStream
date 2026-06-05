@@ -1,0 +1,193 @@
+# Melbourne Validation Experiment Configuration
+# Uses boundary nodes as OD and interior sensors for validation
+
+# Network Configuration - use boundary nodes with sensor data as OD
+network:
+  # Boundary nodes with sensors based on convex hull proximity list
+  # origin_nodes: [51, 54, 86, 92, 93, 137, 186, 255, 262, 321, 163]
+  # destination_nodes: [51, 54, 86, 92, 93, 137, 186, 255, 262, 321, 163]
+  # origin_nodes: [51, 54, 86, 92, 93, 137, 186, 255, 262, 321,]
+  origin_nodes: [
+                 288, 309, 292, 41, 302, 196, 272, 310, 292, 4,
+                262, 189, 330, 340, 294, 110, 311, 48, 188, 286,
+#                 305, 262, 289, 202, 122, 196, 302, 247, 286, 300,
+#                 310, 300, 188, 92, 192, 289, 189, 229, 86, 128,
+#                 184, 189, 48, 289, 272, 270, 228, 186, 47, 309,
+#                 155, 192, 250, 192, 93, 311, 309, 121, 296, 48,
+#                 228, 300, 137, 303, 255, 119, 235, 196, 49, 285,
+#                 2, 249, 47, 202, 82, 289, 110, 269, 302, 51, 249,
+#                 188, 82, 195, 293, 54, 234, 321, 228, 286, 200, 289
+                ]
+  # destination_nodes: [51, 54, 86, 92, 93, 137, 186, 255, 262, 321,
+  #                     288, 309, 41, 302, 196, 272, 310,
+  #                     292, 189, 330, 340, 294, 110, 311,
+  #                     48, 188, 286, 305, 289, 202, 122, 247, 300, 192, 229, 128, 184, 270, 228, 47, 155, 250, 121, 296, 215, 163,
+  #                     230, 4, 303, 119, 235, 49, 285, 2, 249, 82, 269, 195, 293, 234, 200,
+  #                     ]
+  destination_nodes: [288, 309, 292, 41, 302, 196, 272, 310,
+   292, 262, 189, 330, 340, 294, 110, 311, 48, 188, 286,
+    305, 262, 289, 202, 122, 196, 302, 247, 286, 300,
+     310, 300, 188, 92, 192, 289, 189, 229, 86, 128,
+      184, 189, 48, 289, 272, 270, 228, 186, 47, 309,
+       155, 192, 250, 192, 93, 311, 309, 121, 296, 48,
+        296, 311, 215, 163, 47, 215, 305, 137, 289, 230,
+         228, 300, 4, 137, 303, 255, 119, 235, 196, 49,
+          285, 2, 249, 47, 202, 82, 289, 110, 269, 302,
+           51, 249, 188, 82, 195, 293, 54, 234, 321, 228, 286, 200, 289]
+
+# Simulation Parameters
+simulation:
+  simulation_steps: 1428  # same as original (238 min at 10s intervals)
+  seed: 42
+  unit_time: 10
+  assign_flows_type: "classic"
+  path_finder:
+    k_paths: 1
+    theta: 10
+    alpha: 1
+    beta: 0.5
+    omega: 0.8
+
+# Controller Configuration
+# controllers:
+#   enabled: false
+#   nodes: []
+
+# Default Link Parameters
+default_link:
+  length: 50
+  width: 8
+  free_flow_speed: 1.1
+  k_critical: 2
+  k_jam: 6
+  fd_type: "yperman"
+  activity_probability: 0.5
+  gamma: 0.1
+  speed_noise_std: 0.01
+
+# Demand Configuration - all OD nodes use data-driven demand
+demand:
+  origin_51:
+    pattern: "node_demand_from_data"
+  origin_54:
+    pattern: "node_demand_from_data"
+  origin_86:
+    pattern: "node_demand_from_data"
+  origin_92:
+    pattern: "node_demand_from_data"
+  origin_93:
+    pattern: "node_demand_from_data"
+  origin_137:
+    pattern: "node_demand_from_data"
+  origin_186:
+    pattern: "node_demand_from_data"
+  origin_255:
+    pattern: "node_demand_from_data"
+  origin_262:
+    pattern: "node_demand_from_data"
+  origin_321:
+    pattern: "node_demand_from_data"
+  origin_288:
+    pattern: "node_demand_from_data"
+  origin_309:
+    pattern: "node_demand_from_data"
+  origin_292:
+    pattern: "node_demand_from_data"
+  origin_41:
+    pattern: "node_demand_from_data"
+  origin_302:
+    pattern: "node_demand_from_data"
+  origin_196:
+    pattern: "node_demand_from_data"
+  origin_272:
+    pattern: "node_demand_from_data"
+  origin_310:
+    pattern: "node_demand_from_data"
+  origin_189:
+    pattern: "node_demand_from_data"
+  origin_330:
+    pattern: "node_demand_from_data"
+  origin_340:
+    pattern: "node_demand_from_data"
+  origin_294:
+    pattern: "node_demand_from_data"
+  origin_110:
+    pattern: "node_demand_from_data"
+  origin_311:
+    pattern: "node_demand_from_data"
+  origin_48:
+    pattern: "node_demand_from_data"
+  origin_188:
+    pattern: "node_demand_from_data"
+  origin_286:
+    pattern: "node_demand_from_data"
+  origin_305:
+    pattern: "node_demand_from_data"
+  origin_289:
+    pattern: "node_demand_from_data"
+  origin_202:
+    pattern: "node_demand_from_data"
+  origin_122:
+    pattern: "node_demand_from_data"
+  origin_247:
+    pattern: "node_demand_from_data"
+  origin_300:
+    pattern: "node_demand_from_data"
+  origin_192:
+    pattern: "node_demand_from_data"
+  origin_229:
+    pattern: "node_demand_from_data"
+  origin_128:
+    pattern: "node_demand_from_data"
+  origin_184:
+    pattern: "node_demand_from_data"
+  origin_270:
+    pattern: "node_demand_from_data"
+  origin_228:
+    pattern: "node_demand_from_data"
+  origin_47:
+    pattern: "node_demand_from_data"
+  origin_155:
+    pattern: "node_demand_from_data"
+  origin_250:
+    pattern: "node_demand_from_data"
+  origin_121:
+    pattern: "node_demand_from_data"
+  origin_296:
+    pattern: "node_demand_from_data"
+  origin_215:
+    pattern: "node_demand_from_data"
+  origin_163:
+    pattern: "node_demand_from_data"
+  origin_230:
+    pattern: "node_demand_from_data"
+  origin_4:
+    pattern: "node_demand_from_data"
+  origin_303:
+    pattern: "node_demand_from_data"
+  origin_119:
+    pattern: "node_demand_from_data"
+  origin_235:
+    pattern: "node_demand_from_data"
+  origin_49:
+    pattern: "node_demand_from_data"
+  origin_285:
+    pattern: "node_demand_from_data"
+  origin_2:
+    pattern: "node_demand_from_data"
+  origin_249:
+    pattern: "node_demand_from_data"
+  origin_82:
+    pattern: "node_demand_from_data"
+  origin_269:
+    pattern: "node_demand_from_data"
+  origin_195:
+    pattern: "node_demand_from_data"
+  origin_293:
+    pattern: "node_demand_from_data"
+  origin_234:
+    pattern: "node_demand_from_data"
+  origin_200:
+    pattern: "node_demand_from_data"
+
+od_flows_csv: "gravity_od_matrix.csv"

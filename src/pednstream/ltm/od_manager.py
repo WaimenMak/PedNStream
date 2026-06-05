@@ -115,9 +115,10 @@ class DemandGenerator:
                 peak_position=origin_config.get('peak_position', 0.5)
             )
         except KeyError:
-            self.logger.info(
-                f"No demand configuration found for origin {origin_id}, using defaults"
-            )
+            if self.logger:
+                self.logger.info(
+                    f"No demand configuration found for origin {origin_id}, using defaults"
+                )
             return DemandConfig()
 
     def generate_gaussian_peaks(self, origin_id: int, params=None) -> np.ndarray:

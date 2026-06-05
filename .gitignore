@@ -39,3 +39,7 @@ src/outputs/
 /mcp/
 *.log
 
+# Ignore specific simulation-related files
+src/pednstream/ltm/link_bi.py
+src/pednstream/ltm/link_org.py
+/experiments/

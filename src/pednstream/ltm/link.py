@@ -8,6 +8,12 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
 
+# TODO: Double check how computation are using time_step. Check correct logic.
+# time steps variables are used in two contexts, one as time keeper for the simulation, and one as index for accessing arrays. 
+# However the shift between the two can cause confusion and bugs. For example, indexes usually start at 0, but time steps might start at 1. 
+# - previous_step: time step before the current time step, that is time_step - 1
+
+
 @dataclass
 class LinkConfig:
     """Configuration dataclass for Link parameters."""
@@ -93,7 +99,7 @@ class Link(ABC):
         self.speed = np.zeros(self.simulation_steps + 1, dtype=np.float32)
         self.link_flow = np.zeros(self.simulation_steps + 1, dtype=np.float32)
         self.gamma = config.gamma  
-        self._reverse_link: Link | None = None # TODO: Consider having this on Regular Links
+        self._reverse_link: Link | None = None # TODO: Consider having this only Regular Links
         self.activity_probability = config.activity_probability
         # Physical attributes
         self.length = config.length
@@ -128,7 +134,6 @@ class Link(ABC):
         self._travel_time_running_sum = self.travel_time[0]
         self.unit_time = config.unit_time
         self.free_flow_tau = round(self.travel_time[0] / self.unit_time)
-
 
     @property
     def reverse_link(self) -> Link | None:
@@ -165,7 +170,7 @@ class Link(ABC):
 
     @property
     def avg_travel_time(self) -> ndarray:
-        """Average travel time"""
+        """Average travel time."""
         avg = np.ones(self.simulation_steps + 1, dtype=np.float32) * self.travel_time[0]
         return avg
 
@@ -209,7 +214,7 @@ class Link(ABC):
     def update_cum_outflow(self, q_j: float, time_step: int) -> None:
         """Update commulative outflow for given time step.
         
-        Args: 
+        Args:
             q_j (float): flow for outflow at time step
             time_step (int): time step
 
@@ -233,8 +238,9 @@ class Link(ABC):
         Returns:
             None
         """
+        PREVIOUS_STEP = time_step - 1
         self.inflow[time_step] = q_i
-        self.cumulative_inflow[time_step] = self.cumulative_inflow[time_step - 1] + q_i
+        self.cumulative_inflow[time_step] = self.cumulative_inflow[PREVIOUS_STEP] + q_i
         return None
 
     def update_density_flow(self, time_step: int) -> None:
@@ -438,15 +444,12 @@ class Link(ABC):
     def operations(self)-> str:
         pass
 
-# TODO: Double check how computation are using time_step. Check correct logic.
-# Adopt the following conventions when naming time step variables:
-# - time_step: current time step in the simulation, Used for accessing arrays and updating values for the current time step. 
-# - previous_step: time step before the current time step, that is time_step - 1
-
 
 class Separator(Link):
+    """Represents a separator link in a transportation network."""
 
     def __init__(self, config: LinkConfig) -> None:
+        """Initializes a Separator link with specific configurations."""
         super().__init__(config)
 
         # Original width must be kept for downstream calculations.
@@ -455,8 +458,9 @@ class Separator(Link):
         self._separator_width =  separator_width
         self._front_gate_width = separator_width
         self._back_gate_width = separator_width
-        # FIXME: Is the link collecting simulations results? Then maybe should be move to component responsible for the results collection.
+        # FIXME: Is the link collecting simulations results? Then maybe should be move to a component responsible for the results collection.
         self.separator_width_data = separator_width * np.ones(config.simulation_steps + 1)
+        self.is_controller = True  # A separator shall alway be a controller.
 
     @property
     def area(self) -> float:
@@ -486,7 +490,7 @@ class Separator(Link):
     def update_speeds(self, time_step: int) -> None:
         """Update the speed of the link based on the density.
 
-        Args: 
+        Args:
             time_step (int): current time step.
 
         Returns:
@@ -535,7 +539,6 @@ class Separator(Link):
 
         # TODO: is using length the correct way to calculate receiving flow?
         tau_shockwave = round(self.length / (self.shockwave_speed * self.unit_time))
-
 
         if time_step - tau_shockwave < 0:
             receiving_flow_boundary = self.k_jam * self.area
@@ -599,18 +602,11 @@ class Regular(Link):
             reverse_num_peds = self.reverse_link.num_pedestrians[time_step]
         return (self.num_pedestrians[time_step] + reverse_num_peds) / self.area
 
-    def update_link_density_flow(self, time_step: int):
-        
-        num_peds = self.inflow[time_step] - self.outflow[time_step]
-        self.num_pedestrians[time_step] = self.num_pedestrians[time_step - 1] + num_peds
-        self.density[time_step] = self.num_pedestrians[time_step] / self.area
-
     def update_speeds(self, time_step: int) -> None:
-        """
-        Update the speed of the link based on the density
+        """Update the speed of the link based on the density.
 
-        Args: 
-            time_step (int): future time, that is current time step + 1.
+        Args:
+            time_step (int): current simulation time step
 
         Returns:
             None 
@@ -648,7 +644,7 @@ class Regular(Link):
         """Calculate the receiving flow of the link at a given time step.
 
         Args:
-            time_step (int): current time step
+            time_step (int): current simulation time step
             with_reverse (bool): whether to consider reverse link interaction. Default is False.
 
         Returns:

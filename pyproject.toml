@@ -61,10 +61,10 @@ dashboard = [
 
 [project.urls]
 Homepage = "https://github.com/WaimenMak/PedNStream"
-Documentation = ""
+Documentation = "https://github.com/WaimenMak/PedNStream#readme"
 Repository = "https://github.com/WaimenMak/PedNStream"
 "Bug Tracker" = "https://github.com/WaimenMak/PedNStream/issues"
-Changelog = "https://github.com/WaimenMak/PedNStream/main/CHANGELOG.md"
+Changelog = "https://github.com/WaimenMak/PedNStream/blob/main/CHANGELOG.md"
 
 
 [tool.hatch.version]

@@ -63,12 +63,12 @@ controllers:
 
 # Demand Configuration
 demand:
-  origin_0:
+  origin_1:
    pattern: "sudden_demand"
    peak_lambda: 70
    base_lambda: 40
 
-  origin_1:
+  origin_0:
    pattern: "gaussian_peaks"
    peak_lambda: 20
    base_lambda: 10

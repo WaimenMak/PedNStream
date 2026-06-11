@@ -1,0 +1,90 @@
+# SAIL pedestrian network configuration
+# Origin/destination nodes are the graph nodes currently mapped to SAIL sensors.
+# sail_sensor_stats defaults live in rl/demand_function.py; override per-origin here only if needed.
+network:
+  origin_nodes: [13, 17, 18, 32, 34, 44, 58, 67, 81, 84, 85, 104, 106, 123, 151, 169, 202, 234, 270, 284, 290, 291, 292, 293]
+  destination_nodes: [13, 17, 18, 32, 34, 44, 58, 67, 81, 84, 85, 104, 106, 123, 151, 169, 202, 234, 270, 284, 290, 291, 292, 293]
+
+simulation:
+  seed: 42
+  simulation_steps: 500
+  unit_time: 10
+  assign_flows_type: "classic"
+  path_finder:
+    k_paths: 5
+    controller_k_paths: 5
+    temp: 10
+    alpha: 1
+    beta: 0.5
+    omega: 0.8
+    std_dev: 0
+
+controllers:
+  enabled: false
+  nodes: []
+
+default_link:
+  length: 50
+  width: 2
+  free_flow_speed: 1.1
+  k_critical: 2
+  k_jam: 6
+  gamma: 0.01
+  speed_noise_std: 0.05
+  fd_type: "greenshields"
+  activity_probability: 0
+  bi_factor: 1
+
+demand:
+  origin_13:
+    pattern: "sail_sensor_stats"
+  origin_17:
+    pattern: "sail_sensor_stats"
+  origin_18:
+    pattern: "sail_sensor_stats"
+  origin_32:
+    pattern: "sail_sensor_stats"
+  origin_34:
+    pattern: "sail_sensor_stats"
+  origin_44:
+    pattern: "sail_sensor_stats"
+  origin_58:
+    pattern: "sail_sensor_stats"
+  origin_67:
+    pattern: "sail_sensor_stats"
+  origin_81:
+    pattern: "sail_sensor_stats"
+  origin_84:
+    pattern: "sail_sensor_stats"
+  origin_85:
+    pattern: "sail_sensor_stats"
+  origin_104:
+    pattern: "sail_sensor_stats"
+  origin_106:
+    pattern: "sail_sensor_stats"
+  origin_123:
+    pattern: "sail_sensor_stats"
+  origin_151:
+    pattern: "sail_sensor_stats"
+  origin_169:
+    pattern: "sail_sensor_stats"
+  origin_202:
+    pattern: "sail_sensor_stats"
+  origin_234:
+    pattern: "sail_sensor_stats"
+  origin_270:
+    pattern: "sail_sensor_stats"
+  origin_284:
+    pattern: "sail_sensor_stats"
+  origin_290:
+    pattern: "sail_sensor_stats"
+  origin_291:
+    pattern: "sail_sensor_stats"
+  origin_292:
+    pattern: "sail_sensor_stats"
+  origin_293:
+    pattern: "sail_sensor_stats"
+
+
+od_flows_csv: "correlation_od_matrix.csv"
+

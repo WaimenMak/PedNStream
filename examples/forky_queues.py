@@ -11,11 +11,11 @@ sys.path.append(project_root)
 
 import numpy as np
 import matplotlib.pyplot as plt
-from handlers.output_handler import OutputHandler
+from pednstream.utils.output_handler import OutputHandler
 
 # Now you can import using the project structure
-from src.utils.visualizer import NetworkVisualizer, progress_callback
-from src.LTM.network import Network
+from pednstream.utils.visualizer import NetworkVisualizer, progress_callback
+from pednstream.ltm.network import Network
 from pathlib import Path
 
 if __name__ == "__main__":
@@ -68,6 +68,7 @@ if __name__ == "__main__":
             }
         }
     }
+    np.random.seed(42)
     network_env = Network(adj, params, origin_nodes=[0, 4])
     network_env.update_turning_fractions_per_node(node_ids=[1],
                                                   new_turning_fractions=np.array([[1, 0, 0.5, 0.5, 0, 1]])) #[1_2, 1_4, 1_0, 1_4, 1_0, 1_2]

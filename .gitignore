@@ -23,3 +23,23 @@ Tables.xlsx
 
 #Sphinx build files
 docs/_build
+
+# ignore all checkpoints and all wandb logs
+**/wandb/
+**/checkpoints/
+/rl/analysis/parse_summaries.py
+/rl/outputs/
+
+# Python Chache
+__pycache__/
+
+# logs
+src/outputs/
+/rl/
+/mcp/
+*.log
+
+# Ignore specific simulation-related files
+src/pednstream/ltm/link_bi.py
+src/pednstream/ltm/link_org.py
+/experiments/

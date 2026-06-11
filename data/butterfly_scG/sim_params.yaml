@@ -1,0 +1,108 @@
+# Netwrok
+network:
+  origin_nodes: [0, 1, 8, 7]
+  destination_nodes: [8, 7, 0, 1]
+  adjacency_matrix: [ 
+    [0, 0, 1, 0, 0, 0, 0, 0, 0], # 0: Top Left
+    [0, 0, 1, 0, 0, 0, 0, 0, 0], # 1: Bottom Left
+    [1, 1, 0, 1, 1, 1, 0, 0, 0], # 2: Orange Hub
+    [0, 0, 1, 0, 0, 0, 1, 0, 0], # 3: Top Mid
+    [0, 0, 1, 0, 0, 0, 1, 0, 0], # 4: Center Mid
+    [0, 0, 1, 0, 0, 0, 1, 0, 0], # 5: Bottom Mid
+    [0, 0, 0, 1, 1, 1, 0, 1, 1], # 6: Right Hub
+    [0, 0, 0, 0, 0, 0, 1, 0, 0], # 7: Top Right
+    [0, 0, 0, 0, 0, 0, 1, 0, 0]  # 8: Bottom Right
+  ]
+
+
+
+# Simulation Parameters
+simulation:
+  simulation_steps: 600
+  unit_time: 10
+  assign_flows_type: "classic"
+  path_finder:
+    k_paths: 5
+    temp: 5 # temperature parameter for softmax, lower the sharper the distribution
+    alpha: 6 # distance weight
+    beta: 2 # congestion weight
+    omega: 4 # capacity weight
+    std_dev: 0.05 # standard deviation for stochastic path choice
+
+# Default Link Parameters
+default_link:
+  length: 60
+  width: 4
+  free_flow_speed: 1.1
+  k_critical: 2
+  k_jam: 6
+  gamma: 0.01
+  speed_noise_std: 0
+  fd_type: "yperman"
+  activity_probability: 0.1
+  bi_factor: 1
+
+
+# Link-specific Parameters (optional)
+# scenario A: one 2 one
+links:
+ "0_2":
+   width: 6
+ "8_6":
+   width: 6
+ "7_6":
+   width: 6
+#  "2_4":
+#    width: 2.5
+#  "2_3":
+#    width: 2
+#  "2_5":
+#    width: 2.5
+ "1_2":
+   width: 6
+ "4_6":
+   length: 40
+#   front_gate_width: 3.5
+
+
+controllers:
+   enabled: true  # Set to true to enable controller-based path expansion
+   nodes: [2, 6]  # List of node IDs that act as controllers
+
+# Demand Configuration
+demand:
+  origin_0:
+   pattern: "single_peak"
+   peak_lambda: 100
+   base_lambda: 10
+   peak_position: 0.3
+
+  origin_1:
+   pattern: "single_peak"
+   peak_lambda: 110
+   base_lambda: 10
+   peak_position: 0.3
+
+  origin_7:
+   pattern: "single_peak"
+   peak_lambda: 100
+   base_lambda: 9
+   peak_position: 0.7
+
+  origin_8:
+   pattern: "single_peak"
+   peak_lambda: 100
+   base_lambda: 10
+   peak_position: 0.7
+
+
+od_flows:
+ "1_7": 5
+ "1_8": 10
+ "0_7": 10
+ "0_8": 5
+ "8_0": 5
+ "8_1": 10
+ "7_0": 10
+ "7_1": 5
+

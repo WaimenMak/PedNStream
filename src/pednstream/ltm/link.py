@@ -14,6 +14,18 @@ from dataclasses import dataclass
 # - previous_step: time step before the current time step, that is time_step - 1
 
 
+
+@dataclass
+class VirtualLink:
+    """A virtual link used as a source or sink in the network."""
+    link_id: int
+    start_node: int
+    end_node: int
+    simulation_steps: int
+    # decides by user input (based on origin nodes)
+
+
+
 @dataclass
 class LinkConfig:
     """Configuration dataclass for Link parameters."""
@@ -62,10 +74,12 @@ class LinkCreator(ABC):
         """Creates a network link."""
         pass
 
+
 class SeparatorCreator(LinkCreator):
     """Creator for the Separator link type."""
 
     def create_link(self, config) -> Link:
+        """Creates a Separator link."""
         return Separator(config)
     
 
@@ -73,6 +87,7 @@ class RegularCreator(LinkCreator):
     """Creator for the Regular link type."""
 
     def create_link(self, config: LinkConfig) -> Link:
+        """Creates a Regular link."""
         return Regular(config)
     
 
@@ -440,9 +455,6 @@ class Link(ABC):
         """
         pass
 
-    @abstractmethod
-    def operations(self)-> str:
-        pass
 
 
 class Separator(Link):
@@ -575,9 +587,6 @@ class Separator(Link):
             return max(receiving_flow, 0)
         else:
             return receiving_flow
-
-    def operations(self):
-        return "a separtor link"
     
 
 class Regular(Link):
@@ -695,7 +704,3 @@ class Regular(Link):
         else:
             return receiving_flow
 
-
-    def operations(self):
-        return "a regular link"
-    

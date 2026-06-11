@@ -124,7 +124,7 @@ class Network:
                 f"Controller configuration: enabled: {self.controller_enabled}, nodes: {self.controller_nodes}, links: {self.controller_links}"
             )
 
-        # Initialize network structure
+        # Initialize network structure # TODO: nodes and links should be handle y the creator (network)
         self.init_nodes_and_links()
         if self.logger and self.verbose:
             self.logger.info(

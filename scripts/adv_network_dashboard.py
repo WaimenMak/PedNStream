@@ -435,6 +435,12 @@ class NetworkDashboard:
                                     value="mean",
                                     clearable=False,
                                 ),
+                                dcc.Checklist(
+                                    id="show-controller-nodes",
+                                    options=[{"label": "Controller nodes", "value": "show"}],
+                                    value=["show"],
+                                    className="checkbox-row",
+                                ),
                                 html.Label("Time step"),
                                 dcc.Slider(
                                     id="time-step",
@@ -604,7 +610,7 @@ class NetworkDashboard:
                                         dl.TileLayer(),
                                         dl.LayerGroup(id="link-layer"),
                                         dl.LayerGroup(self._node_components(dl), id="node-layer"),
-                                        dl.LayerGroup(self._controller_components(dl), id="controller-layer"),
+                                        dl.LayerGroup(id="controller-layer"),
                                     ],
                                     id="map",
                                     center=self.center,
@@ -675,6 +681,7 @@ class NetworkDashboard:
             Output("time-label", "children"),
             Output("selection-status", "children"),
             Output("colorbar-overlay", "children"),
+            Output("controller-layer", "children"),
             Input("time-step", "value"),
             Input("metric", "value"),
             Input("direction-mode", "value"),
@@ -686,6 +693,7 @@ class NetworkDashboard:
             Input("heatmap-metric", "value"),
             Input("color-min", "value"),
             Input("color-max", "value"),
+            Input("show-controller-nodes", "value"),
         )
         def update_dashboard(
             time_step,
@@ -699,6 +707,7 @@ class NetworkDashboard:
             heatmap_metric,
             color_min,
             color_max,
+            show_controller_nodes,
         ):
             selected = self.resolve_path(scope, od_pair, path_index, manual_path)
             path_links = self._path_link_ids(selected.nodes)
@@ -723,7 +732,8 @@ class NetworkDashboard:
             else:
                 status = f"{selected.source}: {' -> '.join(selected.nodes)}"
             colorbar = self._colorbar_components(html, metric, color_min, color_max)
-            return links, chart, heatmap, time_text, status, colorbar
+            controllers = self._controller_components(dl) if "show" in (show_controller_nodes or []) else []
+            return links, chart, heatmap, time_text, status, colorbar, controllers
 
         @app.callback(
             Output("video-download", "data"),

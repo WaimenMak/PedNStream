@@ -605,160 +605,44 @@ class PathFinder:
 
             # calculate the turn probabilities based on the distances and num_pedestrians of the downstream nodes
             # TODO: calibrate the parameters
-            self.update_node_turn_probs(
-                current_node, od_pair, time_step=0
+            current_node.update_node_turn_probs(
+                od_pair,
+                time_step=0,
+                alpha=self.alpha,
+                beta=self.beta,
+                omega=self.omega,
+                temp=self.temp,
+                std_dev=self.std_dev,
             )  # this is the first time we calculate the turn probabilities, so we can use time_step=0
 
     def update_node_turn_probs(self, node, od_pair, time_step):
-        """Update the turn probabilities for the node, P(down|up,od)"""
-        if not hasattr(node, "current_turn_probs_step"):
-            node.current_turn_probs_step = {}
-
-        # Reuse the probabilities within the same timestep so one choice set
-        # is generated from one consistent utility/noise realization.
-        if node.current_turn_probs_step.get(od_pair) == time_step:
-            return node.node_turn_probs
-
-        for up_node, down_nodes in node.turns_distances[od_pair].items():
-            if down_nodes:
-                turns = list(
-                    (up_node, down_node) for down_node in down_nodes
-                )  # Note, the down_nodes are sorted by the distances
-                distances = list(down_nodes.values())
-                # num_pedestrians = []
-                densities = []
-                capacities = []
-                for down_node in down_nodes:
-                    try:
-                        link = self.links[(node.node_id, down_node)]
-
-                        densities.append(
-                            np.maximum(
-                                link.get_density(max(0, time_step - 1)) - link.k_critical, 0
-                            )
-                            / (link.k_jam - link.k_critical)
-                        )
-                        capacity = link.receiving_flow[
-                            max(0, time_step - 2)
-                        ]  # -2 steps is the most recent, the capacity of -1 step is -1 by default
-                        capacities.append(
-                            capacity
-                            if capacity >= 0
-                            else link.back_gate_width
-                            * link.free_flow_speed
-                            * link.k_critical
-                            * link.unit_time
-                        )
-                    except KeyError:
-                        # this is the case of origin/destination nodes, with down node id -1
-                        densities.append(0)
-                        capacities.append(
-                            100
-                        )  # set a high capacity for origin/destination nodes
-
-                norm_densities = np.array(densities)
-                if self.std_dev == 0:
-                    time_variation = 0
-                else:   # time variation noise in the utility function
-                    time_variation = np.random.normal(0, self.std_dev, len(turns))
-                utilities = (
-                    self.alpha * np.array(distances) / (np.sum(distances) + 1e-6)
-                    + self.beta * norm_densities
-                    - self.omega * np.array(capacities) / (np.sum(capacities) + 1e-6)
-                ) + time_variation
-                exp_utilities = np.exp(-self.temp * utilities)
-                probs = exp_utilities / np.sum(exp_utilities)
-                node.node_turn_probs[od_pair].update(dict(zip(turns, probs)))
-
-        node.current_turn_probs_step[od_pair] = time_step
-        return node.node_turn_probs
+        """Delegate turn probability updates to the node."""
+        return node.update_node_turn_probs(
+            od_pair,
+            time_step,
+            alpha=self.alpha,
+            beta=self.beta,
+            omega=self.omega,
+            temp=self.temp,
+            std_dev=self.std_dev,
+        )
 
     def update_turning_fractions(self, node, time_step: int, od_manager):
-        """Calculate turning fractions using stored turn probabilities: node_turn_probs,
-        Return turning_fractions: np.array
-        """
-        turning_fractions = np.zeros(node.edge_num)
-        # Update P(od|up) for each upstream node
-        for up_node, od_pairs in node.up_od_probs.items():
-            total_flow = 0
-            # First pass: calculate total flow
-            for od_pair in od_pairs:
-                flow = od_manager.get_od_flow(od_pair[0], od_pair[1], time_step)
-                od_pairs[od_pair] = flow
-                total_flow += flow
-
-            # Second pass: normalize to get probabilities
-            if total_flow > 0:
-                for od_pair in od_pairs:
-                    od_pairs[od_pair] /= total_flow
-            else:
-                # If no flow, set equal probabilities
-                n_pairs = len(od_pairs)
-                for od_pair in od_pairs:
-                    od_pairs[od_pair] = 1.0 / n_pairs if n_pairs > 0 else 0
-
-        # Calculate final turning fractions
-        upstream_nodes = [
-            link.start_node.node_id if link.start_node is not None else -1
-            for link in node.incoming_links
-        ]
-        downstream_nodes = [
-            link.end_node.node_id if link.end_node is not None else -1
-            for link in node.outgoing_links
-        ]
-
-        idx = 0
-        for up in upstream_nodes:
-            for down in downstream_nodes:
-                if up == down:
-                    continue
-                turn = (up, down)
-                prob_sum = 0
-
-                # Get all OD pairs for this turn
-                od_pairs = node.ods_in_turns.get(turn, set())
-                for od_pair in od_pairs:
-                    # P(down|up,od) from node_turn_probs
-                    self.update_node_turn_probs(
-                        node, od_pair, time_step=time_step
-                    )  # with updating
-                    turn_prob = node.node_turn_probs[od_pair].get(turn, 0)
-                    # P(od|up) from up_od_probs
-                    od_prob = node.up_od_probs[up].get(od_pair, 0)
-                    prob_sum += turn_prob * od_prob
-
-                turning_fractions[idx] = prob_sum
-                idx += 1
-
-        return turning_fractions
+        """Delegate turning fraction updates to the node."""
+        return node.update_turning_fractions(
+            time_step,
+            od_manager,
+            alpha=self.alpha,
+            beta=self.beta,
+            omega=self.omega,
+            temp=self.temp,
+            std_dev=self.std_dev,
+        )
 
     @staticmethod
     def check_fractions(node):
-        """
-        Check if the turning fractions are valid and normalize if needed.
-
-        Normalization strategy:
-        - If sum > 0: normalize by dividing by sum (preserves relative magnitudes)
-        - If sum == 0: fall back to equal probabilities (no information available)
-        """
-        fract = node.turning_fractions.reshape(node.dest_num, node.source_num - 1)
-
-        for i in range(node.dest_num):
-            row_sum = np.sum(fract[i])
-
-            if np.abs(row_sum - 1) > 1e-3:
-                if row_sum > 1e-6:
-                    # Normalize by sum - preserves relative probabilities
-                    fract[i] = fract[i] / row_sum
-                    print(
-                        f"Warning: turning fractions at node {node.node_id} for downstream {i} do not sum to 1. Normalizing."
-                    )
-                else:
-                    # No information available - use equal probabilities
-                    fract[i] = np.ones(node.source_num - 1) / (node.source_num - 1)
-
-        node.turning_fractions = fract.flatten()
-        return node.turning_fractions
+        """Delegate turning fraction validation to the node."""
+        return node.check_fractions()
 
     def calculate_node_turning_fractions(self, time_step: int, od_manager, node):
         """
@@ -774,7 +658,12 @@ class PathFinder:
         """
         # Only process nodes that appear in paths
         if node.node_id in self.nodes_in_paths:
-            if node.source_num > 2:  # only process intersection nodes
-                fractions = self.update_turning_fractions(node, time_step, od_manager)
-                node.turning_fractions = fractions
-                self.check_fractions(node)
+            node.calculate_node_turning_fractions(
+                time_step,
+                od_manager,
+                alpha=self.alpha,
+                beta=self.beta,
+                omega=self.omega,
+                temp=self.temp,
+                std_dev=self.std_dev,
+            )

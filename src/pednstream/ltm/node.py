@@ -1,5 +1,5 @@
 import numpy as np
-from .link import BaseLink
+# from .link import BaseLink
 from .solver import NodeFlowSolver
 from dataclasses import dataclass
 from typing import Optional, List
@@ -11,19 +11,23 @@ class NodeConfig:
     Dynamic/runtime state (q, A_ub, mask, source_num, dest_num, edge_num,
     virtual links, ods_in_turns) lives on Node itself.
     """
-    node_id: str
-    node_type: str = "regular"          # "regular" or "onetoone"
+    id: int
+    # node_type: str = "regular"          # "regular" or "onetoone"
     gate_width: Optional[float] = None
     turning_fractions: Optional[np.ndarray] = None
     demand: Optional[np.ndarray] = None  # demand profile for origin node
     M: Optional[float] = 1e6            # penalty term for destination node
     w: Optional[float] = 1e-2           # penalty term for turning fractions
+    is_controller: bool = False         # whether this node is a controller, can be used to populate Network's controllers list
+
 
 class Node:
+    """Represents a node in the traffic network."""
+
     def __init__(self, node_config: NodeConfig):
+        """Initialize the Node with its static configuration."""
         # --- Static config (from NodeConfig) ---
-        self.node_id = node_config.node_id
-        self.node_type = node_config.node_type        # "onetoone" or "regular"
+        self.id = node_config.id
         self.turning_fractions = node_config.turning_fractions  # 1D array, length = edge_num
         self.demand = node_config.demand              # demand profile for origin node
         self.M = node_config.M                        # penalty for destination node
@@ -41,11 +45,46 @@ class Node:
         self.A_ub = None        # LP constraint matrix, built in get_matrix_A
         self.mask = None        # boolean mask, built in init_mask
         self.ods_in_turns = {}  # populated on-the-fly during path-finding/flow assignment
+        self._node_type = ""     # "onetoone" or "regular"
 
+        self.is_controller = node_config.is_controller # whether this node is a controller, can be used to populate Network's controllers list
     # ------------------------------------------------------------------
     # Properties: always in sync with the actual link lists — no stale
     # state and no need to call init_node() just to read these values.
     # ------------------------------------------------------------------
+
+    @property
+    def node_type(self):
+        """Return the type of the node."""
+        return self._node_type
+    
+    @node_type.setter
+    def node_type(self, value) -> None:
+        """Set the type of the node based on the adjacency matrix and origin/destination nodes."""
+        try:
+            adjacency_matrix, origin_nodes, destination_nodes = value 
+        except ValueError:
+            raise ValueError("Value must be a tuple of (adjacency_matrix, origin_nodes, destination_nodes)")
+        else:
+            incoming_links = np.sum(adjacency_matrix[: self.id])
+            outgoing_links = np.sum(adjacency_matrix[self.id :])
+        
+            # node type rules
+            if incoming_links >= 2 and outgoing_links >= 2:
+                if self.id in origin_nodes or self.id in destination_nodes:
+                    self._node_type = "regular"
+                    # Create virtual Node
+                    # FIXME: move creation of virtual links to be created in a separated method.
+                    # self._create_origin_destination(node_config) # These Are Links. 
+                else:  # do not create virtual links 
+                    self._node_type = "onetoone"  
+
+            elif incoming_links == 1 and outgoing_links ==1:
+                self._node_type = "onetoone"
+                # create virtual Node
+                # self._create_origin_destination(node_config)
+            # CONTINUE HERE: test this works as expected.
+            return None
 
     @property
     def source_num(self) -> int:

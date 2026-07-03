@@ -7,9 +7,10 @@
 from .network import Network
 from .node import Node
 from .link import Link, Separator
-from .od_manager import ODManager
+from .od_manager import ODManager, DemandGenerator
 from .path_finder import PathFinder
 from .solver import NodeFlowSolver
+
 
 __all__ = [
     'Network',
@@ -19,4 +20,5 @@ __all__ = [
     'ODManager',
     'PathFinder',
     'NodeFlowSolver',
+    'DemandGenerator'
 ]

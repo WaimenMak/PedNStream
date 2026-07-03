@@ -1,23 +1,92 @@
-import numpy as np
-import networkx as nx
-import matplotlib.pyplot as plt
+"""Module for defining the Network class, which represents a transportation network with nodes, links, and demand functions."""
+
 import logging
-from .node import Node
-from .link import Link, Separator
-from .od_manager import ODManager, DemandGenerator
-from .path_finder import PathFinder
-from typing import Callable, List
 from pathlib import Path
+from dataclasses import dataclass, field
+from numpy import ndarray
+from .node import Node, NodeConfig
+from .link import LinkConfig, Link
+from typing import List, Callable, Dict
+from .od_manager import ODManager
 
-"""
-A Link Transmission Model for the Pedestrian Traffic
-"""
+@dataclass
+class SimulationParameters:
+    """Simulation parameters."""
+    params: dict = field(default_factory=dict) # Dictionary to hold various simulation parameters, can be extended as needed.
 
+
+@dataclass
+class NetworkConfig:
+    """Data class for collecting data related to the network configuration."""
+    adjacency_matrix: ndarray # represent the interconnections between nodes in the network.
+    links: List[LinkConfig] # List of configuration objects representing the links in the network
+    nodes: List[NodeConfig] # List of configuration objects representing the nodes in the network
+    origin_nodes: list # 
+    destination_nodes: list = field(default_factory=list) # List of destination nodes, can be empty if not specified
+    od_flows: dict = field(default_factory=dict) # Dictionary to hold origin-destination flow information, from yaml file
+    positions: dict = field(default_factory=dict) # Dictionary to hold node positions, from yaml file
+    demand : dict = field(default_factory=dict) # Dictionary to hold demand information, from yaml file
+    
 
 class Network:
+    """Class representing a transportation network."""
+
+    def __init__(self, config: NetworkConfig):   
+        """Initialize the Network with a configuration dictionary."""
+        self._log_level: int = logging.INFO 
+        self._verbose: bool = True 
+        self.config = config
+        # Stores nodes and links for the network
+        self.nodes: Dict[int, Node] = {} # Dictionary to hold Node objects, keyed by node ID. Ids match the ones in the adjacency matrix.
+        self.links: Dict[str, LinkConfig] = {} # Dictionary to hold LinkConfig objects, keyed by link ID
+
+        self._controllers: List[int] = [] # List to hold IDs of nodes that are controllers, can be populated based on node configurations. Used by the PathFinder. TODO: consider implementing dependency inversion.
+    
+        self._controller_gaters: List[int] = [] # Info passed by the user. TODO: Consider removing it.  
+
+    @property
+    def controllers(self):
+        """Nodes defines as controllers in the network."""
+        if not self._controllers:
+            result = []
+            for node in self.nodes.values():
+                if node.is_controller is True:
+                    result.append(node.node_id)
+            self._controllers = result
+            self._controller_gaters = self._controllers.copy()
+            return self._controllers
+        else:
+           return self._controllers
+    
+    @property
+    def controller_gaters(self):
+        """Get the list of controller gaters."""
+        # FODO: consider removing it. 
+        return self._controller_gaters
+ 
+    @property
+    def log_level(self):
+        """Get the log level."""
+        return self._log_level
+    
+    @log_level.setter
+    def log_level(self, value: int) -> None:
+        """Set the log level."""
+        self._log_level = value
+
+    @property
+    def verbose(self):
+        """Get the verbose flag."""
+        return self._verbose    
+
+    @verbose.setter
+    def verbose(self, value: bool) -> None:
+        """Set the verbose flag."""
+        self._verbose = value
+
     @staticmethod
     def setup_logger(log_level=logging.INFO, log_dir=None):
-        """Set up and configure logger"""
+        """Set up and configure logger."""
         if log_dir is None:
             log_dir = Path.cwd() / "outputs" / "logs"
         else:
@@ -49,393 +118,69 @@ class Network:
             logger.setLevel(log_level)
 
         return logger
+    
+    # TODO: CONTINUE HERE
+    def _create_nodes(self) -> dict[int, Node]:
+        """Create Node objects based on the provided node configurations."""
+        import numpy as np
+        nodes = {}
 
-    def __init__(
-        self,
-        adjacency_matrix: np.array,
-        params: dict,
-        origin_nodes: list,
-        destination_nodes: list = [],
-        demand_pattern: List[Callable[[int, dict], np.ndarray]] = None,
-        od_flows: dict = None,
-        pos: dict = None,
-        log_level: int = logging.INFO,
-        verbose: bool = True,
-    ):
-        """
-        Initialize the network, with nodes and links according to the adjacency matrix
+        for node_config in self.config.nodes:
+            
+            # FIXME: could this be done by the node instantiation?
+            id = node_config.id
+            incoming_links = np.sum(self.config.adjacency_matrix[:, node_config.id])
+            outgoing_links = np.sum(self.config.adjacency_matrix[node_config.id, :])
+       
+            # node type rules
+            if incoming_links >= 2 and outgoing_links >= 2:
+                
+                if id in self.config.origin_nodes or id in self.config.destination_nodes:
+                    node_config.node_type = "regular"
+                    # Create virtual Node
+                    self._create_origin_destination(node_config) # These Are Links. 
+                else:  # do not create virtual links 
+                    node_config.node_type = "onetoone"  
 
-        Args:
-            verbose: If True, enable logging output. Default True for backward compatibility.
-        """
-        # Set up logger
-        self.verbose = verbose
-        self.logger = self.setup_logger(log_level=log_level) if verbose else None
+            elif incoming_links == 1 and outgoing_links ==1:
+                node_config.node_type = "onetoone"
+                # create virtual Node
+                self._create_origin_destination(node_config)
+     
+            # create the Node object
+            node = Node(node_config)
+            nodes[node.id] = node
+        return nodes
+    
+    def _create_links(self) -> dict[tuple[int,int], Link]:
+        """Create LinkConfig objects based on the provided link configurations."""
+        links = {}
+        for link_config in self.config.links:
+            links[link_config.link_id] = link_config
+        return links
+    
+    
+    def create(self) -> None: 
+        """Create the network based on the provided configuration and parameters."""
+        nodes = self._create_nodes()
+        links = self._create_links()
 
-        self.adjacency_matrix = adjacency_matrix
-        self.nodes = {}
-        self.links = {}  # key is tuple(start_node_id, end_node_id)
-        self.params = params  # already contains default link parameters, simulation steps, unit time, link specific params and demand params
-        self.simulation_steps = params["simulation_steps"]
-        self.unit_time = params["unit_time"]
-        self.destination_nodes = destination_nodes
-        self.origin_nodes = origin_nodes
-        self.path_finder = None
-        self.pos = pos
-        self.assign_flows_type = params.get("assign_flows_type", "classic")
-        if self.logger and self.verbose:
-            self.logger.info(
-                f"Network initialization started, assign flows type: {self.assign_flows_type}"
-            )
+        # assemble the network
 
-        # Initialize demand generator with passed logger
-        self.demand_generator = DemandGenerator(
-            self.simulation_steps, params, self.logger if self.verbose else None
-        )
 
-        if demand_pattern:
-            # self.demand_generator.register_pattern(self.params.get('custom_pattern'), demand_pattern)
-            for func in demand_pattern:
-                self.demand_generator.register_pattern(func.__name__, func)
-                if self.logger and self.verbose:
-                    self.logger.info(
-                        f"Custom demand pattern registered: {func.__name__}"
-                    )
 
-        # Controller configuration
-        controller_config = params.get("controllers", {})
-        self.controller_enabled = controller_config.get("enabled", False)
-        self.controller_nodes = controller_config.get(
-            "nodes", set()
-        )  # all nodes related to controllers
-        self.controller_nodes = set(map(int, self.controller_nodes))
-        self.controller_gaters = (
-            self.controller_nodes.copy()
-        )  # only the intersection nodes with gater control
-        self.controller_links = controller_config.get(
-            "links", []
-        )  # link is a string like '1-2'
-        for link in self.controller_links:  # expand the nodes related to controllers, so controller nodes are all nodes related to the controllers
-            start_node, end_node = link.split("-")
-            self.controller_nodes.add(int(start_node))
-            self.controller_nodes.add(int(end_node))
-        if self.logger and self.verbose:
-            self.logger.info(
-                f"Controller configuration: enabled: {self.controller_enabled}, nodes: {self.controller_nodes}, links: {self.controller_links}"
-            )
 
-        # Initialize network structure # TODO: nodes and links should be handle y the creator (network)
-        self.init_nodes_and_links()
-        if self.logger and self.verbose:
-            self.logger.info(
-                f"Network initialized with {len(self.nodes)} nodes and {len(self.links)} links"
-            )
-
-        # Initialize managers if destination nodes are specified
-        if destination_nodes:
-            self.od_manager = ODManager(
-                self.simulation_steps, logger=self.logger if self.verbose else None
-            )
-            self.od_manager.init_od_flows(origin_nodes, destination_nodes, od_flows)
-
-            self.path_finder = PathFinder(
-                self.links,
-                params=self.params,
-                controller_nodes=self.controller_nodes,
-                controller_links=self.controller_links,
-                logger=self.logger if self.verbose else None,
-            )  # Pass params and logger here
-            self.path_finder.find_od_paths(
-                od_pairs=self.od_manager.od_flows.keys(), nodes=self.nodes
-            )
-
-    def _create_origin_destination(self, node: Node):
-        """Create virtual links for origin/destination nodes and set demand"""
-        node._create_virtual_link(
-            node.node_id, "in", is_incoming=True, params=self.params
-        )
-        node._create_virtual_link(
-            node.node_id, "out", is_incoming=False, params=self.params
-        )
-
-        if node.node_id in self.origin_nodes:
-            # Get demand configuration for this origin
-            origin_config = self.params.get("demand", {}).get(
-                f"origin_{node.node_id}", {}
-            )
-            pattern = origin_config.get(
-                "pattern", "gaussian_peaks"
-            )  # get the pattern name of the node in the yaml file
-            node.demand = self.demand_generator.generate_custom(node.node_id, pattern)
-            # log the total demand of the origin node
-            if self.logger and self.verbose:
-                self.logger.info(
-                    f"Total demand of origin node {node.node_id}: {np.sum(node.demand)}"
-                )
-        else:
-            node.demand = np.zeros(
-                self.simulation_steps
-            )  # destination nodes have no demand
-
-    def _create_nodes(self, node_id: int) -> Node:
-        """
-        Creates a node based on its connection counts from the adjacency matrix.
-
-        Args:
-            node_id: The unique identifier of the node to create
-
-        Returns:
-            Node: An instance of appropriate Node type
-        """
-        incoming_count = np.sum(self.adjacency_matrix[:, node_id])
-        outgoing_count = np.sum(self.adjacency_matrix[node_id, :])
-
-        if incoming_count == 2 and outgoing_count == 2:
-            if node_id in self.origin_nodes or node_id in self.destination_nodes:
-                node = Node(node_id=node_id, node_type="regular")
-                self._create_origin_destination(node)
-            else:
-                node = Node(node_id=node_id, node_type="onetoone")
-        elif incoming_count == 1 and outgoing_count == 1:
-            node = Node(node_id=node_id, node_type="onetoone")
-            self._create_origin_destination(node)
-        else:
-            node = Node(node_id=node_id, node_type="regular")
-            if node_id in self.origin_nodes or node_id in self.destination_nodes:
-                self._create_origin_destination(node)
-        return node
-
-    def _get_link_params(self, i: int, j: int) -> dict:
-        """
-        Get link-specific parameters, checking both direction keys.
-
-        Args:
-            i: First node
-            j: Second node
-
-        Returns:
-            dict: Link parameters (same for both directions)
-        """
-        links_config = self.params.get("links", {})
-        default_params = self.params.get("default_link", {})
-
-        # Check both possible keys: i_j and j_i
-        forward_key = f"{i}_{j}"
-        reverse_key = f"{j}_{i}"
-
-        if forward_key in links_config:
-            return {**default_params, **links_config[forward_key]}
-        elif reverse_key in links_config:
-            if "front_gate_width" or "back_gate_width" in links_config[reverse_key]:
-                reverse_link_params = links_config[reverse_key].copy()
-                original_front = reverse_link_params.pop("front_gate_width", None)
-                original_back = reverse_link_params.pop("back_gate_width", None)
-                if original_front is not None:
-                    reverse_link_params["back_gate_width"] = original_front
-                if original_back is not None:
-                    reverse_link_params["front_gate_width"] = original_back
-                return {**default_params, **reverse_link_params}
-            return {**default_params, **links_config[reverse_key]}
-        else:
-            return default_params
-
-    def init_nodes_and_links(self):
-        """Initialize nodes and links based on the adjacency matrix."""
-        num_nodes = self.adjacency_matrix.shape[0]
-        created_nodes = []
-
-        for i in range(num_nodes):
-            if i in created_nodes:
-                node = self.nodes[i]
-            else:
-                node = self._create_nodes(i)
-                created_nodes.append(i)
-                self.nodes[i] = node
-
-            for j in range(i + 1, num_nodes):
-                if self.adjacency_matrix[i, j] == 1:
-                    # Create forward link (i->j)
-                    if j not in created_nodes:
-                        node_j = self._create_nodes(j)
-                        created_nodes.append(j)
-                        self.nodes[j] = node_j
-
-                    # Get shared parameters for both directions
-                    link_params = self._get_link_params(i, j)
-                    if (
-                        f"{i}-{j}" in self.controller_links
-                        or f"{j}-{i}" in self.controller_links
-                    ):
-                        link_type = "separator"
-                    else:
-                        link_type = link_params.get("controller_type", "gate")
-
-                    # Create both links with identical parameters
-                    if link_type == "separator":
-                        forward_link = Separator(
-                            f"{i}_{j}",
-                            node,
-                            self.nodes[j],
-                            self.simulation_steps,
-                            self.unit_time,
-                            **link_params,
-                        )
-                        reverse_link = Separator(
-                            f"{j}_{i}",
-                            self.nodes[j],
-                            node,
-                            self.simulation_steps,
-                            self.unit_time,
-                            **link_params,
-                        )
-                    elif link_type == "gate":
-                        forward_link = Link(
-                            f"{i}_{j}",
-                            node,
-                            self.nodes[j],
-                            self.simulation_steps,
-                            self.unit_time,
-                            **link_params,
-                        )
-                        # Create a copy of link_params for reverse link and swap front/back gate widths
-                        reverse_link_params = link_params.copy()
-                        reverse_link = Link(f"{j}_{i}", self.nodes[j], node, 
-                                          self.simulation_steps, self.unit_time, **reverse_link_params)
-                    else:
-                        raise ValueError(f"Invalid controller type: {link_type}")
-
-                    # Add links to nodes
-                    node.outgoing_links.append(forward_link)
-                    self.nodes[j].incoming_links.append(forward_link)
-                    node.incoming_links.append(reverse_link)
-                    self.nodes[j].outgoing_links.append(reverse_link)
-
-                    # Store links and set reverse links
-                    self.links[(i, j)] = forward_link
-                    self.links[(j, i)] = reverse_link
-                    forward_link.reverse_link = reverse_link
-                    reverse_link.reverse_link = forward_link
-
-            node.init_mask()
-
-    def update_turning_fractions_per_node(
-        self,
-        node_ids: List[int],  # function external call
-        new_turning_fractions: np.array,
-    ):
-        """Update turning fractions for specified nodes"""
-        for i, n in enumerate(node_ids):
-            node = self.nodes[n]
-            node.turning_fractions = new_turning_fractions[i]
-
-    def update_link_states(self, time_step: int):
-        """Update link states for the current time step"""
-        # Update density first
-        for link in self.links.values():
-            link.update_link_density_flow(time_step)
-        # Then update speeds
-        for link in self.links.values():
-            link.update_speeds(time_step)
-
-    def network_loading(self, time_step: int):
-        """Perform network loading for the current time step, time_step starts from 1"""
-        for node_id, node in self.nodes.items():
-            if node.turning_fractions is None:
-                phi = 1 / (node.dest_num - 1)
-                node.turning_fractions = np.ones(node.edge_num) * phi
-
-            if self.destination_nodes:
-                self.path_finder.calculate_node_turning_fractions(
-                    time_step=time_step, od_manager=self.od_manager, node=node
-                )
-            # node flow assignment
-            if (
-                self.path_finder is None
-                or node.node_id in self.path_finder.nodes_in_paths
-            ):
-                if node.node_type == "onetoone":
-                    node.assign_flows(time_step)
-                else:  # regular node
-                    if node.A_ub is None:
-                        node.get_matrix_A()
-                    node.assign_flows(time_step, type=self.assign_flows_type)
-
-        self.update_link_states(time_step)
-
-    def visualize(
-        self,
-        figsize=(8, 10),
-        node_size=200,
-        edge_width=1,
-        show_labels=True,
-        label_font_size=20,
-        alpha=0.8,
-    ):
-        """
-        Visualize the network using networkx and matplotlib.
-
-        Args:
-            figsize: Figure size tuple
-            node_size: Size of nodes in visualization
-            edge_width: Width of edges in visualization
-            show_labels: Whether to show node labels
-            label_font_size: Font size for labels
-            alpha: Transparency level
-        """
-        graph = nx.DiGraph()
-
-        # Add nodes and edges
-        for node_id in self.nodes:
-            graph.add_node(node_id)
-        for (u, v), link in self.links.items():
-            graph.add_edge(u, v, label=link.link_id)
-
-        plt.figure(figsize=figsize)
-
-        if self.pos is None:
-            self.pos = nx.spring_layout(graph, k=1, iterations=50)
-
-        # Draw nodes
-        nx.draw_networkx_nodes(
-            graph, self.pos, node_size=node_size, node_color="lightblue", alpha=alpha
-        )
-
-        # Separate and draw bidirectional and unidirectional edges
-        bidirectional_edges = [
-            (u, v) for (u, v) in graph.edges() if (v, u) in graph.edges()
-        ]
-        unidirectional_edges = [
-            (u, v) for (u, v) in graph.edges() if (v, u) not in graph.edges()
-        ]
-
-        nx.draw_networkx_edges(
-            graph,
-            self.pos,
-            edgelist=bidirectional_edges,
-            arrows=True,
-            arrowsize=2,
-            edge_color="lightblue",
-            width=edge_width,
-            alpha=alpha,
-            connectionstyle="arc3,rad=0.2",
-        )
-
-        nx.draw_networkx_edges(
-            graph,
-            self.pos,
-            edgelist=unidirectional_edges,
-            arrows=True,
-            arrowsize=2,
-            edge_color="blue",
-            width=edge_width,
-            alpha=alpha,
-        )
-
-        if show_labels:
-            nx.draw_networkx_labels(
-                graph, self.pos, font_size=label_font_size, alpha=alpha + 0.2
-            )
-
-        plt.axis("off")
-        plt.tight_layout()
-        plt.show()
+if __name__ == "__main__":
+    # Example usage
+    config = NetworkConfig(
+        adjacency_matrix=None,  # Replace with actual adjacency matrix
+        links=[],  # Replace with actual link configurations
+        nodes=[],  # Replace with actual node configurations
+        origin_nodes=[],  # Replace with actual origin nodes
+        destination_nodes=[],  # Replace with actual destination nodes
+        od_flows={},  # Replace with actual OD flows
+        positions={}  # Replace with actual node positions
+    )
+    
+    network = Network(config)
+    network.create()

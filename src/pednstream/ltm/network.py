@@ -345,9 +345,16 @@ class Network:
                 node.turning_fractions = np.ones(node.edge_num) * phi
 
             if self.destination_nodes:
-                self.path_finder.calculate_node_turning_fractions(
-                    time_step=time_step, od_manager=self.od_manager, node=node
-                )
+                if node.node_id in self.path_finder.nodes_in_paths:
+                    node.calculate_node_turning_fractions(
+                        time_step=time_step,
+                        od_manager=self.od_manager,
+                        alpha=self.path_finder.alpha,
+                        beta=self.path_finder.beta,
+                        omega=self.path_finder.omega,
+                        temp=self.path_finder.temp,
+                        std_dev=self.path_finder.std_dev,
+                    )
             # node flow assignment
             if (
                 self.path_finder is None

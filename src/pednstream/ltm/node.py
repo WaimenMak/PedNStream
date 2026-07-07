@@ -105,7 +105,7 @@ class Node:
         """Helper method to create virtual links for origin and destination nodes"""
         link = BaseLink(
             link_id=f"virtual_{direction}_{node_id}",
-            start_node=self if not is_incoming else None,
+            start_node=self if not is_incoming else None, # TODO move logic to Network creation.
             end_node=self if is_incoming else None,
             simulation_steps=params["simulation_steps"],
         )
@@ -185,7 +185,7 @@ class Node:
         # Calculate sending flows
         for i, l in enumerate(self.incoming_links):
             if (
-                hasattr(self, "virtual_incoming_link")
+                hasattr(self, "virtual_incoming_link") # TODO: this can be substituted by a type check for VituralLink
                 and l == self.virtual_incoming_link
             ):
                 s[i] = self.demand[time_step - 1]
@@ -195,7 +195,7 @@ class Node:
         # Calculate receiving flows
         for j, l in enumerate(self.outgoing_links):
             if (
-                hasattr(self, "virtual_outgoing_link")
+                hasattr(self, "virtual_outgoing_link") # TODO: this can be substituted by a type check for VituralLink
                 and l == self.virtual_outgoing_link
             ):
                 r[j] = self.M

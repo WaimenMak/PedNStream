@@ -82,10 +82,9 @@ class RegularCreator(LinkCreator):
 class VirtualLinkCreator(LinkCreator):
     """Creator for the Virtual link type."""
 
-    def create_link(self, config, **kwargs) -> Link:
+    def create_link(self, config, **kwargs) -> VirtualLink:
         """Creates a Virtual link."""
         return VirtualLink(config)  
-
 
 
 class Link(ABC):
@@ -703,17 +702,6 @@ class Regular(Link):
             return receiving_flow
 
 
-# @dataclass
-# class VirtualLink:
-#     """A virtual link used as a source or sink in the network."""
-#     link_id: str # Fortmat "virtual_direction(in, out)_nodeId". 
-#     start_node: int
-#     end_node: int
-#     simulation_steps: int
-#     demand: Optional[ndarray] = field(default_factory=lambda: np.zeros(1))  # Default to an array of zeros if not provided
-#     # decided by user input (based on origin nodes)
-
-
 class VirtualLink(Link):
     """Represents a virtual link in a transportation network."""
 
@@ -722,10 +710,32 @@ class VirtualLink(Link):
         from pednstream.ltm import DemandGenerator
         import logging
         super().__init__(config)
-        self._demand: np.ndarray = field(default_factory=lambda: np.zeros(1))  # Default to an array of zeros if not provided
-        self.generator: DemandGenerator = DemandGenerator(simulation_steps=config.simulation_steps, params=config, logger=logging.getLogger('VirtualLink'))
+        self._direction: str = ""
+
+
+        # FIXME: these belong to the node.
+        
         
        
+    @property
+    def direction(self) -> str:
+        """Get the direction of the virtual link."""
+        return self._direction
+    
+    @direction.setter
+    def direction(self, value: str) -> None:
+        """Set the direction of the virtual link.
+        
+        Args:
+            value (str): The direction to set. Should be either "in" or "out".
+        
+        Raises:
+            ValueError: If the provided value is not "in" or "out".
+        """
+        if value not in ["in", "out"]:
+            raise ValueError("Direction must be either 'in' or 'out'.")
+        self._direction = value
+
     @property
     def demand(self) -> np.ndarray:
         """Get the demand of the virtual link."""
@@ -752,7 +762,6 @@ class VirtualLink(Link):
         # FIXME: a demand generator is only RELEVANT FOR VIRTUAL LINKS. 
         pass
 
-    # CONTINUE HERE
     
     @property
     def area(self) -> float:

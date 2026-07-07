@@ -15,9 +15,9 @@ class NodeConfig:
     node_type: str = "regular"          # "regular" or "onetoone"
     gate_width: Optional[float] = None
     turning_fractions: Optional[np.ndarray] = None
-    demand: Optional[np.ndarray] = None  # demand profile for origin node
-    M: Optional[float] = 1e6            # penalty term for destination node
-    w: Optional[float] = 1e-2           # penalty term for turning fractions
+    demand: Optional[np.ndarray] = None  # demand array for origin node
+    M: float = 1e6            # penalty term for destination node
+    w: float = 1e-2           # penalty term for turning fractions
 
 class Node:
     def __init__(self, node_config: NodeConfig):

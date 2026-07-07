@@ -3,6 +3,8 @@ import numpy as np
 from .solver import NodeFlowSolver
 from dataclasses import dataclass
 from typing import Optional, List
+from pednstream.ltm import DemandGenerator
+from typing import Optional
 
 @dataclass
 class NodeConfig:
@@ -33,6 +35,8 @@ class Node:
         self.M = node_config.M                        # penalty for destination node
         self.w = node_config.w                        # penalty for turning fractions
         self.gate_width = node_config.gate_width
+        self._demand: np.ndarray = field(default_factory=lambda: np.zeros(1))  # Default to an array of zeros if not provided
+        self.generator: Optional[DemandGenerator] = None
 
         # --- Link containers (populated externally by Network) ---
         self.incoming_links: list = []
@@ -45,7 +49,7 @@ class Node:
         self.A_ub = None        # LP constraint matrix, built in get_matrix_A
         self.mask = None        # boolean mask, built in init_mask
         self.ods_in_turns = {}  # populated on-the-fly during path-finding/flow assignment
-        self._type = ""     # "onetoone" or "regular"
+        self._type = ""    # TODO: see fime below. # "onetoone" or "regular"
 
         self.is_controller = node_config.is_controller # whether this node is a controller, can be used to populate Network's controllers list
     # ------------------------------------------------------------------
@@ -59,6 +63,8 @@ class Node:
         return self._type
     
     @type.setter
+    # FIXME: The type can be deftermine when creating the NodeConfigs, 
+    # Consider removing this property and setter form here, and make it a responsibilbility of the inputs parser (see PR)
     def type(self, value) -> None:
         """Set the type of the node based on the adjacency matrix and origin/destination nodes."""
         try:
@@ -101,21 +107,69 @@ class Node:
         """Number of turning edges (excludes U-turn from each source)."""
         return self.dest_num * self.source_num - self.source_num
 
-    def _create_virtual_link(self, node_id, direction, is_incoming, params: dict):
-        """Helper method to create virtual links for origin and destination nodes"""
-        link = BaseLink(
-            link_id=f"virtual_{direction}_{node_id}",
-            start_node=self if not is_incoming else None, # TODO move logic to Network creation.
-            end_node=self if is_incoming else None,
-            simulation_steps=params["simulation_steps"],
-        )
-        if is_incoming:
-            self.incoming_links.append(link)
-            self.virtual_incoming_link = link
+    def create_virtual_links(self, params: dict, origin_nodes: list)-> None:
+        """Creates a pair virtual links for origin and destination nodes.Virtual links will be attached to the node's incoming and outgoing link lists.
+
+        Args:
+            params (dict): A dictionary containing configuration parameters virtual link parameters, including 'simulation_steps'.
+            origin_nodes (list): A list of node IDs that are considered origin nodes.
+        
+        Returns:
+           None.
+        """
+        # TODO: can this be move one step up, to network creation?
+        from pednstream.ltm.link import VirtualLinkCreator
+        # Value pairs for incoming and outgoing virtual links
+        directions = [("in", True), ("out", False) ]
+
+        # Create vitural links
+        for direction, is_incoming in directions:
+            # create a link, and mark it as vitual
+            v_link = VirtualLinkCreator().create_link(params)
+            v_link.direction = direction
+
+            if is_incoming:
+                # TODO: Reference over Id for end/start nodes. 
+                # Should the end_node be a reference to the node object or just the id? 
+                v_link.end_node = self.id
+                self.incoming_links.append(v_link)
+                self.virtual_incoming_link = v_link
+            else:
+                v_link.start_node = self.id
+                self.outgoing_links.append(v_link)
+                self.virtual_outgoing_link = v_link
+
+        # Attach demand generator to node:
+        if self.id in origin_nodes and self.generator is not None:
+            demand_config = params.get('demand', {}).get(f"origin_{self.id}", {})
+
+            pattern = demand_config.get('pattern', 'gaussian_peaks')
+
+            self._init_demand_generator(params['simulation_steps'], params)
+            self.demand = self.generator.generate_custom(self.id, pattern)
+            # FIXME: implement logger for the following. 
+            # if self.logger and self.verbose:
+            #     self.logger.info(
+            #         f"Total demand of origin node {node.node_id}: {np.sum(node.demand)}"
+            #     )
         else:
-            self.outgoing_links.append(link)
-            self.virtual_outgoing_link = link
-        return link
+            self.demand = np.zeros(params['simulation_steps'])
+
+        return None
+    
+    def _init_demand_generator(self, simulation_steps: int, config: dict) -> None:
+        """Creates a demand generator for the node, if it is an origin node.
+
+        Args:
+            simulation_steps (int): The number of simulation steps for which to generate demand.
+            config (dict): Configuration parameters for the demand generator.
+       
+        Returns:
+            None.
+        """
+        import logging
+        self.generator = DemandGenerator(simulation_steps=simulation_steps, params=config, logger=logging.getLogger('VirtualLink'))
+        return None
 
     def init_mask(self):
         """Build the boolean mask for optimal flow assignment once all links are attached.

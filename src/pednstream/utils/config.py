@@ -175,20 +175,10 @@ def _build_node_configs(
             node_type = "onetoone"
         else:
             node_type = "regular"
-
-        # Parse demand_profile for origin nodes from YAML demand section
-        # e.g. demand: { origin_0: { pattern: "sudden_demand", ... } }
-        demand_profile = "gaussian_peaks"  # default
-        if node_id in origin_nodes:
-            origin_key = f"origin_{node_id}"
-            origin_demand = demand_config.get(origin_key, {})
-            demand_profile = origin_demand.get("pattern", "gaussian_peaks")
-
+            
         node_config = NodeConfig(
             node_id=node_id,
-            node_type=node_type,
-            demand_profile=demand_profile,
-            # demand array is set at runtime by DemandGenerator, not at config time
+            node_type=node_type
         )
         node_configs.append(node_config)
 

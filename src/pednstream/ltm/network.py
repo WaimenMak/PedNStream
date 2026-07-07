@@ -26,7 +26,7 @@ class NetworkConfig:
     od_flows: dict = field(default_factory=dict) # Dictionary to hold origin-destination flow information, from yaml file
     positions: dict = field(default_factory=dict) # Dictionary to hold node positions, from yaml file
     demand : dict = field(default_factory=dict) # Dictionary to hold demand information, from yaml file
-    
+    # TODO: consider moving simulation steps to here, as a global parameter for the network, instead of being part of the link configuration. This would make it easier to manage and change simulation steps for the entire network.
 
 class Network:
     """Class representing a transportation network."""
@@ -125,26 +125,35 @@ class Network:
         import numpy as np
         nodes = {}
 
+        
         for node_config in self.config.nodes:
             
             # FIXME: could this be done by the node instantiation?
             id = node_config.id
-            incoming_links = np.sum(self.config.adjacency_matrix[:, node_config.id])
-            outgoing_links = np.sum(self.config.adjacency_matrix[node_config.id, :])
+            incoming_links = np.sum(self.config.adjacency_matrix[:, id])
+            outgoing_links = np.sum(self.config.adjacency_matrix[id, :])
+
+            # create node 
+            node = Node(node_config)
        
-            # node type rules
+            # Rules to set  note types
             if incoming_links >= 2 and outgoing_links >= 2:
                 
                 if id in self.config.origin_nodes or id in self.config.destination_nodes:
-                    node_config.node_type = "regular"
-                    # Create virtual Node
-                    self._create_origin_destination(node_config) # These Are Links. 
-                else:  # do not create virtual links 
-                    node_config.node_type = "onetoone"  
+                    node.type = "regular"
+                    # follow up steps:
+                    #  1. Create virtual Link
+                    # TODO: CONTINUE HERE: decide how to pass parametes to 
+                    # create_virtual_links. 
+                    node.create_virtual_links()
 
+                    # 2. Assigne demand to the virtual link.
+                    self._create_origin_destination(node_config) # replace this by the steps above
+                else:  # do not create virtual links 
+                    node.type = "onetoone"  
             elif incoming_links == 1 and outgoing_links ==1:
-                node_config.node_type = "onetoone"
-                # create virtual Node
+                node.type = "onetoone"
+                # create virtual link
                 self._create_origin_destination(node_config)
      
             # create the Node object

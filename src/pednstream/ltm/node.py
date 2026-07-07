@@ -45,7 +45,7 @@ class Node:
         self.A_ub = None        # LP constraint matrix, built in get_matrix_A
         self.mask = None        # boolean mask, built in init_mask
         self.ods_in_turns = {}  # populated on-the-fly during path-finding/flow assignment
-        self._node_type = ""     # "onetoone" or "regular"
+        self._type = ""     # "onetoone" or "regular"
 
         self.is_controller = node_config.is_controller # whether this node is a controller, can be used to populate Network's controllers list
     # ------------------------------------------------------------------
@@ -54,12 +54,12 @@ class Node:
     # ------------------------------------------------------------------
 
     @property
-    def node_type(self):
+    def type(self):
         """Return the type of the node."""
-        return self._node_type
+        return self._type
     
-    @node_type.setter
-    def node_type(self, value) -> None:
+    @type.setter
+    def type(self, value) -> None:
         """Set the type of the node based on the adjacency matrix and origin/destination nodes."""
         try:
             adjacency_matrix, origin_nodes, destination_nodes = value 
@@ -72,15 +72,15 @@ class Node:
             # node type rules
             if incoming_links >= 2 and outgoing_links >= 2:
                 if self.id in origin_nodes or self.id in destination_nodes:
-                    self._node_type = "regular"
+                    self._type = "regular"
                     # Create virtual Node
                     # FIXME: move creation of virtual links to be created in a separated method.
                     # self._create_origin_destination(node_config) # These Are Links. 
                 else:  # do not create virtual links 
-                    self._node_type = "onetoone"  
+                    self._type = "onetoone"  
 
             elif incoming_links == 1 and outgoing_links ==1:
-                self._node_type = "onetoone"
+                self._type = "onetoone"
                 # create virtual Node
                 # self._create_origin_destination(node_config)
             # CONTINUE HERE: test this works as expected.

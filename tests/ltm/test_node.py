@@ -31,7 +31,7 @@ class TestNode:
     def test_node_type_property(self, node_config):
         """Test initial node_type property of the Node class"""
         node = Node(node_config)
-        assert node.node_type == ""  # Initially, node_type should be empty
+        assert node.type == ""  # Initially, node_type should be empty
 
 
     def test_node_type_setter(self, node_config):
@@ -41,14 +41,14 @@ class TestNode:
         origin_nodes = [0]
         destination_nodes = [1]
 
-        node.node_type = (adjacency_matrix, origin_nodes, destination_nodes)
-        assert node.node_type == "onetoone"  # Based on the provided adjacency matrix and nodes
+        node.type = (adjacency_matrix, origin_nodes, destination_nodes)
+        assert node.type == "onetoone"  # Based on the provided adjacency matrix and nodes
 
     def test_node_type_setter_invalid_value(self, node_config):
         """Test that ValueError is raised when setting node_type with an invalid value"""
         node = Node(node_config)
         with pytest.raises(ValueError):
-            node.node_type = "invalid_value"  # Not a tuple of (adjacency_matrix, origin_nodes, destination_nodes)      
+            node.type = "invalid_value"  # Not a tuple of (adjacency_matrix, origin_nodes, destination_nodes)      
 
 
     def test_node_type_setter_regular_node(self, node_config):
@@ -58,5 +58,5 @@ class TestNode:
         origin_nodes = [1]
         destination_nodes = [2]
 
-        node.node_type = (adjacency_matrix, origin_nodes, destination_nodes)
-        assert node.node_type == "regular"  # Based on the provided adjacency matrix and nodes
+        node.type = (adjacency_matrix, origin_nodes, destination_nodes)
+        assert node.type == "regular"  # Based on the provided adjacency matrix and nodes

@@ -25,6 +25,246 @@ def _assemble_network_config(params: Dict[str, Any], config: Dict[str, Any]) -> 
 
     return network_config
 
+def _build_link_configs(
+    adjacency_matrix: np.ndarray,
+    default_link: Dict[str, Any],
+    links_overrides: Dict[str, Any],
+    simulation_steps: int,
+    unit_time: int,
+    controller_links: list = [],
+) -> list:
+    """
+    Build a list of LinkConfig objects from the adjacency matrix.
+
+    For each edge (i, j) in the adjacency matrix, creates both a forward (i→j)
+    and reverse (j→i) LinkConfig. Uses link-specific overrides when available,
+    otherwise falls back to default_link parameters.
+
+    Args:
+        adjacency_matrix: NxN numpy array of 0s and 1s.
+        default_link: Default link parameters from YAML (length, width, etc.)
+        links_overrides: Link-specific overrides, keyed by "i_j" strings.
+        simulation_steps: Number of simulation steps.
+        unit_time: Unit time for the simulation.
+        controller_links: List of controller link keys (e.g. ["1-2"]).
+
+    Returns:
+        List of LinkConfig dataclass instances.
+    """
+    from pednstream.ltm.link import LinkConfig
+
+    link_configs = []
+    num_nodes = adjacency_matrix.shape[0]
+
+    for i in range(num_nodes):
+        for j in range(i + 1, num_nodes):
+            if adjacency_matrix[i, j] != 1:
+                continue
+
+            # Resolve parameters: check both "i_j" and "j_i" keys
+            forward_key = f"{i}_{j}"
+            reverse_key = f"{j}_{i}"
+            if forward_key in links_overrides:
+                merged_params = {**default_link, **links_overrides[forward_key]}
+            elif reverse_key in links_overrides:
+                merged_params = {**default_link, **links_overrides[reverse_key]}
+            else:
+                merged_params = dict(default_link)
+
+            # Determine if this is a controller (separator) link
+            is_controller = (
+                f"{i}-{j}" in controller_links
+                or f"{j}-{i}" in controller_links
+            )
+
+            # Build forward LinkConfig (i → j)
+            forward_config = LinkConfig(
+                start_node=i,
+                end_node=j,
+                link_id=(i, j),
+                simulation_steps=simulation_steps,
+                unit_time=unit_time,
+                is_controller=is_controller,
+                length=merged_params["length"],
+                width=merged_params["width"],
+                free_flow_speed=merged_params["free_flow_speed"],
+                k_critical=merged_params["k_critical"],
+                k_jam=merged_params["k_jam"],
+                gamma=merged_params.get("gamma", 2e-3),
+                bi_factor=merged_params.get("bi_factor", 1),
+                fd_type=merged_params.get("fd_type", "yperman"),
+                speed_noise_std=merged_params.get("speed_noise_std", 0),
+                activity_probability=merged_params.get("activity_probability", 0.0),
+                front_gate_width=merged_params.get("front_gate_width"),
+                back_gate_width=merged_params.get("back_gate_width"),
+            )
+
+            # Build reverse LinkConfig (j → i) — swap front/back gate widths
+            reverse_config = LinkConfig(
+                start_node=j,
+                end_node=i,
+                link_id=(j, i),
+                simulation_steps=simulation_steps,
+                unit_time=unit_time,
+                is_controller=is_controller,
+                length=merged_params["length"],
+                width=merged_params["width"],
+                free_flow_speed=merged_params["free_flow_speed"],
+                k_critical=merged_params["k_critical"],
+                k_jam=merged_params["k_jam"],
+                gamma=merged_params.get("gamma", 2e-3),
+                bi_factor=merged_params.get("bi_factor", 1),
+                fd_type=merged_params.get("fd_type", "yperman"),
+                speed_noise_std=merged_params.get("speed_noise_std", 0),
+                activity_probability=merged_params.get("activity_probability", 0.0),
+                front_gate_width=merged_params.get("back_gate_width"),   # swapped
+                back_gate_width=merged_params.get("front_gate_width"),   # swapped
+            )
+
+            link_configs.append(forward_config)
+            link_configs.append(reverse_config)
+
+    return link_configs
+
+
+def _build_node_configs(
+    adjacency_matrix: np.ndarray,
+    origin_nodes: list,
+    destination_nodes: list,
+    demand_config: Dict[str, Any] = None,
+    controller_nodes: set = None,
+) -> list:
+    """
+    Build a list of NodeConfig objects from the adjacency matrix.
+
+    Determines node_type ("onetoone" or "regular") based on connection counts
+    and origin/destination membership, mirroring Network._create_nodes() logic.
+    For origin nodes, parses the demand profile from the YAML config.
+
+    Args:
+        adjacency_matrix: NxN numpy array of 0s and 1s.
+        origin_nodes: List of origin node IDs.
+        destination_nodes: List of destination node IDs.
+        demand_config: The "demand" section from the YAML config, e.g.
+            {"origin_0": {"pattern": "sudden_demand", "peak_lambda": 20, ...}}.
+        controller_nodes: Optional set of node IDs that act as controllers.
+
+    Returns:
+        List of NodeConfig dataclass instances.
+    """
+    from pednstream.ltm.node import NodeConfig
+
+    if controller_nodes is None:
+        controller_nodes = set()
+    if demand_config is None:
+        demand_config = {}
+
+    node_configs = []
+    num_nodes = adjacency_matrix.shape[0]
+
+    for node_id in range(num_nodes):
+        incoming_count = int(np.sum(adjacency_matrix[:, node_id]))
+        outgoing_count = int(np.sum(adjacency_matrix[node_id, :]))
+
+        is_od = node_id in origin_nodes or node_id in destination_nodes
+
+        # Determine node_type — same logic as Network._create_nodes()
+        if incoming_count == 2 and outgoing_count == 2:
+            node_type = "regular" if is_od else "onetoone"
+        elif incoming_count == 1 and outgoing_count == 1:
+            node_type = "onetoone"
+        else:
+            node_type = "regular"
+            
+        node_config = NodeConfig(
+            node_id=node_id,
+            node_type=node_type
+        )
+        node_configs.append(node_config)
+
+    return node_configs
+
+
+def _new_assemble_network_config(config: Dict[str, Any], adjacency_matrix: np.ndarray = None) -> tuple["NetworkConfig", "SimulationConfig"]:
+    """
+    Assemble NetworkConfig and SimulationConfig dataclasses from the raw YAML config dictionary.
+
+    Args:
+        config: The raw parsed YAML configuration dictionary.
+        adjacency_matrix: Optional adjacency matrix. If None, attempts to read from config.
+
+    Returns:
+        tuple: (NetworkConfig, SimulationConfig) dataclass instances.
+    """
+    from pednstream.ltm.network import NetworkConfig, SimulationConfig
+
+    # --- Simulation parameters ---
+    path_finder_params = config["simulation"].get("path_finder", {})
+    simulation_steps = config["simulation"]["simulation_steps"]
+    unit_time = config["simulation"]["unit_time"]
+
+    # --- Adjacency matrix ---
+    if adjacency_matrix is None and "adjacency_matrix" in config.get("network", {}):
+        adjacency_matrix = np.array(config["network"]["adjacency_matrix"])
+
+    # --- Build LinkConfig list ---
+    link_configs = []
+    if adjacency_matrix is not None:
+        controller_links = config.get("controllers", {}).get("links", [])
+        link_configs = _build_link_configs(
+            adjacency_matrix=adjacency_matrix,
+            default_link=config["default_link"],
+            links_overrides=config.get("links", {}),
+            simulation_steps=simulation_steps,
+            unit_time=unit_time,
+            controller_links=controller_links,
+        )
+
+    # --- Build NodeConfig list ---
+    origin_nodes = config["network"]["origin_nodes"]
+    destination_nodes = config["network"].get("destination_nodes", [])
+    node_configs = []
+    if adjacency_matrix is not None:
+        controller_nodes = set(
+            map(int, config.get("controllers", {}).get("nodes", []))
+        )
+        node_configs = _build_node_configs(
+            adjacency_matrix=adjacency_matrix,
+            origin_nodes=origin_nodes,
+            destination_nodes=destination_nodes,
+            demand_config=config.get("demand", {}),
+            controller_nodes=controller_nodes,
+        )
+
+    # --- OD flows (inline dict) ---
+    od_flows = {}
+    if "od_flows" in config:
+        for od_pair, flow in config["od_flows"].items():
+            origin, dest = map(int, od_pair.split("_"))
+            od_flows[(origin, dest)] = flow
+
+    # --- Build Config Objects ---
+    network_config = NetworkConfig(
+        adjacency_matrix=adjacency_matrix,
+        links=link_configs,
+        nodes=node_configs,
+        origin_nodes=origin_nodes,
+        destination_nodes=destination_nodes,
+        positions={},   # populated later from node_positions.json
+    )
+
+    simulation_config = SimulationConfig(
+        simulation_steps=simulation_steps,
+        unit_time=unit_time,
+        assign_flows_type=config["simulation"].get("assign_flows_type", "classic"),
+        seed=config["simulation"].get("seed", None),
+        path_finder=path_finder_params,
+        demand_params=config.get("demand", {}),
+        od_flows=od_flows,
+    )
+
+    return network_config, simulation_config
+
 
 def _parse_pair_key(key: str, label: str, example: str) -> tuple[int, int]:
     """Parse keys in the form 'i_j' and return integer tuple (i, j)."""

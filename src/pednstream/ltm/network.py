@@ -6,12 +6,34 @@ from .node import Node
 from .link import Link, Separator
 from .od_manager import ODManager, DemandGenerator
 from .path_finder import PathFinder
-from typing import Callable, List
+from dataclasses import dataclass, field
+from typing import Callable, List, Optional, Dict, Any
 from pathlib import Path
 
 """
 A Link Transmission Model for the Pedestrian Traffic
 """
+
+@dataclass
+class SimulationConfig:
+    """Configuration for simulation runtime and parameters."""
+    simulation_steps: int
+    unit_time: int
+    assign_flows_type: str
+    seed: Optional[int]
+    path_finder: dict
+    demand_params: dict  # Original YAML demand section for generating runtime demand
+    od_flows: dict       # OD flows mapping (origin, destination) -> flow
+
+@dataclass
+class NetworkConfig:
+    """Configuration for the physical network topology."""
+    adjacency_matrix: np.ndarray
+    links: list          # List of LinkConfig
+    nodes: list          # List of NodeConfig
+    origin_nodes: list
+    destination_nodes: list = field(default_factory=list)
+    positions: dict = field(default_factory=dict)
 
 
 class Network:

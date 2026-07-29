@@ -47,6 +47,7 @@ class NodeFlowSolver:
         )
         if np.any(q < 0):
             raise Warning(f"Negative flows detected: {q}")
+        # the methods below return data with the same shape as q.
         return q
 
     # ------------------------------------------------------------------

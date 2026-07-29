@@ -43,9 +43,9 @@ class ODManager:
             for o in origin_nodes:
                 for d in destination_nodes:
                     if o != d:
-                        self.od_flows[(o, d)] = np.ones(self.simulation_steps + 1)
+                        self.od_flows[(o, d)] = np.ones(self.simulation_steps + 1) # Necessary at network initialization, one per simulation
 
-    def _set_predefined_flows(self, od_flows: dict):
+    def _set_predefined_flows(self, od_flows: dict): # Set predefined OD flows from YAML file
         """Set predefined OD flows"""
         for (o, d), flow in od_flows.items():
             if isinstance(
@@ -68,11 +68,12 @@ class ODManager:
         ]
 
 
-class DemandGenerator:
+class DemandGenerator:  # Generate a function for the simulation at initialization,  One per simulation.
     """
     Generate demand patterns for origin nodes.
     """
 
+    # TODO: Refactor to reduce repetion.
     def __init__(self, simulation_steps: int, params: dict, logger: logging.Logger):
         self.logger = logger
         self.simulation_steps = simulation_steps

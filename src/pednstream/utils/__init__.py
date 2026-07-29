@@ -3,5 +3,3 @@
 # @Author  : mmai
 # @FileName: __init__.py
 # @Software: PyCharm
-
-from .output_handler import OutputHandler

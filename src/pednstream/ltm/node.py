@@ -2,28 +2,79 @@ import numpy as np
 from collections import defaultdict
 from scipy.optimize import linprog
 from .link import BaseLink
+from .solver import NodeFlowSolver
+from collections import defaultdict
+from dataclasses import dataclass
+from typing import Optional, List
 
+@dataclass
+class NodeConfig:
+    """Static configuration for a Node. Only holds values known before simulation starts.
+
+    Dynamic/runtime state (q, A_ub, mask, source_num, dest_num, edge_num,
+    virtual links, ods_in_turns) lives on Node itself.
+    """
+    node_id: str
+    node_type: str = "regular"          # "regular" or "onetoone"
+    gate_width: Optional[float] = None
+    turning_fractions: Optional[np.ndarray] = None
+    demand: Optional[np.ndarray] = None  # demand array for origin node
+    M: float = 1e6            # penalty term for destination node
+    w: float = 1e-2           # penalty term for turning fractions
 
 class Node:
-    def __init__(self, node_id):
-        self.node_id = node_id
-        self.incoming_links = []
-        self.outgoing_links = []
-        self.turning_fractions = None  # 1D array, the length is the number of edges
-        self.mask = None
-        self.q = None
-        self.w = 1e-2  # penalty term for turning fractions
-        self.source_num = None
-        self.dest_num = None
-        self.edge_num = None
-        self.A_ub = None
-        self.A_eq = None
+    def __init__(self, node_config: NodeConfig):
+        # --- Static config (from NodeConfig) ---
+        self.node_id = node_config.node_id
+        self.node_type = node_config.node_type        # "onetoone" or "regular"
+        self.turning_fractions = node_config.turning_fractions  # 1D array, length = edge_num
+        self.demand = node_config.demand              # demand profile for origin node
+        self.M = node_config.M                        # penalty for destination node
+        self.w = node_config.w                        # penalty for turning fractions
+        self.gate_width = node_config.gate_width
+
+        # --- Link containers (populated externally by Network) ---
+        self.incoming_links: list = []
+        self.outgoing_links: list = []
         self.virtual_incoming_link = None
         self.virtual_outgoing_link = None
-        self.M = 1e6  # for destination node, large constant for receiving flow
-        self.demand = None  # for origin node
-        self.mask = None  # for regular node, classic update method
-        self.ods_in_turns = {}  # for recording the turns in which od pairs
+
+        # --- Runtime state (computed during simulation) ---
+        self.q = None           # flows for each edge, set in assign_flows
+        self.A_ub = None        # LP constraint matrix, built in get_matrix_A
+        self.mask = None        # boolean mask, built in init_mask
+        self.ods_in_turns = {}  # populated on-the-fly during path-finding/flow assignment
+        self.node_turn_probs = {}
+        self.turns_distances = {}
+        self.up_od_probs = defaultdict(lambda: defaultdict(int))
+        self.current_turn_probs_step = {}
+
+    # ------------------------------------------------------------------
+    # Properties: always in sync with the actual link lists — no stale
+    # state and no need to call init_node() just to read these values.
+    # ------------------------------------------------------------------
+
+    @property
+    def source_num(self) -> int:
+        """Number of incoming links (sources at this node)."""
+        return len(self.incoming_links)
+
+    @property
+    def dest_num(self) -> int:
+        """Number of outgoing links (destinations at this node)."""
+        return len(self.outgoing_links)
+
+    @property
+    def edge_num(self) -> int:
+        """Number of turning edges (excludes U-turn from each source)."""
+        return self.dest_num * self.source_num - self.source_num
+
+    def get_outgoing_link_to(self, down_node_id):
+        """Return the outgoing link from this node to a downstream node id."""
+        for link in self.outgoing_links:
+            if link.end_node is not None and link.end_node.node_id == down_node_id:
+                return link
+        return None
 
         # Path finder attributes — pre-initialized to avoid hasattr checks in hot path
         self.node_turn_probs = {}  # {(o,d): {(up_node, down_node): prob}}
@@ -47,18 +98,19 @@ class Node:
             self.virtual_outgoing_link = link
         return link
 
-    def init_node(self):
-        """Initializes node-specific attributes based on the type."""
-        # source number is the number of incoming links
-        self.source_num = len(self.incoming_links)
-        self.dest_num = len(self.outgoing_links)
-        self.edge_num = self.dest_num * self.source_num - self.source_num
+    def init_mask(self):
+        """Build the boolean mask for optimal flow assignment once all links are attached.
+
+        Must be called after incoming/outgoing links are fully populated.
+        source_num / dest_num / edge_num are live properties, so this is
+        the only one-time computation that still needs an explicit trigger.
+        """
         self.mask = np.ones([self.source_num, self.source_num], dtype=bool)
         np.fill_diagonal(self.mask, False)
 
     def get_matrix_A(self):
         """
-        Get the matrix A_ub for the linear programming problem
+        Get the matrix A_ub for the linear programming problem, only computed once.
         """
         row_num = self.source_num + self.dest_num
         # - source_num for the link from the same source-destination pair, now it is included in the source_num
@@ -86,33 +138,6 @@ class Node:
         start_idx = [i * self.dest_num + i for i in range(self.source_num)]
         self.A_ub = np.delete(self.A_ub, start_idx, axis=1)
 
-    def update_matrix_A_eq(self, turning_fractions: np.array):
-        """
-        Update the turning fractions matrix A_eq more efficiently
-
-        Args:
-            turning_fractions: Array of turning fraction values
-        """
-        self.turning_fractions = turning_fractions
-        assert len(turning_fractions) == self.edge_num
-
-        # Initialize A_eq matrix with zeros
-        self.A_eq = np.zeros((self.edge_num, self.edge_num + 2 * self.edge_num))
-
-        for i in range(self.edge_num):
-            source_idx = i // (self.dest_num - 1)
-            start_ind = source_idx * (self.dest_num - 1)
-
-            # Set turning fractions for all destinations from this source
-            self.A_eq[i, start_ind : start_ind + self.dest_num - 1] = turning_fractions[
-                i
-            ]
-            # the penalty term for the edge from the same source-destination pair should be 0
-            self.A_eq[i, i] = turning_fractions[i] - 1  # the lth column is phi - 1
-            self.A_eq[i, self.edge_num + i * 2 : self.edge_num + (i + 1) * 2] = (
-                np.array([1, -1])
-            )  # the penalty term
-
     def update_links(self, time_step):
         """Update the upstream link's downstream cumulative outflow
         q -->> [S1, S2, R1, R2, R3], already sum up the flows from/to the same link
@@ -130,6 +155,168 @@ class Node:
         for m, link in enumerate(self.outgoing_links):
             outflow = self.q[self.source_num + m]
             link.update_cum_inflow(outflow, time_step)
+
+    def update_node_turn_probs(
+        self, od_pair, time_step, alpha, beta, omega, temp, std_dev
+    ):
+        """Update turn probabilities for this node, P(down|up,od)."""
+        # Reuse the probabilities within the same timestep so one choice set
+        # is generated from one consistent utility/noise realization.
+        if self.current_turn_probs_step.get(od_pair) == time_step:
+            return self.node_turn_probs
+
+        for up_node, down_nodes in self.turns_distances[od_pair].items():
+            if down_nodes:
+                turns = list((up_node, down_node) for down_node in down_nodes)
+                distances = list(down_nodes.values())
+                densities = []
+                capacities = []
+                for down_node in down_nodes:
+                    link = self.get_outgoing_link_to(down_node)
+                    if link is not None:
+                        densities.append(
+                            np.maximum(
+                                link.get_density(max(0, time_step - 1))
+                                - link.k_critical,
+                                0,
+                            )
+                            / (link.k_jam - link.k_critical)
+                        )
+                        capacity = link.receiving_flow[
+                            max(0, time_step - 2)
+                        ]  # -2 steps is the most recent, the capacity of -1 step is -1 by default
+                        capacities.append(
+                            capacity
+                            if capacity >= 0
+                            else link.back_gate_width
+                            * link.free_flow_speed
+                            * link.k_critical
+                            * link.unit_time
+                        )
+                    else:
+                        # this is the case of origin/destination nodes, with down node id -1
+                        densities.append(0)
+                        capacities.append(100)
+
+                norm_densities = np.array(densities)
+                if std_dev == 0:
+                    time_variation = 0
+                else:
+                    time_variation = np.random.normal(0, std_dev, len(turns))
+                utilities = (
+                    alpha * np.array(distances) / (np.sum(distances) + 1e-6)
+                    + beta * norm_densities
+                    - omega * np.array(capacities) / (np.sum(capacities) + 1e-6)
+                ) + time_variation
+                exp_utilities = np.exp(-temp * utilities)
+                probs = exp_utilities / np.sum(exp_utilities)
+                self.node_turn_probs[od_pair].update(dict(zip(turns, probs)))
+
+        self.current_turn_probs_step[od_pair] = time_step
+        return self.node_turn_probs
+
+    def update_turning_fractions(
+        self, time_step: int, od_manager, alpha, beta, omega, temp, std_dev
+    ):
+        """Calculate turning fractions using stored turn probabilities."""
+        turning_fractions = np.zeros(self.edge_num)
+        # Update P(od|up) for each upstream node
+        for up_node, od_pairs in self.up_od_probs.items():
+            total_flow = 0
+            # First pass: calculate total flow
+            for od_pair in od_pairs:
+                flow = od_manager.get_od_flow(od_pair[0], od_pair[1], time_step)
+                od_pairs[od_pair] = flow
+                total_flow += flow
+
+            # Second pass: normalize to get probabilities
+            if total_flow > 0:
+                for od_pair in od_pairs:
+                    od_pairs[od_pair] /= total_flow
+            else:
+                # If no flow, set equal probabilities
+                n_pairs = len(od_pairs)
+                for od_pair in od_pairs:
+                    od_pairs[od_pair] = 1.0 / n_pairs if n_pairs > 0 else 0
+
+        # Calculate final turning fractions
+        upstream_nodes = [
+            link.start_node.node_id if link.start_node is not None else -1
+            for link in self.incoming_links
+        ]
+        downstream_nodes = [
+            link.end_node.node_id if link.end_node is not None else -1
+            for link in self.outgoing_links
+        ]
+
+        idx = 0
+        for up in upstream_nodes:
+            for down in downstream_nodes:
+                if up == down:
+                    continue
+                turn = (up, down)
+                prob_sum = 0
+
+                # Get all OD pairs for this turn
+                od_pairs = self.ods_in_turns.get(turn, set())
+                for od_pair in od_pairs:
+                    # P(down|up,od) from node_turn_probs
+                    self.update_node_turn_probs(
+                        od_pair,
+                        time_step=time_step,
+                        alpha=alpha,
+                        beta=beta,
+                        omega=omega,
+                        temp=temp,
+                        std_dev=std_dev,
+                    )
+                    turn_prob = self.node_turn_probs[od_pair].get(turn, 0)
+                    # P(od|up) from up_od_probs
+                    od_prob = self.up_od_probs[up].get(od_pair, 0)
+                    prob_sum += turn_prob * od_prob
+
+                turning_fractions[idx] = prob_sum
+                idx += 1
+
+        return turning_fractions
+
+    def check_fractions(self):
+        """
+        Check if the turning fractions are valid and normalize if needed.
+
+        Normalization strategy:
+        - If sum > 0: normalize by dividing by sum (preserves relative magnitudes)
+        - If sum == 0: fall back to equal probabilities (no information available)
+        """
+        fract = self.turning_fractions.reshape(self.dest_num, self.source_num - 1)
+
+        for i in range(self.dest_num):
+            row_sum = np.sum(fract[i])
+
+            if np.abs(row_sum - 1) > 1e-3:
+                if row_sum > 1e-6:
+                    # Normalize by sum - preserves relative probabilities
+                    fract[i] = fract[i] / row_sum
+                    print(
+                        f"Warning: turning fractions at node {self.node_id} for downstream {i} do not sum to 1. Normalizing."
+                    )
+                else:
+                    # No information available - use equal probabilities
+                    fract[i] = np.ones(self.source_num - 1) / (self.source_num - 1)
+
+        self.turning_fractions = fract.flatten()
+        return self.turning_fractions
+
+    def calculate_node_turning_fractions(
+        self, time_step: int, od_manager, alpha, beta, omega, temp, std_dev
+    ):
+        """Calculate and store this node's current turning fractions."""
+        if self.source_num > 2:
+            fractions = self.update_turning_fractions(
+                time_step, od_manager, alpha, beta, omega, temp, std_dev
+            )
+            self.turning_fractions = fractions
+            self.check_fractions()
 
     def assign_flows(self, time_step: int, type="classic"):
         """
@@ -174,92 +361,9 @@ class Node:
             raise Warning(
                 f"Negative flows detected at time step {time_step}: s={s}, r={r}"
             )
-        self.solve(s, r, type=type)
+
+        # Delegate flow computation to the standalone solver
+        q = NodeFlowSolver.solve(self, s, r, type=type)
+        if q is not None:
+            self.q = q
         self.update_links(time_step)
-
-    def solve(self, s, r, type="classic"):
-        return
-
-
-class OneToOneNode(Node):
-    def __init__(self, node_id):
-        super().__init__(node_id)
-
-    def solve(self, s, r, type="classic"):
-        """
-        q = [S0, S1, R0, R1], S1 and R1 are virtual links
-        """
-        # Ensure non-negative flows by using maximum of 0 and the minimum flow
-        self.q = np.array(
-            [
-                np.min([s[0], r[1]]),
-                np.min([s[1], r[0]]),
-                np.min([s[1], r[0]]),
-                np.min([s[0], r[1]]),
-            ]
-        )
-        if np.any(self.q < 0):
-            raise Warning(f"Negative flows detected: {self.q}")
-        return
-
-
-class RegularNode(Node):
-    def __init__(self, node_id):
-        super().__init__(node_id)
-
-    def solve(self, s, r, type="classic"):
-        if type == "optimal":
-            self.update_matrix_A_eq(
-                self.turning_fractions
-            )  # update the matrix A_eq for the turning fractions
-            # solve the linear programming problem
-            w = self.w * np.ones(2 * self.edge_num)  # variables for the penalty term
-            c = -1 * np.ones(self.edge_num)  # variables for the flow
-            c = np.concatenate((c, w))
-            assert self.edge_num > 0
-            b_ub = np.concatenate((s, r))
-
-            if self.A_eq is not None:
-                res = linprog(
-                    c,
-                    A_ub=self.A_ub,
-                    A_eq=self.A_eq,
-                    b_ub=b_ub,
-                    b_eq=np.zeros(self.edge_num),
-                )
-            else:
-                res = linprog(c, A_ub=self.A_ub, b_ub=b_ub)
-            if res.success:
-                flows = self.A_ub @ np.floor(res.x)
-                # Ensure non-negative flows and round down to nearest integer
-                self.q = np.maximum(0, flows)
-            return
-        if type == "classic":
-            # use the update method originally from LTM paper
-            s_tiled = np.tile(s, (self.source_num, 1))
-            p = self.turning_fractions.reshape(self.dest_num, self.source_num - 1)
-            # Add zero diagonal elements to make it a square matrix (m x m)
-            p_square = np.zeros((self.dest_num, self.source_num))
-            # Fill non-diagonal elements with the reshaped turning fractions
-            p_square[self.mask] = p.flatten()
-            p = p_square
-
-            weighted_s_frac = p * s_tiled.T  # 2
-            row_sums = np.sum(weighted_s_frac, axis=0, keepdims=True)  # 2
-            weighted_s = weighted_s_frac / np.where(row_sums != 0, row_sums, 1e-5)  # 2
-            weighted_sr = r * weighted_s  # 2
-
-            flows_list = []
-            for i in range(self.edge_num):
-                source_idx = i // (self.dest_num - 1)
-                destination_idx = i % (self.dest_num - 1)
-                g_ij = min(
-                    self.turning_fractions[i] * s[source_idx],
-                    weighted_sr[source_idx][self.mask[source_idx, :]][destination_idx],
-                )  # do not use min # 2
-                flows_list.append(g_ij)
-            flows = self.A_ub[:, : self.edge_num] @ np.floor(np.array(flows_list))
-            self.q = np.maximum(0, flows)
-            return
-        else:
-            raise ValueError(f"Invalid type: {type}")

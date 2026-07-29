@@ -595,8 +595,14 @@ class PathFinder:
 
             # calculate the turn probabilities based on the distances and num_pedestrians of the downstream nodes
             # TODO: calibrate the parameters
-            self.update_node_turn_probs(
-                current_node, od_pair, time_step=0
+            current_node.update_node_turn_probs(
+                od_pair,
+                time_step=0,
+                alpha=self.alpha,
+                beta=self.beta,
+                omega=self.omega,
+                temp=self.temp,
+                std_dev=self.std_dev,
             )  # this is the first time we calculate the turn probabilities, so we can use time_step=0
 
     def _cache_link_attributes(self, time_step):
@@ -796,34 +802,33 @@ class PathFinder:
                 idx += 1
 
         return turning_fractions
+        """Delegate turn probability updates to the node."""
+        return node.update_node_turn_probs(
+            od_pair,
+            time_step,
+            alpha=self.alpha,
+            beta=self.beta,
+            omega=self.omega,
+            temp=self.temp,
+            std_dev=self.std_dev,
+        )
+
+    def update_turning_fractions(self, node, time_step: int, od_manager):
+        """Delegate turning fraction updates to the node."""
+        return node.update_turning_fractions(
+            time_step,
+            od_manager,
+            alpha=self.alpha,
+            beta=self.beta,
+            omega=self.omega,
+            temp=self.temp,
+            std_dev=self.std_dev,
+        )
 
     @staticmethod
     def check_fractions(node):
-        """
-        Check if the turning fractions are valid and normalize if needed.
-
-        Normalization strategy:
-        - If sum > 0: normalize by dividing by sum (preserves relative magnitudes)
-        - If sum == 0: fall back to equal probabilities (no information available)
-        """
-        fract = node.turning_fractions.reshape(node.dest_num, node.source_num - 1)
-
-        for i in range(node.dest_num):
-            row_sum = np.sum(fract[i])
-
-            if np.abs(row_sum - 1) > 1e-3:
-                if row_sum > 1e-6:
-                    # Normalize by sum - preserves relative probabilities
-                    fract[i] = fract[i] / row_sum
-                    print(
-                        f"Warning: turning fractions at node {node.node_id} for downstream {i} do not sum to 1. Normalizing."
-                    )
-                else:
-                    # No information available - use equal probabilities
-                    fract[i] = np.ones(node.source_num - 1) / (node.source_num - 1)
-
-        node.turning_fractions = fract.flatten()
-        return node.turning_fractions
+        """Delegate turning fraction validation to the node."""
+        return node.check_fractions()
 
     def _ensure_od_flow_cache(self, time_step: int, od_manager):
         """Pre-fetch all OD flows for the current timestep to avoid per-call overhead.

@@ -61,7 +61,7 @@ class Network:
     @property
     def controller_gaters(self):
         """Get the list of controller gaters."""
-        # FODO: consider removing it. 
+        # TODO: consider removing it. 
         return self._controller_gaters
  
     @property

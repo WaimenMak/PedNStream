@@ -772,9 +772,10 @@ class PathFinder:
         Returns:
             np.array: Turning fractions for the node
         """
+        # TODO: consider if this can  extracted from here. Maybe not.
         # Only process nodes that appear in paths
         if node.node_id in self.nodes_in_paths:
             if node.source_num > 2:  # only process intersection nodes
                 fractions = self.update_turning_fractions(node, time_step, od_manager)
-                node.turning_fractions = fractions
+                node.turning_fractions = fractions # updtes value on the node. 
                 self.check_fractions(node)

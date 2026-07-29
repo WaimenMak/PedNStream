@@ -1,3 +1,5 @@
+import math
+
 import networkx as nx
 import numpy as np
 from collections import defaultdict
@@ -164,6 +166,9 @@ class PathFinder:
         self.node_turn_probs = {}  # {node_id: {(o,d): {(up_node, down_node): probability}}}
         self.node_to_od_pairs = {}  # {node_id: set((o1,d1), (o2,d2), ...)}, to get the relevant od pairs for the node
         self._initialized = False  # Add initialization flag
+        self._link_cache_step = -1  # Last timestep for which link cache was built
+        self._link_density_cache = {}  # {(node_id, down_node): normalized_density}
+        self._link_capacity_cache = {}  # {(node_id, down_node): capacity}
         self.logger = logger
 
         # Get parameters from config or use defaults
@@ -571,30 +576,15 @@ class PathFinder:
                     continue
 
             if od_turn_distances:
-                # Initialize or get existing turn_probs from node
-                if not hasattr(current_node, "node_turn_probs"):
-                    current_node.node_turn_probs = {}
-
-                # Initialize turns_by_upstream in node if not exists
-                if not hasattr(current_node, "turns_distances"):
-                    current_node.turns_distances = {}  # {(o,d): {up_node: {down_node: distance}}}
-
-                # Initialize up_od_probs if not exists
-                if not hasattr(current_node, "up_od_probs"):
-                    current_node.up_od_probs = defaultdict(lambda: defaultdict(int))
-
+                # Attributes are pre-initialized in Node.__init__; no hasattr needed.
                 current_node.turns_distances[od_pair] = {}
                 # Update distances in existing structure or create new
                 for turn, distance in od_turn_distances.items():
                     up_node = turn[0]
                     down_node = turn[1]
                     if up_node not in current_node.turns_distances[od_pair]:
-                        # current_node.turns_distances[up_node] = {}
                         current_node.turns_distances[od_pair][up_node] = {}
-                    # current_node.turns_by_upstream[up_node][turn] = distance
-                    # current_node.turns_distances[up_node][down_node] = distance
                     current_node.turns_distances[od_pair][up_node][down_node] = distance
-                    # current_node.up_od_probs[up_node][od_pair] += 1
                     current_node.up_od_probs[up_node][od_pair] = (
                         0  # just assign od_pair to the upstream node
                     )
@@ -615,7 +605,203 @@ class PathFinder:
                 std_dev=self.std_dev,
             )  # this is the first time we calculate the turn probabilities, so we can use time_step=0
 
+    def _cache_link_attributes(self, time_step):
+        """Cache link density and capacity data for the current timestep.
+
+        Called once per timestep before processing any nodes, so that
+        update_node_turn_probs can look up pre-computed values instead of
+        redundantly querying link objects across OD pairs.
+        """
+        if self._link_cache_step == time_step:
+            return  # already cached for this step
+
+        density_ts = max(0, time_step - 1)
+        capacity_ts = max(0, time_step - 2)
+        density_cache = self._link_density_cache
+        capacity_cache = self._link_capacity_cache
+        density_cache.clear()
+        capacity_cache.clear()
+
+        for (start, end), link in self.links.items():
+            raw_density = link.get_density(density_ts)
+            norm_density = max(raw_density - link.k_critical, 0.0) / (
+                link.k_jam - link.k_critical
+            )
+            density_cache[(start, end)] = norm_density
+
+            cap = link.receiving_flow[capacity_ts]
+            if cap < 0:
+                cap = (
+                    link.back_gate_width
+                    * link.free_flow_speed
+                    * link.k_critical
+                    * link.unit_time
+                )
+            capacity_cache[(start, end)] = cap
+
+        self._link_cache_step = time_step
+
     def update_node_turn_probs(self, node, od_pair, time_step):
+        """Update the turn probabilities for the node, P(down|up,od).
+
+        Optimized to use:
+        - Cached link attributes (density/capacity) to avoid redundant lookups
+        - math.exp instead of np.exp for tiny arrays (2-3 elements)
+        - Direct dict assignment instead of dict(zip(...)) allocation
+        """
+        # current_turn_probs_step is pre-initialized in Node.__init__
+        # Reuse the probabilities within the same timestep so one choice set
+        # is generated from one consistent utility/noise realization.
+        if node.current_turn_probs_step.get(od_pair) == time_step:
+            return node.node_turn_probs
+
+        node_id = node.node_id
+        density_cache = self._link_density_cache
+        capacity_cache = self._link_capacity_cache
+        alpha = self.alpha
+        beta = self.beta
+        omega = self.omega
+        neg_temp = -self.temp
+        std_dev = self.std_dev
+        od_probs = node.node_turn_probs[od_pair]
+
+        for up_node, down_nodes in node.turns_distances[od_pair].items():
+            if not down_nodes:
+                continue
+
+            n = len(down_nodes)
+            # Build lists of turns, distances, densities, capacities using
+            # plain Python — avoids np.array overhead for tiny n (typically 2-3)
+            turns = []
+            distances = []
+            densities = []
+            capacities = []
+            for down_node, dist in down_nodes.items():
+                turns.append((up_node, down_node))
+                distances.append(dist)
+                key = (node_id, down_node)
+                if key in density_cache:
+                    densities.append(density_cache[key])
+                    capacities.append(capacity_cache[key])
+                else:
+                    # origin/destination virtual nodes (down_node == -1)
+                    densities.append(0.0)
+                    capacities.append(100.0)
+
+            # Compute utilities using plain Python math for small n
+            sum_dist = sum(distances) + 1e-6
+            sum_cap = sum(capacities) + 1e-6
+
+            # Pre-generate noise if needed
+            if std_dev != 0:
+                noise = np.random.normal(0, std_dev, n)
+            else:
+                noise = None
+
+            # Compute exp(-temp * utility) for each turn
+            exp_utils = [0.0] * n
+            for i in range(n):
+                u = (
+                    alpha * distances[i] / sum_dist
+                    + beta * densities[i]
+                    - omega * capacities[i] / sum_cap
+                )
+                if noise is not None:
+                    u += noise[i]
+                exp_utils[i] = math.exp(neg_temp * u)
+
+            # Normalize to probabilities
+            total = sum(exp_utils)
+            if total > 0:
+                inv_total = 1.0 / total
+                for i in range(n):
+                    od_probs[turns[i]] = exp_utils[i] * inv_total
+            else:
+                eq_prob = 1.0 / n
+                for i in range(n):
+                    od_probs[turns[i]] = eq_prob
+
+        node.current_turn_probs_step[od_pair] = time_step
+        return node.node_turn_probs
+
+    def update_turning_fractions(self, node, time_step: int, od_manager):
+        """Calculate turning fractions using stored turn probabilities: node_turn_probs,
+        Return turning_fractions: np.array
+
+        Optimized to:
+        - Cache link attributes once per timestep before processing
+        - Batch-update all OD pairs' turn probs before assembling fractions
+        - Use pre-fetched OD flow values
+        """
+        # Ensure link caches are fresh for this timestep
+        self._cache_link_attributes(time_step)
+
+        turning_fractions = np.zeros(node.edge_num)
+        od_flows_cache = self._od_manager_cache  # pre-fetched in calculate_node_turning_fractions
+
+        # Update P(od|up) for each upstream node using pre-fetched flows
+        for up_node, od_pairs in node.up_od_probs.items():
+            total_flow = 0.0
+            # First pass: calculate total flow
+            for od_pair in od_pairs:
+                flow = od_flows_cache.get(od_pair, 0.0)
+                od_pairs[od_pair] = flow
+                total_flow += flow
+
+            # Second pass: normalize to get probabilities
+            if total_flow > 0:
+                inv_total = 1.0 / total_flow
+                for od_pair in od_pairs:
+                    od_pairs[od_pair] *= inv_total
+            else:
+                # If no flow, set equal probabilities
+                n_pairs = len(od_pairs)
+                eq_prob = 1.0 / n_pairs if n_pairs > 0 else 0.0
+                for od_pair in od_pairs:
+                    od_pairs[od_pair] = eq_prob
+
+        # Batch-update turn probabilities for all OD pairs at this node first,
+        # so each OD pair is computed exactly once (not once per turn reference).
+        node_turn_probs = node.node_turn_probs
+        for od_pair in node_turn_probs:
+            self.update_node_turn_probs(node, od_pair, time_step=time_step)
+
+        # Calculate final turning fractions
+        upstream_nodes = [
+            link.start_node.node_id if link.start_node is not None else -1
+            for link in node.incoming_links
+        ]
+        downstream_nodes = [
+            link.end_node.node_id if link.end_node is not None else -1
+            for link in node.outgoing_links
+        ]
+
+        up_od_probs = node.up_od_probs
+        ods_in_turns = node.ods_in_turns
+
+        idx = 0
+        for up in upstream_nodes:
+            up_probs = up_od_probs.get(up)
+            for down in downstream_nodes:
+                if up == down:
+                    continue
+                turn = (up, down)
+                prob_sum = 0.0
+
+                # Get all OD pairs for this turn
+                turn_od_pairs = ods_in_turns.get(turn)
+                if turn_od_pairs and up_probs:
+                    for od_pair in turn_od_pairs:
+                        # P(down|up,od) from node_turn_probs
+                        turn_prob = node_turn_probs[od_pair].get(turn, 0)
+                        # P(od|up) from up_od_probs
+                        od_prob = up_probs.get(od_pair, 0)
+                        prob_sum += turn_prob * od_prob
+
+                turning_fractions[idx] = prob_sum
+                idx += 1
+
+        return turning_fractions
         """Delegate turn probability updates to the node."""
         return node.update_node_turn_probs(
             od_pair,
@@ -644,6 +830,19 @@ class PathFinder:
         """Delegate turning fraction validation to the node."""
         return node.check_fractions()
 
+    def _ensure_od_flow_cache(self, time_step: int, od_manager):
+        """Pre-fetch all OD flows for the current timestep to avoid per-call overhead.
+
+        This cache is shared across all nodes processed in the same timestep.
+        """
+        if not hasattr(self, '_od_cache_step') or self._od_cache_step != time_step:
+            self._od_manager_cache = {}
+            for od_pair in self.od_paths:
+                self._od_manager_cache[od_pair] = od_manager.get_od_flow(
+                    od_pair[0], od_pair[1], time_step
+                )
+            self._od_cache_step = time_step
+
     def calculate_node_turning_fractions(self, time_step: int, od_manager, node):
         """
         Calculate turning fractions only for nodes that appear in OD paths.
@@ -658,12 +857,9 @@ class PathFinder:
         """
         # Only process nodes that appear in paths
         if node.node_id in self.nodes_in_paths:
-            node.calculate_node_turning_fractions(
-                time_step,
-                od_manager,
-                alpha=self.alpha,
-                beta=self.beta,
-                omega=self.omega,
-                temp=self.temp,
-                std_dev=self.std_dev,
-            )
+            if node.source_num > 2:  # only process intersection nodes
+                # Pre-fetch OD flows once per timestep (shared across all nodes)
+                self._ensure_od_flow_cache(time_step, od_manager)
+                fractions = self.update_turning_fractions(node, time_step, od_manager)
+                node.turning_fractions = fractions
+                self.check_fractions(node)

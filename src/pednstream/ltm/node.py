@@ -1,4 +1,6 @@
 import numpy as np
+from collections import defaultdict
+from scipy.optimize import linprog
 from .link import BaseLink
 from .solver import NodeFlowSolver
 from collections import defaultdict
@@ -73,6 +75,12 @@ class Node:
             if link.end_node is not None and link.end_node.node_id == down_node_id:
                 return link
         return None
+
+        # Path finder attributes — pre-initialized to avoid hasattr checks in hot path
+        self.node_turn_probs = {}  # {(o,d): {(up_node, down_node): prob}}
+        self.turns_distances = {}  # {(o,d): {up_node: {down_node: distance}}}
+        self.up_od_probs = defaultdict(lambda: defaultdict(int))  # {up_node: {od_pair: prob}}
+        self.current_turn_probs_step = {}  # {od_pair: last_computed_timestep}
 
     def _create_virtual_link(self, node_id, direction, is_incoming, params: dict):
         """Helper method to create virtual links for origin and destination nodes"""

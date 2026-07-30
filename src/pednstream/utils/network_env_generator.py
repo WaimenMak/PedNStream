@@ -68,6 +68,8 @@ class NetworkEnvGenerator:
             dict: complete links config dictionary built from edge distances and defaults.
         """
         links = {}
+
+        # Gathers configs for the links
         for (u, v), distance in edge_distances.items():
             link_id = f"{u}_{v}"
             final_params = {
@@ -81,7 +83,7 @@ class NetworkEnvGenerator:
             if reverse_id not in existing_link_configs and reverse_id not in links:
                 links[reverse_id] = final_params.copy()
 
-        return links
+        return links # Equivalent to LinkConfigs
 
     def load_network_data(self, data_dir: str = "") -> dict:
         """Loads network data from file.
@@ -129,6 +131,8 @@ class NetworkEnvGenerator:
             adjacency_matrix = self.config["adjacency_matrix"]
 
         # load the node positions if it exists
+
+        # COLLECTS data from input files related to nodes and positions.
         node_positions_path = data_path / "node_positions.json"
         if node_positions_path.exists():
             with open(node_positions_path, "r") as f:
@@ -145,15 +149,17 @@ class NetworkEnvGenerator:
 
         return data
 
-    def create_network(
+    def create_network( # TODO: look at this to network generation
         self,
         data_path: str = "",
-        custom_demand_functions: List[Callable] = [],
-        od_flows: dict = {},
+        custom_demand_functions: List[Callable] = [], # provides user the option to directly input demand functions.
+        
+        # Ways that the user can use ot override some values 
         link_params_overrides: dict = {},
         demand_params_overrides: dict = {},
         od_nodes_overrides: dict = {},
-        verbose: bool = True,
+
+        verbose: bool = True,  # logging control
     ) -> Network:
         """Create network from data directory. Data directory can be overwritten by using `data_path`.
 

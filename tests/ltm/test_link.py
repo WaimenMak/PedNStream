@@ -4,7 +4,7 @@ import pytest
 from pednstream.ltm.link import LinkConfig
 @pytest.fixture
 def link_config():
-    link_id = 20
+    link_id = (1,2)
     start_node = 1
     end_node = 2
     simulation_steps = 10

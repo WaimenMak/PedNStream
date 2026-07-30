@@ -5,7 +5,8 @@ from pednstream.utils.functions import BiDirectionalFd, cal_link_flow_kv
 from typing import Any
 from numpy import ndarray
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import Optional
 
 
 # TODO: Double check how computation are using time_step. Check correct logic.
@@ -18,7 +19,7 @@ from dataclasses import dataclass
 class LinkConfig:
     """Configuration dataclass for Link parameters."""
 
-    link_id: int 
+    link_id: tuple[int, int] # Format "startNodeId-endNodeId", e.g. "1-2" for a link from node 1 to node 2. For virtual links, the format can be "virtual_in_nodeId" or "virtual_out_nodeId". 
     start_node: int  
     end_node : int  
     simulation_steps : int 
@@ -56,6 +57,7 @@ class LinkConfig:
         
 
 class LinkCreator(ABC):
+    """Abstract base class for creating different types of links."""
 
     @abstractmethod
     def create_link(self, config: LinkConfig) -> Link:
@@ -66,6 +68,7 @@ class SeparatorCreator(LinkCreator):
     """Creator for the Separator link type."""
 
     def create_link(self, config) -> Link:
+        """Creates a Separator link."""
         return Separator(config)
     
 
@@ -73,8 +76,16 @@ class RegularCreator(LinkCreator):
     """Creator for the Regular link type."""
 
     def create_link(self, config: LinkConfig) -> Link:
+        """Creates a Regular link."""
         return Regular(config)
-    
+
+class VirtualLinkCreator(LinkCreator):
+    """Creator for the Virtual link type."""
+
+    def create_link(self, config, **kwargs) -> VirtualLink:
+        """Creates a Virtual link."""
+        return VirtualLink(config)  
+
 
 class Link(ABC):
     """Interface for different Link types."""
@@ -171,8 +182,9 @@ class Link(ABC):
     @property
     def avg_travel_time(self) -> ndarray:
         """Average travel time."""
-        avg = np.ones(self.simulation_steps + 1, dtype=np.float32) * self.travel_time[0]
-        return avg
+        # FIXME: DO NOT COMPUTE THIS IN EVERY TIME STEP. This should be a constant set at initialization.  
+        avg = np.ones(self.simulation_steps + 1, dtype=np.float32) * self.travel_time[0] 
+        return avg 
 
     @property
     def travel_time(self) -> ndarray:
@@ -440,9 +452,6 @@ class Link(ABC):
         """
         pass
 
-    @abstractmethod
-    def operations(self)-> str:
-        pass
 
 
 class Separator(Link):
@@ -575,9 +584,6 @@ class Separator(Link):
             return max(receiving_flow, 0)
         else:
             return receiving_flow
-
-    def operations(self):
-        return "a separtor link"
     
 
 class Regular(Link):
@@ -696,6 +702,106 @@ class Regular(Link):
             return receiving_flow
 
 
-    def operations(self):
-        return "a regular link"
+class VirtualLink(Link):
+    """Represents a virtual link in a transportation network."""
+
+    def __init__(self, config: LinkConfig) -> None:
+        """Initializes a Virtual link with specific configurations."""
+        from pednstream.ltm import DemandGenerator
+        import logging
+        super().__init__(config)
+        self._direction: str = ""
+
+
+        # FIXME: these belong to the node.
+        
+        
+       
+    @property
+    def direction(self) -> str:
+        """Get the direction of the virtual link."""
+        return self._direction
     
+    @direction.setter
+    def direction(self, value: str) -> None:
+        """Set the direction of the virtual link.
+        
+        Args:
+            value (str): The direction to set. Should be either "in" or "out".
+        
+        Raises:
+            ValueError: If the provided value is not "in" or "out".
+        """
+        if value not in ["in", "out"]:
+            raise ValueError("Direction must be either 'in' or 'out'.")
+        self._direction = value
+
+    @property
+    def demand(self) -> np.ndarray:
+        """Get the demand of the virtual link."""
+        return self._demand
+    
+    @demand.setter
+    def demand(self, origin_config: dict) -> None:
+        """Set the demand of the virtual link.
+        Args:
+            origin_config (dict): A dictionary containing the demand values 
+            for an origin node. The keys should be in the format "origin_<node_id>" and the values should be dictionaries containing the demand parameters.
+        
+            Example:
+            {origin_<node_id>: {"pattern": "sudden_demand", "peak_lambda": 20, "base_lambda": 5}}
+        """
+        node_id = next(iter(origin_config)).split("_")[-1]   # Extract node_id from the key
+        pattern = origin_config[f"origin_{node_id}"]["pattern"]
+        self._demand = self.generator.generate_custom(origin_id=node_id, pattern=pattern) 
+        
+
+    def demand_generator(self, node_id, pattern):
+        """Generate demand based on the specified pattern."""
+
+        # FIXME: a demand generator is only RELEVANT FOR VIRTUAL LINKS. 
+        pass
+
+    
+    @property
+    def area(self) -> float:
+        """Area of the virtual link."""
+        # FIXME: 
+        raise NotImplementedError("Not implemented.")
+    
+    def get_density(self, time_step: int):
+        """Get the density of the virtual link.
+
+        Args:
+            time_step (int): time step
+
+        Returns:
+            float: density value
+        """
+        # FIXME: 
+        raise NotImplementedError("Not implemented.")
+
+    def update_speeds(self, time_step: int) -> None:
+        """Update the speed of the virtual link based on the density.
+
+        Args:
+            time_step (int): current simulation time step
+
+        Returns:
+            None 
+        """
+         # FIXME: 
+        raise NotImplementedError("Not implemented.")
+    
+    def calculate_receiving_flow(self, time_step: int, with_reverse: bool = False) -> float:
+        """Calculate the receiving flow of the virtual link at a given time step.
+
+        Args:
+            time_step (int): current simulation time step
+            with_reverse (bool): whether to consider reverse link interaction. Default is False.
+
+        Returns:
+            float: recieving flow
+        """
+        #FIXME:
+        raise NotImplementedError("Not implemented.")

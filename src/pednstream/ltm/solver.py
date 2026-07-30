@@ -39,6 +39,7 @@ def _solve_onetoone(node, s: np.ndarray, r: np.ndarray) -> np.ndarray:
     )
     if np.any(flows < 0):
         raise Warning(f"Negative flows detected: {flows}")
+        # the methods below return data with the same shape as q.
     return flows
 
 # ------------------------------------------------------------------

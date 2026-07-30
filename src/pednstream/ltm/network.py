@@ -2,18 +2,16 @@
 
 import logging
 from .node import Node
-from .link import Link, Separator
-from .od_manager import ODManager, DemandGenerator
-from .path_finder import PathFinder
 from dataclasses import dataclass, field
-from typing import Callable, List, Optional, Dict, Any
+from typing import List, Optional, Dict
 from pathlib import Path
 from dataclasses import dataclass, field
 from numpy import ndarray
 from .node import Node, NodeConfig
 from .link import LinkConfig, Link
-from typing import List, Callable, Dict
+from typing import List, Dict
 from .od_manager import ODManager
+from numpy import ndarray
 
 @dataclass
 class SimulationParameters:
@@ -21,18 +19,20 @@ class SimulationParameters:
     params: dict = field(default_factory=dict) # Dictionary to hold various simulation parameters, can be extended as needed.
 
 
-@dataclass
-class NetworkConfig:
-    """Data class for collecting data related to the network configuration."""
-    adjacency_matrix: ndarray # represent the interconnections between nodes in the network.
-    links: List[LinkConfig] # List of configuration objects representing the links in the network
-    nodes: List[NodeConfig] # List of configuration objects representing the nodes in the network
-    origin_nodes: list # 
-    destination_nodes: list = field(default_factory=list) # List of destination nodes, can be empty if not specified
-    od_flows: dict = field(default_factory=dict) # Dictionary to hold origin-destination flow information, from yaml file
-    positions: dict = field(default_factory=dict) # Dictionary to hold node positions, from yaml file
-    demand : dict = field(default_factory=dict) # Dictionary to hold demand information, from yaml file
-    # TODO: consider moving simulation steps to here, as a global parameter for the network, instead of being part of the link configuration. This would make it easier to manage and change simulation steps for the entire network.
+# @dataclass [My code]
+# class NetworkConfig:
+#     """Data class for collecting data related to the network configuration."""
+#     adjacency_matrix: ndarray # represent the interconnections between nodes in the network.
+#     links: List[LinkConfig] # List of configuration objects representing the links in the network
+#     nodes: List[NodeConfig] # List of configuration objects representing the nodes in the network
+#     origin_nodes: list # 
+#     destination_nodes: list = field(default_factory=list) # List of destination nodes, can be empty if not specified
+#     od_flows: dict = field(default_factory=dict) # Dictionary to hold origin-destination flow information, from yaml file
+#     positions: dict = field(default_factory=dict) # Dictionary to hold node positions, from yaml file
+#     demand : dict = field(default_factory=dict) # Dictionary to hold demand information, from yaml file
+#     # TODO: consider moving simulation steps to here, as a global parameter for the network, instead of being part of the link configuration. This would make it easier to manage and change simulation steps for the entire network.
+
+
 @dataclass
 class SimulationConfig:
     """Configuration for simulation runtime and parameters."""
@@ -47,7 +47,7 @@ class SimulationConfig:
 @dataclass
 class NetworkConfig:
     """Configuration for the physical network topology."""
-    adjacency_matrix: np.ndarray
+    adjacency_matrix: ndarray
     links: list          # List of LinkConfig
     nodes: list          # List of NodeConfig
     origin_nodes: list

@@ -1,6 +1,12 @@
 """Module for defining the Network class, which represents a transportation network with nodes, links, and demand functions."""
 
 import logging
+from .node import Node
+from .link import Link, Separator
+from .od_manager import ODManager, DemandGenerator
+from .path_finder import PathFinder
+from dataclasses import dataclass, field
+from typing import Callable, List, Optional, Dict, Any
 from pathlib import Path
 from dataclasses import dataclass, field
 from numpy import ndarray
@@ -27,6 +33,27 @@ class NetworkConfig:
     positions: dict = field(default_factory=dict) # Dictionary to hold node positions, from yaml file
     demand : dict = field(default_factory=dict) # Dictionary to hold demand information, from yaml file
     # TODO: consider moving simulation steps to here, as a global parameter for the network, instead of being part of the link configuration. This would make it easier to manage and change simulation steps for the entire network.
+@dataclass
+class SimulationConfig:
+    """Configuration for simulation runtime and parameters."""
+    simulation_steps: int
+    unit_time: int
+    assign_flows_type: str
+    seed: Optional[int]
+    path_finder: dict
+    demand_params: dict  # Original YAML demand section for generating runtime demand
+    od_flows: dict       # OD flows mapping (origin, destination) -> flow
+
+@dataclass
+class NetworkConfig:
+    """Configuration for the physical network topology."""
+    adjacency_matrix: np.ndarray
+    links: list          # List of LinkConfig
+    nodes: list          # List of NodeConfig
+    origin_nodes: list
+    destination_nodes: list = field(default_factory=list)
+    positions: dict = field(default_factory=dict)
+
 
 class Network:
     """Class representing a transportation network."""

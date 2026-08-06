@@ -17,13 +17,14 @@ class NodeConfig:
     virtual links, ods_in_turns) lives on Node itself.
     """
     id: int
-    # node_type: str = "regular"          # "regular" or "onetoone"
+    type: str = "regular"         "
     gate_width: Optional[float] = None
     turning_fractions: Optional[np.ndarray] = None
     demand: Optional[np.ndarray] = None  # demand profile for origin node
     M: Optional[float] = 1e6            # penalty term for destination node
     w: Optional[float] = 1e-2           # penalty term for turning fractions
     is_controller: bool = False         # whether this node is a controller, can be used to populate Network's controllers list
+
 
 
 class Node:
@@ -56,7 +57,7 @@ class Node:
         self.turns_distances = {}
         self.up_od_probs = defaultdict(lambda: defaultdict(int))
         self.current_turn_probs_step = {}
-        self._type = ""    # TODO: see fime below. # "onetoone" or "regular"
+        self._type = ""    # TODO: see fixme below. # "onetoone" or "regular"
 
         self.is_controller = node_config.is_controller # whether this node is a controller, can be used to populate Network's controllers list
     # ------------------------------------------------------------------

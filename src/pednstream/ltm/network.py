@@ -1,17 +1,13 @@
 """Module for defining the Network class, which represents a transportation network with nodes, links, and demand functions."""
 
 import logging
-from .node import Node
 from dataclasses import dataclass, field
 from typing import List, Optional, Dict
 from pathlib import Path
-from dataclasses import dataclass, field
 from numpy import ndarray
 from .node import Node, NodeConfig
 from .link import LinkConfig, Link
-from typing import List, Dict
 from .od_manager import ODManager
-from numpy import ndarray
 
 @dataclass
 class SimulationParameters:
@@ -48,8 +44,8 @@ class SimulationConfig:
 class NetworkConfig:
     """Configuration for the physical network topology."""
     adjacency_matrix: ndarray
-    links: list          # List of LinkConfig
-    nodes: list          # List of NodeConfig
+    links: list[LinkConfig]          # List of LinkConfig
+    nodes: list[NodeConfig]          # List of NodeConfig
     origin_nodes: list
     destination_nodes: list = field(default_factory=list)
     positions: dict = field(default_factory=dict)
@@ -66,9 +62,7 @@ class Network:
         # Stores nodes and links for the network
         self.nodes: Dict[int, Node] = {} # Dictionary to hold Node objects, keyed by node ID. Ids match the ones in the adjacency matrix.
         self.links: Dict[str, LinkConfig] = {} # Dictionary to hold LinkConfig objects, keyed by link ID
-
         self._controllers: List[int] = [] # List to hold IDs of nodes that are controllers, can be populated based on node configurations. Used by the PathFinder. TODO: consider implementing dependency inversion.
-    
         self._controller_gaters: List[int] = [] # Info passed by the user. TODO: Consider removing it.  
 
     @property
@@ -78,7 +72,7 @@ class Network:
             result = []
             for node in self.nodes.values():
                 if node.is_controller is True:
-                    result.append(node.node_id)
+                    result.append(node.id)
             self._controllers = result
             self._controller_gaters = self._controllers.copy()
             return self._controllers
@@ -92,7 +86,7 @@ class Network:
         return self._controller_gaters
  
     @property
-    def log_level(self):
+    def log_level(self) -> int:
         """Get the log level."""
         return self._log_level
     
@@ -102,7 +96,7 @@ class Network:
         self._log_level = value
 
     @property
-    def verbose(self):
+    def verbose(self) -> bool:
         """Get the verbose flag."""
         return self._verbose    
 
@@ -146,7 +140,7 @@ class Network:
 
         return logger
     
-    # TODO: CONTINUE HERE
+
     def _create_nodes(self) -> dict[int, Node]:
         """Create Node objects based on the provided node configurations."""
         import numpy as np

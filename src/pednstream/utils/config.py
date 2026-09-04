@@ -1,15 +1,375 @@
+"""Configuration interface.
+
+It enables users to load condiguration parameters from a YAML file and validate them against the expected structure.
+"""
+
 import csv
 import yaml
 import numpy as np
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Mapping
 from pednstream.exceptions import RequiredConfigError, InvalidConfigError
+
+from dataclasses import dataclass, field
+
+# Expected filenames simulations parameters when
+# expected as separate file.
+ADJ_MATRIX_FILENAME = "adj_matrix.npy" 
+OD_FLOWS_FILENAME = "od_flows.csv"
+
+class PathFinderParams:
+    """Dataclass for path finder parameters."""
+
+    def __init__(self, **kwargs):
+        """Initialize PathFinderSpec with default values and override with kwargs."""
+        for k, v in kwargs.items():
+            setattr(self, k, v)
+
+
+class DemandParams:
+    """Dataclass for demand parameters."""
+
+    def __init__(self, **kwargs):
+        """Initialize DemandSpec with default values and override with kwargs."""
+        for k, v in kwargs.items():
+            setattr(self, k, v)
+
+@dataclass(frozen=True)
+class ScenarioParams:
+    """Normilized scenario specification from YAML config. Contains all the parameters needed to initialize a Network instance and run a simulation."""
+
+    origin_nodes: tuple[int, ...]
+    destination_nodes: tuple[int, ...]
+    simulation_steps: int
+    unit_time: float
+    default_link: Mapping[str, Any]
+    link_overrides: Mapping[tuple[int, int], Mapping[str, Any]]
+    demand: Mapping[int, DemandParams]
+    controller_nodes: Optional[frozenset[int]]
+    controller_links: Optional[frozenset[tuple[int, int]]]
+    controller_schedule: Optional[Mapping[int, Any]] = field(default_factory=dict)
+    seed: int | None = None
+    assign_flows_type: str = "classic"
+    path_finder: PathFinderParams = PathFinderParams()
+    adjacency_matrix: np.ndarray | None = None
+    od_flows: Optional[Mapping[tuple[int, int], float]] = None
+    links: Optional[Mapping[tuple[int, int], Mapping[str, Any]]] = None
+
+    def od_flows_from_file(self, path:Path) -> None:
+        """Load OD flows from a long-format CSV with columns: origin, destination, weight.
+        
+        Args:
+            path (Path): Path to the CSV file containing OD flows.
+        """
+        object.__setattr__(
+            self,
+            "od_flows",
+            _load_od_flows_from_csv(
+            path,
+            origin_nodes=self.origin_nodes,
+            destination_nodes=self.destination_nodes,
+        ))
+        return None
+
+    def adjancency_matrix_from_file(self, path: Path) -> None:
+        """Load adjacency matrix from a .npy file.
+        
+        Args:
+            path (Path): Path to the .npy file containing the adjacency matrix.
+        """
+        object.__setattr__(
+            self,
+            "adjacency_matrix",
+            np.load(Path(path).as_posix())
+        )
+        return None
+    
+
+def _load_od_flows_from_csv(
+    csv_path: Path,
+    origin_nodes: tuple[int, ...],
+    destination_nodes: tuple[int, ...]
+) -> Dict[tuple, float]:
+    """Load OD flows from a long-format CSV with columns: origin, destination, weight.
+
+    Pairs whose origin/destination are not in the declared node lists are
+    silently filtered out. Zero weights are preserved.
+    """
+    if not csv_path.exists():
+        raise FileNotFoundError(f"od_flows_csv file not found: {csv_path}")
+
+    origin_set = set(origin_nodes)
+    destination_set = set(destination_nodes)
+    od_flows: Dict[tuple, float] = {}
+
+    with open(csv_path, "r") as f:
+        reader = csv.DictReader(f)
+        required_cols = {"origin", "destination", "weight"}
+        if reader.fieldnames is None or not required_cols.issubset(reader.fieldnames):
+            raise InvalidConfigError(
+                f"od_flows_csv '{csv_path}' must have columns: "
+                f"{sorted(required_cols)}; got {reader.fieldnames}"
+            )
+
+        for row in reader:
+            o = int(row["origin"])
+            d = int(row["destination"])
+            if o not in origin_set or d not in destination_set:
+                continue
+            od_flows[(o, d)] = float(row["weight"])
+
+    return od_flows
+
+
+
+def fetch_data_files(path: str) -> Dict[str, Path]:
+    """Fetches data files from a directory.
+    
+    Args:
+        path: Path to the simulation data directory containing files like adj_matrix.npy, node_positions.json, od_flows.csv, etc.
+
+    Returns:
+        dict: A dictionary containing paths to files at the root of path.
+    """
+    data_dir = Path(path)
+    if not data_dir.is_dir():
+        raise FileNotFoundError(f"Simulation data directory not found: {data_dir}")
+    
+    # filter only files
+    data_files = {f.name: f for f in data_dir.iterdir() if f.is_file()}
+    
+    return data_files
+
+
+def read_scenario(path) -> ScenarioParams:
+    """Read and validate a scenario configuration from a YAML file.
+
+    Args:
+        path: Path to the YAML configuration file.
+
+    Returns:
+        ScenarioSpec: A dataclass containing the normalized scenario parameters.
+    """
+    with open(path, "r") as f:
+        config = yaml.safe_load(f)
+
+    # Validate the configuration
+    validate_config(config)
+
+    # retrieve adjacency matrix from either YAML or .npy file
+    data_files=fetch_data_files(str(Path(path).parent))
+    if config["network"].get("adjacency_matrix") and ADJ_MATRIX_FILENAME in data_files:
+        raise InvalidConfigError(
+            F"Both 'adjacency_matrix' in YAML and {ADJ_MATRIX_FILENAME} file found; pick one."
+        )
+    elif config["network"].get("adjacency_matrix"): 
+        adjacency_matrix=np.array(config["network"]["adjacency_matrix"])
+    elif ADJ_MATRIX_FILENAME in data_files:
+            adjacency_matrix=np.load(data_files[ADJ_MATRIX_FILENAME].as_posix())
+    else:
+            adjacency_matrix=None
+
+    # Initialize ScenarioSpec dataclass
+    scenario_spec = ScenarioParams(
+        origin_nodes=tuple(config["network"]["origin_nodes"]),
+        destination_nodes=tuple(config["network"].get("destination_nodes", [])),
+        simulation_steps=config["simulation"]["simulation_steps"],
+        unit_time=config["simulation"]["unit_time"],
+        default_link=config["default_link"],
+        link_overrides={
+            _parse_pair_key(k, label="links", example="i_j"): v
+            for k, v in config.get("links", {}).items()
+        },
+        demand={
+            int(k.split("_")[1]): DemandParams(**v)
+            for k, v in config.get("demand", {}).items()
+        },
+        od_flows={
+            _parse_pair_key(k, label="od_flows", example="origin_destination"): v
+            for k, v in config.get("od_flows", {}).items()
+        },
+        controller_nodes=frozenset(
+            map(int, config.get("controllers", {}).get("nodes", []))
+        ),
+        controller_links=frozenset(
+            _parse_pair_key(k, label="controllers.links", example="i_j")
+            for k in config.get("controllers", {}).get("links", [])
+        ),
+        seed=config["simulation"].get("seed"),
+        assign_flows_type=config["simulation"].get("assign_flows_type", "classic"),
+        path_finder=PathFinderParams(**config["simulation"].get("path_finder", {})),
+    )
+
+    # Load adjacency matrix if available
+    if adjacency_matrix is not None:
+        scenario_spec.adjancency_matrix_from_file(data_files[ADJ_MATRIX_FILENAME])
+
+    # Load OD flows from CSV if specified
+    if "od_flows_csv" in config:
+        scenario_spec.od_flows_from_file(data_files[OD_FLOWS_FILENAME])
+    
+    return scenario_spec
+
+
+# TODO: continue, move to validations and refactor if needed.
+# CHECKS:
+
+def _validate_od_flows(config: Dict[str, Any]) -> None:
+    """Validate OD-flow key format and node membership."""
+    if "od_flows" not in config:
+        return
+
+    origin_nodes = config["network"].get("origin_nodes", [])
+    destination_nodes = config["network"].get("destination_nodes", [])
+
+    if not destination_nodes:
+        raise InvalidConfigError(
+            "od_flows requires destination_nodes to be defined and non-empty"
+        )
+
+    for od_pair in config["od_flows"].keys():
+        origin, dest = _parse_pair_key(
+            od_pair,
+            label="od_flows",
+            example="origin_destination (e.g., '1_2')",
+        )
+
+        if origin not in origin_nodes:
+            raise InvalidConfigError(
+                f"od_flows key '{od_pair}': origin {origin} is not in origin_nodes {origin_nodes}"
+            )
+
+        if dest not in destination_nodes:
+            raise InvalidConfigError(
+                f"od_flows key '{od_pair}': destination {dest} is not in destination_nodes {destination_nodes}"
+            )
+
+
+def _validate_od_flows_csv(config: Dict[str, Any]) -> None:
+    """Validate that od_flows_csv is not used together with od_flows.
+
+    Also validates that destination_nodes is defined.
+    """
+    if "od_flows_csv" not in config:
+        return
+
+    if "od_flows" in config:
+        raise InvalidConfigError(
+            "Cannot specify both 'od_flows' and 'od_flows_csv'; pick one"
+        )
+
+    destination_nodes = config["network"].get("destination_nodes", [])
+    if not destination_nodes:
+        raise InvalidConfigError(
+            "od_flows_csv requires destination_nodes to be defined and non-empty"
+        )
+
+
+
+
+
+def _validate_demand(config: Dict[str, Any]) -> None:
+    """Validate demand key format and origin membership."""
+    if "demand" not in config:
+        return
+
+    origin_nodes = config["network"].get("origin_nodes", [])
+
+    for demand_key in config["demand"].keys():
+        if not demand_key.startswith("origin_"):
+            raise InvalidConfigError(
+                f"Invalid demand key format: '{demand_key}'. Expected 'origin_X' (e.g., 'origin_0')"
+            )
+
+        try:
+            origin_id = int(demand_key.split("_")[1])
+        except (IndexError, ValueError) as exc:
+            raise InvalidConfigError(
+                f"Invalid demand key format: '{demand_key}'. Expected 'origin_X' where X is an integer"
+            ) from exc
+
+        if origin_id not in origin_nodes:
+            raise InvalidConfigError(
+                f"demand key '{demand_key}': origin {origin_id} is not in origin_nodes {origin_nodes}"
+            )
+
+
+def _validate_links(
+    config: Dict[str, Any], adjacency_matrix: Optional[np.ndarray] = None
+) -> None:
+    """Validate link key format and edge existence when adjacency is available."""
+    if "links" not in config or adjacency_matrix is None:
+        return
+
+    for link_key in config["links"].keys():
+        i, j = _parse_pair_key(link_key, label="links", example="i_j (e.g., '1_2')")
+
+        if i >= adjacency_matrix.shape[0] or j >= adjacency_matrix.shape[1]:
+            raise InvalidConfigError(
+                f"links key '{link_key}': node index out of bounds for adjacency matrix of shape {adjacency_matrix.shape}"
+            )
+
+        if adjacency_matrix[i, j] != 1:
+            raise InvalidConfigError(
+                f"links key '{link_key}': no edge exists between nodes {i} and {j} in adjacency matrix"
+            )
+
+def validate_config(
+    config: Dict[str, Any], adjacency_matrix: Optional[np.ndarray] = None
+) -> None:
+    """Validate configuration parameters.
+
+    Args:
+        config: Configuration dictionary to validate
+        adjacency_matrix: Optional adjacency matrix for validating link overrides
+
+    Raises:
+        RequiredConfigError: If required section/field is missing
+        InvalidConfigError: If configuration value is invalid
+    """
+    required_fields = {
+        "network": ["origin_nodes"],
+        "simulation": ["simulation_steps", "unit_time"],
+        "default_link": ["length", "width", "free_flow_speed", "k_critical", "k_jam"],
+    }
+
+    for section, fields in required_fields.items():
+        if section not in config:
+            raise RequiredConfigError(
+                f"Missing required section in configuration: {section}"
+            )
+
+        for field in fields:
+            if field not in config[section]:
+                raise RequiredConfigError(
+                    f"Missing required field in configuration: {field} in section {section}"
+                )
+    _validate_od_flows(config)
+    _validate_od_flows_csv(config)
+    _validate_demand(config)
+    _validate_links(config, adjacency_matrix=adjacency_matrix)
+    return None
+
+
+# BUILDS:
+
+
+def build_configs(spec, adjacency_matrix, positions=None) -> tuple[NetworkConfig, SimulationConfig]:
+    """Build NetworkConfig and SimulationConfig dataclasses from the ScenarioSpec and adjacency matrix.
+
+    Args:
+        spec: ScenarioSpec dataclass containing the normalized scenario parameters.
+        adjacency_matrix: NxN numpy array representing the network topology.
+
+    """
+     # TODO: Implement
+
+    return None, None
+
 
 
 def _assemble_network_config(params: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Assemble the network configuration dictionary.
-    """
+    """Assemble the network configuration dictionary."""
     network_config = {
         "params": params,
         "origin_nodes": config["network"]["origin_nodes"],
@@ -33,8 +393,7 @@ def _build_link_configs(
     unit_time: int,
     controller_links: list = [],
 ) -> list:
-    """
-    Build a list of LinkConfig objects from the adjacency matrix.
+    """Build a list of LinkConfig objects from the adjacency matrix.
 
     For each edge (i, j) in the adjacency matrix, creates both a forward (i→j)
     and reverse (j→i) LinkConfig. Uses link-specific overrides when available,
@@ -131,11 +490,10 @@ def _build_node_configs(
     adjacency_matrix: np.ndarray,
     origin_nodes: list,
     destination_nodes: list,
-    demand_config: Dict[str, Any] = None,
-    controller_nodes: set = None,
+    demand_config: Dict[str, Any] = {},
+    controller_nodes: set = set(),
 ) -> list:
-    """
-    Build a list of NodeConfig objects from the adjacency matrix.
+    """Build a list of NodeConfig objects from the adjacency matrix.
 
     Determines node_type ("onetoone" or "regular") based on connection counts
     and origin/destination membership, mirroring Network._create_nodes() logic.
@@ -177,17 +535,16 @@ def _build_node_configs(
             node_type = "regular"
             
         node_config = NodeConfig(
-            node_id=node_id,
-            node_type=node_type
+            id=node_id,
+            type=node_type
         )
         node_configs.append(node_config)
 
     return node_configs
 
 
-def _new_assemble_network_config(config: Dict[str, Any], adjacency_matrix: np.ndarray = None) -> tuple["NetworkConfig", "SimulationConfig"]:
-    """
-    Assemble NetworkConfig and SimulationConfig dataclasses from the raw YAML config dictionary.
+def _new_assemble_network_config(config: Dict[str, Any], adjacency_matrix: np.ndarray | None = None) -> tuple["NetworkConfig", "SimulationConfig"]:
+    """Assemble NetworkConfig and SimulationConfig dataclasses from the raw YAML config dictionary.
 
     Args:
         config: The raw parsed YAML configuration dictionary.
@@ -279,140 +636,9 @@ def _parse_pair_key(key: str, label: str, example: str) -> tuple[int, int]:
         ) from exc
 
 
-def _validate_od_flows(config: Dict[str, Any]) -> None:
-    """Validate OD-flow key format and node membership."""
-    if "od_flows" not in config:
-        return
-
-    origin_nodes = config["network"].get("origin_nodes", [])
-    destination_nodes = config["network"].get("destination_nodes", [])
-
-    if not destination_nodes:
-        raise InvalidConfigError(
-            "od_flows requires destination_nodes to be defined and non-empty"
-        )
-
-    for od_pair in config["od_flows"].keys():
-        origin, dest = _parse_pair_key(
-            od_pair,
-            label="od_flows",
-            example="origin_destination (e.g., '1_2')",
-        )
-
-        if origin not in origin_nodes:
-            raise InvalidConfigError(
-                f"od_flows key '{od_pair}': origin {origin} is not in origin_nodes {origin_nodes}"
-            )
-
-        if dest not in destination_nodes:
-            raise InvalidConfigError(
-                f"od_flows key '{od_pair}': destination {dest} is not in destination_nodes {destination_nodes}"
-            )
-
-
-def _validate_od_flows_csv(config: Dict[str, Any]) -> None:
-    """Validate that od_flows_csv is not used together with od_flows and
-    that destination_nodes is defined."""
-    if "od_flows_csv" not in config:
-        return
-
-    if "od_flows" in config:
-        raise InvalidConfigError(
-            "Cannot specify both 'od_flows' and 'od_flows_csv'; pick one"
-        )
-
-    destination_nodes = config["network"].get("destination_nodes", [])
-    if not destination_nodes:
-        raise InvalidConfigError(
-            "od_flows_csv requires destination_nodes to be defined and non-empty"
-        )
-
-
-def _load_od_flows_from_csv(
-    csv_path: Path,
-    origin_nodes: list,
-    destination_nodes: list,
-) -> Dict[tuple, float]:
-    """Load OD flows from a long-format CSV with columns: origin, destination, weight.
-
-    Pairs whose origin/destination are not in the declared node lists are
-    silently filtered out. Zero weights are preserved.
-    """
-    if not csv_path.exists():
-        raise FileNotFoundError(f"od_flows_csv file not found: {csv_path}")
-
-    origin_set = set(origin_nodes)
-    destination_set = set(destination_nodes)
-    od_flows: Dict[tuple, float] = {}
-
-    with open(csv_path, "r") as f:
-        reader = csv.DictReader(f)
-        required_cols = {"origin", "destination", "weight"}
-        if reader.fieldnames is None or not required_cols.issubset(reader.fieldnames):
-            raise InvalidConfigError(
-                f"od_flows_csv '{csv_path}' must have columns: "
-                f"{sorted(required_cols)}; got {reader.fieldnames}"
-            )
-
-        for row in reader:
-            o = int(row["origin"])
-            d = int(row["destination"])
-            if o not in origin_set or d not in destination_set:
-                continue
-            od_flows[(o, d)] = float(row["weight"])
-
-    return od_flows
-
-
-def _validate_demand(config: Dict[str, Any]) -> None:
-    """Validate demand key format and origin membership."""
-    if "demand" not in config:
-        return
-
-    origin_nodes = config["network"].get("origin_nodes", [])
-
-    for demand_key in config["demand"].keys():
-        if not demand_key.startswith("origin_"):
-            raise InvalidConfigError(
-                f"Invalid demand key format: '{demand_key}'. Expected 'origin_X' (e.g., 'origin_0')"
-            )
-
-        try:
-            origin_id = int(demand_key.split("_")[1])
-        except (IndexError, ValueError) as exc:
-            raise InvalidConfigError(
-                f"Invalid demand key format: '{demand_key}'. Expected 'origin_X' where X is an integer"
-            ) from exc
-
-        if origin_id not in origin_nodes:
-            raise InvalidConfigError(
-                f"demand key '{demand_key}': origin {origin_id} is not in origin_nodes {origin_nodes}"
-            )
-
-
-def _validate_links(
-    config: Dict[str, Any], adjacency_matrix: Optional[np.ndarray] = None
-) -> None:
-    """Validate link key format and edge existence when adjacency is available."""
-    if "links" not in config or adjacency_matrix is None:
-        return
-
-    for link_key in config["links"].keys():
-        i, j = _parse_pair_key(link_key, label="links", example="i_j (e.g., '1_2')")
-
-        if i >= adjacency_matrix.shape[0] or j >= adjacency_matrix.shape[1]:
-            raise InvalidConfigError(
-                f"links key '{link_key}': node index out of bounds for adjacency matrix of shape {adjacency_matrix.shape}"
-            )
-
-        if adjacency_matrix[i, j] != 1:
-            raise InvalidConfigError(
-                f"links key '{link_key}': no edge exists between nodes {i} and {j} in adjacency matrix"
-            )
 
 def load_config(config_path: str) -> dict:
-    """
-    Load and validate configuration from a YAML file with a flattened structure.
+    """Load and validate configuration from a YAML file with a flattened structure.
 
     Args:
         config_path: Path to the YAML configuration file.
@@ -464,38 +690,15 @@ def load_config(config_path: str) -> dict:
     return network_config
 
 
-def validate_config(
-    config: Dict[str, Any], adjacency_matrix: Optional[np.ndarray] = None
-) -> None:
-    """
-    Validate configuration parameters
 
-    Args:
-        config: Configuration dictionary to validate
-        adjacency_matrix: Optional adjacency matrix for validating link overrides
 
-    Raises:
-        RequiredConfigError: If required section/field is missing
-        InvalidConfigError: If configuration value is invalid
-    """
-    required_fields = {
-        "network": ["origin_nodes"],
-        "simulation": ["simulation_steps", "unit_time"],
-        "default_link": ["length", "width", "free_flow_speed", "k_critical", "k_jam"],
-    }
+if __name__ == "__main__":
+    # Example usage
+    config_path = "tests/data/delft/sim_params.yaml"
+    # config = load_config(config_path)
+    config = read_scenario(config_path)
+    # validate_config(config)
+    print(config)
 
-    for section, fields in required_fields.items():
-        if section not in config:
-            raise RequiredConfigError(
-                f"Missing required section in configuration: {section}"
-            )
-
-        for field in fields:
-            if field not in config[section]:
-                raise RequiredConfigError(
-                    f"Missing required field in configuration: {field} in section {section}"
-                )
-    _validate_od_flows(config)
-    _validate_od_flows_csv(config)
-    _validate_demand(config)
-    _validate_links(config, adjacency_matrix=adjacency_matrix)
+    files = fetch_data_files("tests/data/delft")
+    # print(files)

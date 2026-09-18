@@ -9,7 +9,7 @@ import numpy as np
 from pathlib import Path
 from typing import Dict, Any, Optional, Mapping
 from pednstream.exceptions import RequiredConfigError, InvalidConfigError
-
+from pednstream.ltm.network import NetworkConfig, SimulationConfig
 from dataclasses import dataclass, field
 
 # Expected filenames simulations parameters when
@@ -211,9 +211,6 @@ def read_scenario(path) -> ScenarioParams:
     return scenario_spec
 
 
-# TODO: continue, move to validations and refactor if needed.
-# CHECKS:
-
 def _validate_od_flows(config: Dict[str, Any]) -> None:
     """Validate OD-flow key format and node membership."""
     if "od_flows" not in config:
@@ -244,6 +241,8 @@ def _validate_od_flows(config: Dict[str, Any]) -> None:
                 f"od_flows key '{od_pair}': destination {dest} is not in destination_nodes {destination_nodes}"
             )
 
+    return None
+
 
 def _validate_od_flows_csv(config: Dict[str, Any]) -> None:
     """Validate that od_flows_csv is not used together with od_flows.
@@ -263,9 +262,6 @@ def _validate_od_flows_csv(config: Dict[str, Any]) -> None:
         raise InvalidConfigError(
             "od_flows_csv requires destination_nodes to be defined and non-empty"
         )
-
-
-
 
 
 def _validate_demand(config: Dict[str, Any]) -> None:
@@ -314,10 +310,11 @@ def _validate_links(
                 f"links key '{link_key}': no edge exists between nodes {i} and {j} in adjacency matrix"
             )
 
+
 def validate_config(
     config: Dict[str, Any], adjacency_matrix: Optional[np.ndarray] = None
 ) -> None:
-    """Validate configuration parameters.
+    """Validate structure of configuration parameters.
 
     Args:
         config: Configuration dictionary to validate
@@ -354,17 +351,6 @@ def validate_config(
 # BUILDS:
 
 
-def build_configs(spec, adjacency_matrix, positions=None) -> tuple[NetworkConfig, SimulationConfig]:
-    """Build NetworkConfig and SimulationConfig dataclasses from the ScenarioSpec and adjacency matrix.
-
-    Args:
-        spec: ScenarioSpec dataclass containing the normalized scenario parameters.
-        adjacency_matrix: NxN numpy array representing the network topology.
-
-    """
-     # TODO: Implement
-
-    return None, None
 
 
 
@@ -543,6 +529,74 @@ def _build_node_configs(
     return node_configs
 
 
+def build_configs(spec, adjacency_matrix, positions=None) -> tuple[NetworkConfig, SimulationConfig]:
+    """Build NetworkConfig and SimulationConfig dataclasses from the ScenarioSpec and adjacency matrix.
+
+    Args:
+        spec: ScenarioSpec dataclass containing the normalized scenario parameters.
+        adjacency_matrix: NxN numpy array representing the network topology.
+
+    """
+    path_finder_params = spec.path_finder.__dict__
+    simulation_steps = spec.simulation_steps
+    unit_time = spec.unit_time
+    adjacency_matrix = spec.adjacency_matrix
+
+    # Build LinkConfig list
+    controller_links = spec.controller_links 
+    links_configs = _build_link_configs(
+        adjacency_matrix=adjacency_matrix,
+        default_link=spec.default_link,
+        links_overrides=spec.link_overrides,
+        simulation_steps=simulation_steps,
+        unit_time=unit_time,
+        controller_links=controller_links,
+    )
+
+    # Build NodeConfig list
+    controller_nodes = spec.controller_nodes
+    nodes_configs = _build_node_configs(
+        adjacency_matrix=adjacency_matrix,
+        origin_nodes=spec.origin_nodes,
+        destination_nodes=spec.destination_nodes,
+        demand_config=spec.demand,
+        controller_nodes= controller_nodes
+    )
+
+    # Build OD flows 'inline' dictionary
+    od_flows = {}
+    if od_flows is not None:
+        # TODO: Review the cases this should fail
+        for od_pair, flow in spec.od_flows.items():
+            origin, dest = map(int, od_pair.split("_"))
+            od_flows[(origin, dest)] = flow
+
+    network_config = NetworkConfig(
+        adjacency_matrix=adjacency_matrix,
+        links=links_configs,
+        nodes=nodes_configs,
+        origin_nodes=spec.origin_nodes,
+        destination_nodes=spec.destination_nodes,
+         # Postiions are populated later from node_positions.json
+    )
+
+    simulation_config = SimulationConfig(
+        simulation_steps=simulation_steps,
+        unit_time=unit_time,
+        assign_flows_type=spec.assign_flows_type,
+        seed=spec.seed,
+        path_finder=path_finder_params,
+        demand_params=spec.demand,
+        od_flows=od_flows,
+    )
+
+
+    return network_config, simulation_config
+
+# TODO: continue here. Test, function above. 
+
+
+
 def _new_assemble_network_config(config: Dict[str, Any], adjacency_matrix: np.ndarray | None = None) -> tuple["NetworkConfig", "SimulationConfig"]:
     """Assemble NetworkConfig and SimulationConfig dataclasses from the raw YAML config dictionary.
 
@@ -578,7 +632,7 @@ def _new_assemble_network_config(config: Dict[str, Any], adjacency_matrix: np.nd
         )
 
     # --- Build NodeConfig list ---
-    origin_nodes = config["network"]["origin_nodes"]
+    origin_nodes = config["network"]["origin_nodes"] # required
     destination_nodes = config["network"].get("destination_nodes", [])
     node_configs = []
     if adjacency_matrix is not None:

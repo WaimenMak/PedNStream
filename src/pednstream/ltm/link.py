@@ -91,6 +91,7 @@ class Link(ABC):
     """Interface for different Link types."""
 
     def __init__(self, config: LinkConfig) -> None:
+        """Initializes a Link with specific configurations."""
         self.config = config
 
         self.link_id = config.link_id
@@ -711,12 +712,8 @@ class VirtualLink(Link):
         import logging
         super().__init__(config)
         self._direction: str = ""
-
-
         # FIXME: these belong to the node.
         
-        
-       
     @property
     def direction(self) -> str:
         """Get the direction of the virtual link."""
@@ -744,11 +741,12 @@ class VirtualLink(Link):
     @demand.setter
     def demand(self, origin_config: dict) -> None:
         """Set the demand of the virtual link.
+
         Args:
             origin_config (dict): A dictionary containing the demand values 
             for an origin node. The keys should be in the format "origin_<node_id>" and the values should be dictionaries containing the demand parameters.
         
-            Example:
+        Example:
             {origin_<node_id>: {"pattern": "sudden_demand", "peak_lambda": 20, "base_lambda": 5}}
         """
         node_id = next(iter(origin_config)).split("_")[-1]   # Extract node_id from the key
@@ -758,7 +756,6 @@ class VirtualLink(Link):
 
     def demand_generator(self, node_id, pattern):
         """Generate demand based on the specified pattern."""
-
         # FIXME: a demand generator is only RELEVANT FOR VIRTUAL LINKS. 
         pass
 

@@ -12,10 +12,9 @@ from pednstream.exceptions import RequiredConfigError, InvalidConfigError
 from pednstream.ltm.network import NetworkConfig, SimulationConfig
 from dataclasses import dataclass, field
 
-# Expected filenames simulations parameters when
-# expected as separate file.
-ADJ_MATRIX_FILENAME = "adj_matrix.npy" 
-OD_FLOWS_FILENAME = "od_flows.csv"
+# Expected filename of the adjacency matrix when
+# provided as a separate file.
+ADJ_MATRIX_FILENAME = "adj_matrix.npy"
 
 class PathFinderParams:
     """Dataclass for path finder parameters."""
@@ -169,6 +168,9 @@ def read_scenario(path) -> ScenarioParams:
     else:
             adjacency_matrix=None
 
+    # Link overrides can only be checked once the adjacency matrix is known
+    _validate_links(config, adjacency_matrix=adjacency_matrix)
+
     # Initialize ScenarioSpec dataclass
     scenario_params = ScenarioParams(
         origin_nodes=tuple(config["network"]["origin_nodes"]),
@@ -198,15 +200,12 @@ def read_scenario(path) -> ScenarioParams:
         seed=config["simulation"].get("seed"),
         assign_flows_type=config["simulation"].get("assign_flows_type", "classic"),
         path_finder=PathFinderParams(**config["simulation"].get("path_finder", {})),
+        adjacency_matrix=adjacency_matrix,
     )
 
-    # Load adjacency matrix if available
-    if adjacency_matrix is not None:
-        scenario_params.adjancency_matrix_from_file(data_files[ADJ_MATRIX_FILENAME])
-
-    # Load OD flows from CSV if specified
+    # Load OD flows from CSV if specified, relative to the YAML file
     if "od_flows_csv" in config:
-        scenario_params.od_flows_from_file(data_files[OD_FLOWS_FILENAME])
+        scenario_params.od_flows_from_file(Path(path).parent / config["od_flows_csv"])
     
     return scenario_params
 
@@ -370,10 +369,10 @@ def _assemble_network_config(params: Dict[str, Any], config: Dict[str, Any]) -> 
 def _build_link_configs(
     adjacency_matrix: np.ndarray,
     default_link: Dict[str, Any],
-    links_overrides: Dict[str, Any],
+    links_overrides: Mapping[tuple[int, int], Mapping[str, Any]],
     simulation_steps: int,
     unit_time: int,
-    controller_links: list = [],
+    controller_links: frozenset[tuple[int, int]] = frozenset(),
 ) -> list:
     """Build a list of LinkConfig objects from the adjacency matrix.
 
@@ -384,10 +383,10 @@ def _build_link_configs(
     Args:
         adjacency_matrix: NxN numpy array of 0s and 1s.
         default_link: Default link parameters from YAML (length, width, etc.)
-        links_overrides: Link-specific overrides, keyed by "i_j" strings.
+        links_overrides: Link-specific overrides, keyed by (i, j) tuples.
         simulation_steps: Number of simulation steps.
         unit_time: Unit time for the simulation.
-        controller_links: List of controller link keys (e.g. ["1-2"]).
+        controller_links: Set of controller links as (i, j) tuples, e.g. {(1, 2)}.
 
     Returns:
         List of LinkConfig dataclass instances.
@@ -402,9 +401,9 @@ def _build_link_configs(
             if adjacency_matrix[i, j] != 1:
                 continue
 
-            # Resolve parameters: check both "i_j" and "j_i" keys
-            forward_key = f"{i}_{j}"
-            reverse_key = f"{j}_{i}"
+            # Resolve parameters: check both (i, j) and (j, i) keys
+            forward_key = (i, j)
+            reverse_key = (j, i)
             if forward_key in links_overrides:
                 merged_params = {**default_link, **links_overrides[forward_key]}
             elif reverse_key in links_overrides:
@@ -414,8 +413,8 @@ def _build_link_configs(
 
             # Determine if this is a controller (separator) link
             is_controller = (
-                f"{i}-{j}" in controller_links
-                or f"{j}-{i}" in controller_links
+                forward_key in controller_links
+                or reverse_key in controller_links
             )
 
             # Build forward LinkConfig (i → j)
@@ -562,13 +561,8 @@ def build_configs(params: ScenarioParams, positions=None) -> tuple[NetworkConfig
         controller_nodes= controller_nodes
     )
 
-    # Build OD flows 'inline' dictionary
-    od_flows = {}
-    if bool(params.od_flows) is True:
-        # TODO: Review the cases this should fail
-        for od_pair, flow in params.od_flows.items():
-            origin, dest = map(int, od_pair.split("_"))
-            od_flows[(origin, dest)] = flow
+    # OD flows are already keyed by (origin, destination) tuples
+    od_flows = dict(params.od_flows or {})
 
     network_config = NetworkConfig(
         adjacency_matrix=adjacency_matrix,

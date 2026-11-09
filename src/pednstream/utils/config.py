@@ -610,61 +610,6 @@ def _parse_pair_key(key: str, label: str, example: str) -> tuple[int, int]:
 
 
 
-def load_config(config_path: str) -> dict:
-    """Load and validate configuration from a YAML file with a flattened structure.
-
-    Args:
-        config_path: Path to the YAML configuration file.
-
-    Returns:
-        dict: Configuration parameters for the Network class
-    """
-    with open(config_path, "r") as f:
-        config = yaml.safe_load(f)
-
-    # 1. Assemble the 'params' dictionary required by the Network class
-    path_finder_params = config["simulation"].get("path_finder", {})
-
-    params = {
-        "simulation_steps": config["simulation"]["simulation_steps"],
-        "unit_time": config["simulation"]["unit_time"],
-        "assign_flows_type": config["simulation"].get("assign_flows_type", "classic"),
-        "seed": config["simulation"].get("seed", None),
-        "path_finder": path_finder_params,
-        "default_link": config["default_link"],
-        "links": config.get("links", {}),
-        "demand": config.get("demand", {}),
-        "controllers": config.get("controllers", {}),
-    }
-
-    # 2. Assemble the config dictionary
-    network_config = _assemble_network_config(params, config)
-
-    # 4. Handle optional 'od_flows' (inline YAML dict) or 'od_flows_csv' (CSV file)
-    if "od_flows" in config and "od_flows_csv" in config:
-        raise InvalidConfigError(
-            "Cannot specify both 'od_flows' and 'od_flows_csv'; pick one"
-        )
-
-    if "od_flows" in config:
-        od_flows = {}
-        for od_pair, flow in config["od_flows"].items():
-            origin, dest = map(int, od_pair.split("_"))
-            od_flows[(origin, dest)] = flow
-        network_config["od_flows"] = od_flows
-    elif "od_flows_csv" in config:
-        csv_path = Path(config_path).parent / config["od_flows_csv"]
-        network_config["od_flows"] = _load_od_flows_from_csv(
-            csv_path,
-            origin_nodes=config["network"].get("origin_nodes", []),
-            destination_nodes=config["network"].get("destination_nodes", []),
-        )
-
-    return network_config
-
-
-
-
 if __name__ == "__main__":
     # Example usage
     config_path = "tests/data/delft/sim_params.yaml"

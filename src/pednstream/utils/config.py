@@ -1,6 +1,8 @@
 """Configuration interface.
 
-It enables users to load configuration parameters from a YAML file and validate them. It also provides functionality to build NetworkConfig and SimulationConfig dataclasses from the normalized scenario parameters.
+It enables users to load configuration parameters from a YAML file and validate them. 
+It also provides functionality to build NetworkConfig and SimulationConfig dataclasses 
+from the normalized scenario parameters.
 """
 
 import csv
@@ -9,12 +11,23 @@ import numpy as np
 from pathlib import Path
 from typing import Dict, Any, Optional, Mapping
 from pednstream.exceptions import RequiredConfigError, InvalidConfigError
-from pednstream.ltm.network import NetworkConfig, SimulationConfig
+from pednstream.ltm.network import NetworkConfig
 from dataclasses import dataclass, field
 
 # Expected filename of the adjacency matrix when
 # provided as a separate file.
 ADJ_MATRIX_FILENAME = "adj_matrix.npy"
+
+@dataclass
+class SimulationConfig:
+    """Configuration for simulation runtime and parameters."""
+    simulation_steps: int
+    unit_time: int
+    assign_flows_type: str
+    seed: Optional[int]
+    path_finder: dict
+    demand_params: dict  # Original YAML demand section for generating runtime demand
+    od_flows: dict       # OD flows mapping (origin, destination) -> flow
 
 class PathFinderParams:
     """Dataclass for path finder parameters."""

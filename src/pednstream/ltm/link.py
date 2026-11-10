@@ -79,9 +79,7 @@ class Link(BaseLink):
         self.k_critical = kwargs['k_critical']
         self.shockwave_speed = self.capacity / (self.k_jam - self.k_critical)
         self.current_speed = self.free_flow_speed
-        self.max_travel_time = (
-            self.length / 0.05
-        )  # Jam threshold, equivalent to speed of 0.01 m/s
+        self.max_travel_time = self.length / 0.05  # Travel-time cap at 0.05 m/s
 
         self.speed_density_fd = BiDirectionalFd(
             v_f=self.free_flow_speed,
@@ -172,8 +170,10 @@ class Link(BaseLink):
         # Update travel time and speed
         self.speed[time_step] = speed
         self.travel_time[time_step] = (
-            self.length / speed if speed > 0 else self.max_travel_time
-        )  # avoid infinite travel time
+            min(self.length / speed, self.max_travel_time)
+            if speed > 0
+            else self.max_travel_time
+        )
         self.link_flow[time_step] = cal_link_flow_kv(
             self.density[time_step], self.speed[time_step]
         )
@@ -416,8 +416,10 @@ class Separator(Link):
         # Update travel time and speed
         self.speed[time_step] = speed
         self.travel_time[time_step] = (
-            self.length / speed if speed > 0 else self.max_travel_time
-        )  # avoid infinite travel time
+            min(self.length / speed, self.max_travel_time)
+            if speed > 0
+            else self.max_travel_time
+        )
 
         self.link_flow[time_step] = cal_link_flow_kv(
             self.density[time_step], self.speed[time_step]

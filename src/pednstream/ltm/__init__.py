@@ -5,11 +5,11 @@
 # @Software: PyCharm
 
 from .network import Network
-from .node import Node
-from .link import Link, Separator
+from .node import Node, NodeConfig
+from .link import Link, Separator, LinkConfig
 from .od_manager import ODManager, DemandGenerator
 from .path_finder import PathFinder
-from .solver import NodeFlowSolver
+from .solver import solve as NodeFlowSolver
 
 
 __all__ = [
@@ -17,6 +17,7 @@ __all__ = [
     'Node',
     'Link',
     'Separator',
+    'NodeConfig',
     'ODManager',
     'PathFinder',
     'NodeFlowSolver',

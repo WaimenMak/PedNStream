@@ -1,6 +1,6 @@
 """Configuration interface.
 
-It enables users to load condiguration parameters from a YAML file and validate them against the expected structure.
+It enables users to load configuration parameters from a YAML file and validate them. It also provides functionality to build NetworkConfig and SimulationConfig dataclasses from the normalized scenario parameters.
 """
 
 import csv
@@ -120,7 +120,6 @@ def _load_od_flows_from_csv(
             od_flows[(o, d)] = float(row["weight"])
 
     return od_flows
-
 
 
 def fetch_data_files(path: str) -> Dict[str, Path]:
@@ -604,18 +603,21 @@ def _parse_pair_key(key: str, label: str, example: str) -> tuple[int, int]:
         ) from exc
 
 
+def load_config(path: str) -> dict:
+    """Load a YAML configuration file and build configuration dataclasses.
+    
+    Args:
+        path: Path to the YAML configuration file.
+
+    Returns:
+        dict: A dictionary containing 'network' and 'simulation' keys with their respective dataclasses.
+    """
+    scenario_params = read_scenario(path)
+    configs = build_configs(scenario_params)
+    return configs
+    
 
 if __name__ == "__main__":
     # Example usage
     config_path = "tests/data/delft/sim_params.yaml"
-    # config = load_config(config_path)
-    config = read_scenario(config_path)
-    # validate_config(config)
-
-    build = build_configs(config)
-
-    print(build)
-    print (type(build))
-
-    files = fetch_data_files("tests/data/delft")
-    # print(files)
+    load_config(config_path)

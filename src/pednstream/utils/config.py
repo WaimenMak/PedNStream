@@ -35,8 +35,10 @@ class DemandParams:
 
 @dataclass(frozen=True)
 class ScenarioParams:
-    """Normilized scenario specification from YAML config. Contains all the parameters needed to initialize a Network instance and run a simulation."""
+    """Normilized scenario specification from YAML config.
 
+    Contains all the parameters needed to initialize a Network instance and run a simulation.
+    """
     origin_nodes: tuple[int, ...]
     destination_nodes: tuple[int, ...]
     simulation_steps: int
@@ -529,7 +531,9 @@ def build_configs(params: ScenarioParams, positions=None) -> tuple[NetworkConfig
 
     Args:
         params: ScenarioParams dataclass containing the normalized scenario parameters.
-        positions: Optional dictionary of node positions. THIS IS NOT USED HERE, but can be populated later from node_positions.json. This is odd and should be refactored to be more consistent.
+        positions: Optional dictionary of node positions. 
+        THIS IS NOT USED HERE, but can be populated later from node_positions.json. 
+        This is odd and should be refactored to be more consistent.
 
     Returns:
         tuple: (NetworkConfig, SimulationConfig) dataclass instances.
@@ -585,9 +589,6 @@ def build_configs(params: ScenarioParams, positions=None) -> tuple[NetworkConfig
 
 
     return network_config, simulation_config
-
-
-# REVIEW POINT
 
 
 def _parse_pair_key(key: str, label: str, example: str) -> tuple[int, int]:

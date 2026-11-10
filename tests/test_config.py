@@ -239,7 +239,10 @@ def test_build_configs_creates_links_and_nodes():
         demand={0: DemandParams(peak_lambda=10)},
     )
 
-    network_config, simulation_config = build_configs(params)
+    configs = build_configs(params)
+
+    assert set(configs) == {"network", "simulation"}
+    network_config, simulation_config = configs["network"], configs["simulation"]
 
     links = {link.link_id: link for link in network_config.links}
     assert set(links) == {
@@ -272,6 +275,6 @@ def test_build_configs_creates_links_and_nodes():
 def test_build_configs_passes_od_flows():
     params = make_params(od_flows={(0, 3): 10.5, (2, 3): 0.0})
 
-    _, simulation_config = build_configs(params)
+    simulation_config = build_configs(params)["simulation"]
 
     assert simulation_config.od_flows == {(0, 3): 10.5, (2, 3): 0.0}

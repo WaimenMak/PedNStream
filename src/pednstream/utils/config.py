@@ -127,7 +127,8 @@ def fetch_data_files(path: str) -> Dict[str, Path]:
     """Fetches data files from a directory.
     
     Args:
-        path: Path to the simulation data directory containing files like adj_matrix.npy, node_positions.json, od_flows.csv, etc.
+        path: Path to the simulation data directory containing files like adj_matrix.npy, 
+        node_positions.json, od_flows.csv, etc.
 
     Returns:
         dict: A dictionary containing paths to files at the root of path.
@@ -526,7 +527,7 @@ def _build_node_configs(
     return node_configs
 
 
-def build_configs(params: ScenarioParams, positions=None) -> tuple[NetworkConfig, SimulationConfig]:
+def build_configs(params: ScenarioParams, positions=None) -> dict[str, NetworkConfig | SimulationConfig]:
     """Build NetworkConfig and SimulationConfig dataclasses from the ScenarioSpec and adjacency matrix.
 
     Args:
@@ -536,7 +537,7 @@ def build_configs(params: ScenarioParams, positions=None) -> tuple[NetworkConfig
         This is odd and should be refactored to be more consistent.
 
     Returns:
-        tuple: (NetworkConfig, SimulationConfig) dataclass instances.
+        dict: A dictionary containing 'network' and 'simulation' keys with their respective dataclass instances.
 
     """
     path_finder_params = params.path_finder.__dict__
@@ -587,8 +588,7 @@ def build_configs(params: ScenarioParams, positions=None) -> tuple[NetworkConfig
         od_flows=od_flows,
     )
 
-
-    return network_config, simulation_config
+    return {"network": network_config, "simulation": simulation_config}
 
 
 def _parse_pair_key(key: str, label: str, example: str) -> tuple[int, int]:
@@ -615,6 +615,7 @@ if __name__ == "__main__":
     build = build_configs(config)
 
     print(build)
+    print (type(build))
 
     files = fetch_data_files("tests/data/delft")
     # print(files)

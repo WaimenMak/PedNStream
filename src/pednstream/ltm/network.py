@@ -5,14 +5,14 @@ from dataclasses import dataclass, field
 from typing import List, Optional, Dict
 from pathlib import Path
 from numpy import ndarray
-from .node import Node, NodeConfig
-from .link import LinkConfig, Link
-from .od_manager import ODManager
+from pednstream.ltm.node import Node, NodeConfig
+from pednstream.ltm.link import LinkConfig, Link
+from pednstream.ltm.od_manager import ODManager
 
-@dataclass
-class SimulationParameters:
-    """Simulation parameters."""
-    params: dict = field(default_factory=dict) # Dictionary to hold various simulation parameters, can be extended as needed.
+# @dataclass
+# class SimulationParameters:
+#     """Simulation parameters."""
+#     params: dict = field(default_factory=dict) # Dictionary to hold various simulation parameters, can be extended as needed.
 
 
 # @dataclass [My code]
@@ -29,16 +29,7 @@ class SimulationParameters:
 #     # TODO: consider moving simulation steps to here, as a global parameter for the network, instead of being part of the link configuration. This would make it easier to manage and change simulation steps for the entire network.
 
 
-@dataclass
-class SimulationConfig:
-    """Configuration for simulation runtime and parameters."""
-    simulation_steps: int
-    unit_time: int
-    assign_flows_type: str
-    seed: Optional[int]
-    path_finder: dict
-    demand_params: dict  # Original YAML demand section for generating runtime demand
-    od_flows: dict       # OD flows mapping (origin, destination) -> flow
+
 
 @dataclass
 class NetworkConfig:

@@ -169,6 +169,7 @@ class PathFinder:
         self._link_cache_step = -1  # Last timestep for which link cache was built
         self._link_density_cache = {}  # {(node_id, down_node): normalized_density}
         self._link_capacity_cache = {}  # {(node_id, down_node): capacity}
+        self.od_tracker = None  # set by Network when od_tracking is enabled
         self.logger = logger
 
         # Get parameters from config or use defaults
@@ -734,7 +735,16 @@ class PathFinder:
         od_flows_cache = self._od_manager_cache  # pre-fetched in calculate_node_turning_fractions
 
         # Update P(od|up) for each upstream node using pre-fetched flows
+        tracker = self.od_tracker
         for up_node, od_pairs in node.up_od_probs.items():
+            if tracker is not None and up_node != -1:
+                # OD tracking: P(od|up) is the actual mix of people on link up -> node
+                tracked = tracker.up_od_probs(node, up_node, od_pairs)
+                if tracked is not None:
+                    for od_pair in od_pairs:
+                        od_pairs[od_pair] = tracked.get(od_pair, 0.0)
+                    continue
+                # empty link: fall back to the weight-based estimate below
             total_flow = 0.0
             # First pass: calculate total flow
             for od_pair in od_pairs:

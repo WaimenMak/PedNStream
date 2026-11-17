@@ -206,6 +206,19 @@ class OneToOneNode(Node):
 class RegularNode(Node):
     def __init__(self, node_id):
         super().__init__(node_id)
+        self.edge_flows = None  # [(incoming idx, outgoing idx, flow)], used by ODTracker
+
+    def _set_edge_flows(self, edge_q):
+        """Keep the flow of every turn (edge i: incoming i // (dest_num-1) to the
+        (i % (dest_num-1))-th outgoing link, skipping the U-turn)."""
+        n = self.dest_num - 1
+        edges = []
+        for i, g in enumerate(edge_q):
+            k, j = divmod(i, n)
+            if j >= k:
+                j += 1
+            edges.append((k, j, float(g)))
+        self.edge_flows = edges
 
     def solve(self, s, r, type="classic"):
         if type == "optimal":
@@ -230,6 +243,7 @@ class RegularNode(Node):
             else:
                 res = linprog(c, A_ub=self.A_ub, b_ub=b_ub)
             if res.success:
+                self._set_edge_flows(np.floor(res.x[: self.edge_num]))
                 flows = self.A_ub @ np.floor(res.x)
                 # Ensure non-negative flows and round down to nearest integer
                 self.q = np.maximum(0, flows)
@@ -258,7 +272,9 @@ class RegularNode(Node):
                     weighted_sr[source_idx][self.mask[source_idx, :]][destination_idx],
                 )  # do not use min # 2
                 flows_list.append(g_ij)
-            flows = self.A_ub[:, : self.edge_num] @ np.floor(np.array(flows_list))
+            edge_q = np.floor(np.array(flows_list))
+            self._set_edge_flows(edge_q)
+            flows = self.A_ub[:, : self.edge_num] @ edge_q
             self.q = np.maximum(0, flows)
             return
         else:

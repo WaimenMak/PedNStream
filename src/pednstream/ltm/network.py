@@ -6,6 +6,7 @@ from .node import Node, OneToOneNode, RegularNode
 from .link import Link, Separator
 from .od_manager import ODManager, DemandGenerator
 from .path_finder import PathFinder
+from .od_tracker import ODTracker, edge_flows_one_to_one
 from typing import Callable, List
 from pathlib import Path
 
@@ -83,6 +84,9 @@ class Network:
         self.path_finder = None
         self.pos = pos
         self.assign_flows_type = params.get("assign_flows_type", "classic")
+        # OD-labelled flow tracking (opt-in): people keep their OD pair along the way
+        self.od_tracking = bool(params.get("od_tracking", False))
+        self.od_tracker = None
         if self.logger and self.verbose:
             self.logger.info(
                 f"Network initialization started, assign flows type: {self.assign_flows_type}"
@@ -148,6 +152,9 @@ class Network:
             self.path_finder.find_od_paths(
                 od_pairs=self.od_manager.od_flows.keys(), nodes=self.nodes
             )
+            if self.od_tracking:
+                self.od_tracker = ODTracker(self)
+                self.path_finder.od_tracker = self.od_tracker
 
     def _create_origin_destination(self, node: Node):
         """Create virtual links for origin/destination nodes and set demand"""
@@ -355,11 +362,17 @@ class Network:
             ):
                 if isinstance(node, OneToOneNode):
                     node.assign_flows(time_step)
+                    if self.od_tracker is not None:
+                        node.edge_flows = edge_flows_one_to_one(node)
                 else:  # regular node
                     if node.A_ub is None:
                         node.get_matrix_A()
                     node.assign_flows(time_step, type=self.assign_flows_type)
+                if self.od_tracker is not None:
+                    self.od_tracker.record_node(node, time_step)
 
+        if self.od_tracker is not None:
+            self.od_tracker.commit(time_step)
         self.update_link_states(time_step)
 
     def visualize(

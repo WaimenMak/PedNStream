@@ -1,0 +1,94 @@
+# =====================================================================
+#  "Station Square" — workshop network for PedNStream
+# =====================================================================
+#
+#            6  City Exit (DEST Y)
+#            |
+#            |  4_6
+#            4  Mall Junction
+#            |  \
+#   2_4      |    \  3_4  (narrow diagonal)
+#  (wide)    |      \
+#   0 ───────2 ───────3 ─────────── 5  Platform (DEST X)
+#  West     Plaza 2_3 Hall    3_5
+#  Gate        (NARROW)  |
+# (ORIGIN A)             |  1_3
+#                        1  South Gate (ORIGIN B)
+#
+#  Gate A enters at the Plaza (2), Gate B enters at the Hall (3).
+#  Routes (k_paths = 2):
+#    A -> X : 0-2-3-5   or 0-2-4-3-5
+#    A -> Y : 0-2-4-6   or 0-2-3-4-6
+#    B -> X : 1-3-5     (only one route!)
+#    B -> Y : 1-3-4-6   or 1-3-2-4-6
+#  A->X and B->Y can meet HEAD-ON in the narrow corridor 2_3.
+#
+#  Students normally only touch the `od_flows` block (via the notebooks),
+#  but every value here can be changed.
+# =====================================================================
+
+network:
+  adjacency_matrix: [
+    [0, 0, 1, 0, 0, 0, 0],  # 0 West Gate     -> Plaza
+    [0, 0, 0, 1, 0, 0, 0],  # 1 South Gate    -> Hall
+    [1, 0, 0, 1, 1, 0, 0],  # 2 Plaza         -> West Gate, Hall, Mall
+    [0, 1, 1, 0, 1, 1, 0],  # 3 Hall          -> South Gate, Plaza, Mall, Platform
+    [0, 0, 1, 1, 0, 0, 1],  # 4 Mall Junction -> Plaza, Hall, City Exit
+    [0, 0, 0, 1, 0, 0, 0],  # 5 Platform
+    [0, 0, 0, 0, 1, 0, 0],  # 6 City Exit
+  ]
+  origin_nodes: [0, 1]
+  destination_nodes: [5, 6]
+
+simulation:
+  seed: 42               # fixed seed -> every group sees the same demand
+  simulation_steps: 300  # 300 steps x 10 s = 50 minutes
+  unit_time: 10          # seconds per step
+  assign_flows_type: "classic"
+  path_finder:
+    k_paths: 2     # each OD pair gets its 2 shortest routes
+    temp: 5        # softmax temperature (lower = everyone picks the best route)
+    alpha: 1       # weight on route length
+    beta: 2        # weight on congestion (density)
+    omega: 1       # weight on capacity (width)
+    std_dev: 0     # no random noise in route choice
+
+default_link:
+  length: 50           # m
+  width: 3             # m
+  free_flow_speed: 1.1 # m/s
+  k_critical: 2        # ped/m^2  (above this the link is congested)
+  k_jam: 6             # ped/m^2  (jammed, nobody moves)
+  gamma: 0.01
+
+links:
+  "2_3": {width: 2}               # the narrow corridor = the bottleneck
+  "2_4": {width: 4}               # wide boulevard
+  "3_4": {width: 2, length: 70}   # narrow diagonal connector
+
+# Arrivals per time step at each gate (one peak at ~35% of the run).
+# NB: if the first corridor is full, PedNStream drops the excess (people are
+# 'turned away'), it does not queue them outside the gate.
+demand:
+  origin_0:
+    pattern: "single_peak"
+    base_lambda: 5
+    peak_lambda: 40
+    peak_position: 0.35
+  origin_1:
+    pattern: "single_peak"
+    base_lambda: 5
+    peak_lambda: 40
+    peak_position: 0.35
+
+# OD WEIGHTS — relative, not absolute! They say how strongly the people entering
+# at a gate are drawn to each destination:
+#   0_5: 1, 0_6: 1  -> West Gate drawn equally to the Platform and the City Exit
+#   0_5: 3, 0_6: 1  -> three times as strongly to the Platform
+# PedNStream does not give each person a fixed destination: it re-applies these
+# weights at every junction, so the split that comes out can differ a little.
+od_flows:
+  "0_5": 1
+  "0_6": 1
+  "1_5": 1
+  "1_6": 1

@@ -47,39 +47,43 @@ class ODTracker:
         for k, (o, _d) in enumerate(self.od_pairs):
             self._od_by_origin.setdefault(o, []).append(k)
 
-    # ------------------------------------------------------------------ mixes
-    def link_mix(self, up_node: int, node_id: int):
-        """Share of each OD pair among the people on link up_node -> node_id, or None if empty."""
+    # ----------------------------------------------------------- compositions
+    # All compositions are unnormalised: every place that uses one divides by a
+    # sum afterwards, so the scale cancels.
+    def link_counts(self, up_node: int, node_id: int):
+        """People on link up_node -> node_id per OD pair (raw), or None if empty or virtual."""
         c = self.counts.get((up_node, node_id))
-        if c is None:
+        if c is None or c.sum() <= 1e-9:
             return None
-        total = c.sum()
-        if total <= 1e-9:
-            return None
-        return c / total
+        return c
 
-    def origin_mix(self, origin: int, time_step: int) -> np.ndarray:
-        """P(od | origin) for new people, from the OD weights at this time step."""
-        mix = np.zeros(self.K)
+    def origin_weights(self, origin: int, time_step: int) -> np.ndarray:
+        """Unnormalised P(od | origin) for new people, from the OD weights at this time step."""
+        w = np.zeros(self.K)
         ks = self._od_by_origin.get(origin, [])
         if not ks:
-            return mix
+            return w
         od_manager = self.network.od_manager
-        w = np.array([max(od_manager.get_od_flow(*self.od_pairs[k], time_step), 0.0) for k in ks])
-        w = w / w.sum() if w.sum() > 0 else np.full(len(ks), 1.0 / len(ks))
-        mix[ks] = w
-        return mix
+        vals = np.array([max(od_manager.get_od_flow(*self.od_pairs[k], time_step), 0.0) for k in ks])
+        w[ks] = vals if vals.sum() > 0 else 1.0  # all weights 0: split equally
+        return w
+
+    def source_weights(self, node, up_node: int, time_step: int):
+        """Unnormalised OD composition of the people leaving up_node into node."""
+        if up_node == -1:
+            return self.origin_weights(node.node_id, time_step)
+        return self.link_counts(up_node, node.node_id)
 
     def up_od_probs(self, node, up_node: int, od_pairs) -> dict | None:
         """Tracked P(od | up) for the OD pairs listed at this node, or None to fall back."""
-        mix = self.link_mix(up_node, node.node_id)
-        if mix is None:
+        c = self.link_counts(up_node, node.node_id)
+        if c is None:
             return None
-        probs = {od: mix[self.index[od]] for od in od_pairs if od in self.index}
+        probs = {od: c[self.index[od]] for od in od_pairs if od in self.index}
         total = sum(probs.values())
         if total <= 1e-12:
             return None
-        return {od: p / total for od, p in probs.items()}
+        return {od: v / total for od, v in probs.items()}
 
     # --------------------------------------------------------------- transfer
     def _turn_probs(self, node, up: int, down: int) -> np.ndarray | None:
@@ -106,18 +110,16 @@ class ODTracker:
             up = in_link.start_node.node_id if in_link.start_node is not None else -1
             down = out_link.end_node.node_id if out_link.end_node is not None else -1
 
-            if up == -1:
-                mix = self.origin_mix(node.node_id, time_step)
-            else:
-                mix = self.link_mix(up, node.node_id)
-            if mix is None or mix.sum() <= 0:
+            w = self.source_weights(node, up, time_step)
+            if w is None or w.sum() <= 0:
                 self._unlabelled_step += g
                 continue
 
+            # split g over OD pairs in proportion to composition * P(down | up, od)
             p = self._turn_probs(node, up, down)
-            weights = mix * p if p is not None else mix
-            if weights.sum() <= 1e-12:  # no tracked OD wants this turn: keep the link's mix
-                weights = mix
+            weights = w * p if p is not None else w
+            if weights.sum() <= 1e-12:  # no tracked OD wants this turn: keep the composition
+                weights = w
             moved = g * weights / weights.sum()
 
             if up == -1:

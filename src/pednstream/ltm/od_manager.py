@@ -6,7 +6,7 @@ import logging
 
 @dataclass
 class DemandConfig:
-    """Configuration for demand generation with defaults"""
+    """Configuration for demand generation with default."""
 
     peak_lambda: float = 10.0
     base_lambda: float = 5.0
@@ -15,7 +15,7 @@ class DemandConfig:
     peak_position: float = 0.5  # Position of peak in simulation (0.0-1.0)
 
 class ODManager:
-    """Manages Origin-Destination flows and operations"""
+    """Manages Origin-Destination flows and operations."""
 
     def __init__(self, simulation_steps: int, logger: logging.Logger = None):
         self.logger = logger or logging.getLogger(__name__)
@@ -26,8 +26,7 @@ class ODManager:
     def init_od_flows(
         self, origin_nodes: list, destination_nodes: list, od_flows: dict = None
     ):
-        """
-        Initialize OD flows with user-defined values.
+        """Initialize OD flows with user-defined values.
 
         Args:
             origin_nodes: List of origin node IDs
@@ -46,7 +45,7 @@ class ODManager:
                         self.od_flows[(o, d)] = np.ones(self.simulation_steps + 1) # Necessary at network initialization, one per simulation
 
     def _set_predefined_flows(self, od_flows: dict): # Set predefined OD flows from YAML file
-        """Set predefined OD flows"""
+        """Set predefined OD flows."""
         for (o, d), flow in od_flows.items():
             if isinstance(
                 flow, (int, float)
@@ -62,16 +61,14 @@ class ODManager:
                 self.od_flows[(o, d)] = np.array(flow)
 
     def get_od_flow(self, origin: int, destination: int, time_step: int) -> float:
-        """Get flow for specific OD pair at time step"""
+        """Get flow for specific OD pair at time step."""
         return self.od_flows.get((origin, destination), self._default_zero_flow)[
             time_step
         ]
 
 
 class DemandGenerator:  # Generate a function for the simulation at initialization,  One per simulation.
-    """
-    Generate demand patterns for origin nodes.
-    """
+    """Generate demand patterns for origin nodes."""
 
     # TODO: Refactor to reduce repetion.
     def __init__(self, simulation_steps: int, params: dict, logger: logging.Logger):

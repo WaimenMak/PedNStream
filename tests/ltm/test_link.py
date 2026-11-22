@@ -7,7 +7,6 @@ def link_config():
     link_id = (1,2)
     start_node = 1
     end_node = 2
-    simulation_steps = 10
     unit_time = 1
     length =  12
     width = 2
@@ -24,7 +23,7 @@ def link_config():
     back_gate_width = None
 
     return LinkConfig(link_id, start_node, end_node, 
-                      simulation_steps, unit_time, 
+                      unit_time, 
                        length, width, 
                       free_flow_speed, k_critical, 
                       k_jam, is_controller, activity_probability, 
@@ -50,7 +49,6 @@ class TestLinkConfig:
                 link_id=21,
                 start_node=1,
                 end_node=2,
-                simulation_steps=10,
                 unit_time=1,
                 length=12,
                 width=None,  # Width is None
@@ -76,7 +74,6 @@ class TestLinkConfig:
                 link_id=22,
                 start_node=1,
                 end_node=2,
-                simulation_steps=10,
                 unit_time=1,
                 length=12,
                 width=2,
@@ -122,3 +119,49 @@ class TestLink:
         from pednstream.ltm.link import Separator
         link = Separator(link_config)
         assert link.is_controller  # Should always True for Separator
+
+
+class TestLinkStateAllocation:
+    """The time horizon is decoupled from link creation."""
+
+    def test_link_created_without_steps(self, link_config):
+        from pednstream.ltm.link import Regular
+        link = Regular(link_config)
+        assert not link.is_allocated
+        assert link.free_flow_travel_time == pytest.approx(12 / 1.4)
+
+    def test_allocate_state_sizes(self, link_config):
+        from pednstream.ltm.link import Regular, Separator
+        for cls in (Regular, Separator):
+            link = cls(link_config)
+            link.allocate_state(10)
+            assert link.is_allocated
+            for name in ("inflow", "outflow", "cumulative_inflow", "cumulative_outflow",
+                         "sending_flow", "receiving_flow", "num_pedestrians", "density",
+                         "speed", "link_flow", "travel_time", "avg_travel_time",
+                         "back_gate_width_data", "front_gate_width_data"):
+                assert len(getattr(link, name)) == 11, name
+            assert link.travel_time[0] == pytest.approx(link.free_flow_travel_time)
+        assert len(link.separator_width_data) == 11
+
+    def test_allocate_state_resets(self, link_config):
+        from pednstream.ltm.link import Regular
+        link = Regular(link_config)
+        link.allocate_state(10)
+        link.inflow[3] = 5
+        link.allocate_state(20)
+        assert len(link.inflow) == 21
+        assert link.inflow.sum() == 0
+
+    def test_travel_time_writes_persist(self, link_config):
+        """travel_time used to be a property returning a fresh array, so writes were lost."""
+        from pednstream.ltm.link import Regular
+        link = Regular(link_config)
+        link.allocate_state(10)
+        link.travel_time[4] = 42.0
+        assert link.travel_time[4] == 42.0
+
+    def test_allocate_state_rejects_non_positive(self, link_config):
+        from pednstream.ltm.link import Regular
+        with pytest.raises(ValueError):
+            Regular(link_config).allocate_state(0)

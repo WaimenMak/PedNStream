@@ -1,15 +1,14 @@
 import numpy as np
 from collections import defaultdict
 from scipy.optimize import linprog
-from .link import BaseLink
-from .solver import NodeFlowSolver
+# from .link import BaseLink
+# from .solver import NodeFlowSolver
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import Optional, List
-from pednstream.ltm import DemandGenerator
 from typing import Optional
 
-@dataclass
+@dataclass(frozen=True)
 class NodeConfig:
     """Static configuration for a Node. Only holds values known before simulation starts.
 
@@ -17,14 +16,13 @@ class NodeConfig:
     virtual links, ods_in_turns) lives on Node itself.
     """
     id: int
-    type: str = "regular"         "
+    type: str = "regular" 
     gate_width: Optional[float] = None
     turning_fractions: Optional[np.ndarray] = None
     demand: Optional[np.ndarray] = None  # demand profile for origin node
     M: Optional[float] = 1e6            # penalty term for destination node
     w: Optional[float] = 1e-2           # penalty term for turning fractions
     is_controller: bool = False         # whether this node is a controller, can be used to populate Network's controllers list
-
 
 
 class Node:
@@ -39,8 +37,6 @@ class Node:
         self.M = node_config.M                        # penalty for destination node
         self.w = node_config.w                        # penalty for turning fractions
         self.gate_width = node_config.gate_width
-        self._demand: np.ndarray = field(default_factory=lambda: np.zeros(1))  # Default to an array of zeros if not provided
-        self.generator: Optional[DemandGenerator] = None
 
         # --- Link containers (populated externally by Network) ---
         self.incoming_links: list = []
@@ -71,8 +67,8 @@ class Node:
         return self._type
     
     @type.setter
-    # FIXME: The type can be deftermine when creating the NodeConfigs, 
-    # Consider removing this property and setter form here, and make it a responsibilbility of the inputs parser (see PR)
+    # FIXME: The type can be determine when creating the NodeConfigs, 
+    # Consider removing this property and setter here, and make it a responsibilbility of the inputs parser (see PR)
     def type(self, value) -> None:
         """Set the type of the node based on the adjacency matrix and origin/destination nodes."""
         try:
@@ -128,68 +124,30 @@ class Node:
         self.up_od_probs = defaultdict(lambda: defaultdict(int))  # {up_node: {od_pair: prob}}
         self.current_turn_probs_step = {}  # {od_pair: last_computed_timestep}
 
-    def create_virtual_links(self, params: dict, origin_nodes: list)-> None:
-        """Creates a pair virtual links for origin and destination nodes.Virtual links will be attached to the node's incoming and outgoing link lists.
+    def create_virtual_links(self) -> None:
+        """Create a pair of virtual links (in/out) for an origin/destination node.
 
-        Args:
-            params (dict): A dictionary containing configuration parameters virtual link parameters, including 'simulation_steps'.
-            origin_nodes (list): A list of node IDs that are considered origin nodes.
-        
+        The virtual links are appended to the node's incoming and outgoing link lists.
+        This is a topology-only step: time-series state is allocated later with
+        ``Link.allocate_state()`` (see ``Network.allocate()``), and the demand profile
+        is assigned by the simulation layer (see ``Network.set_demand()``).
+
         Returns:
            None.
         """
-        # TODO: can this be move one step up, to network creation?
-        from pednstream.ltm.link import VirtualLinkCreator
-        # Value pairs for incoming and outgoing virtual links
-        directions = [("in", True), ("out", False) ]
+        from pednstream.ltm.link import VirtualLinkCreator, virtual_link_config
 
-        # Create vitural links
-        for direction, is_incoming in directions:
-            # create a link, and mark it as vitual
-            v_link = VirtualLinkCreator().create_link(params)
+        for direction, is_incoming in (("in", True), ("out", False)):
+            v_link = VirtualLinkCreator().create_link(virtual_link_config(self.id, direction))
             v_link.direction = direction
 
             if is_incoming:
-                # TODO: Reference over Id for end/start nodes. 
-                # Should the end_node be a reference to the node object or just the id? 
-                v_link.end_node = self.id
                 self.incoming_links.append(v_link)
                 self.virtual_incoming_link = v_link
             else:
-                v_link.start_node = self.id
                 self.outgoing_links.append(v_link)
                 self.virtual_outgoing_link = v_link
 
-        # Attach demand generator to node:
-        if self.id in origin_nodes and self.generator is not None:
-            demand_config = params.get('demand', {}).get(f"origin_{self.id}", {})
-
-            pattern = demand_config.get('pattern', 'gaussian_peaks')
-
-            self._init_demand_generator(params['simulation_steps'], params)
-            self.demand = self.generator.generate_custom(self.id, pattern)
-            # FIXME: implement logger for the following. 
-            # if self.logger and self.verbose:
-            #     self.logger.info(
-            #         f"Total demand of origin node {node.node_id}: {np.sum(node.demand)}"
-            #     )
-        else:
-            self.demand = np.zeros(params['simulation_steps'])
-
-        return None
-    
-    def _init_demand_generator(self, simulation_steps: int, config: dict) -> None:
-        """Creates a demand generator for the node, if it is an origin node.
-
-        Args:
-            simulation_steps (int): The number of simulation steps for which to generate demand.
-            config (dict): Configuration parameters for the demand generator.
-       
-        Returns:
-            None.
-        """
-        import logging
-        self.generator = DemandGenerator(simulation_steps=simulation_steps, params=config, logger=logging.getLogger('VirtualLink'))
         return None
 
     def init_mask(self):
@@ -203,9 +161,7 @@ class Node:
         np.fill_diagonal(self.mask, False)
 
     def get_matrix_A(self):
-        """
-        Get the matrix A_ub for the linear programming problem, only computed once.
-        """
+        """Get the matrix A_ub for the linear programming problem, only computed once."""
         row_num = self.source_num + self.dest_num
         # - source_num for the link from the same source-destination pair, now it is included in the source_num
         self.A_ub = np.zeros(

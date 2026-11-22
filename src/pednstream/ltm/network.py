@@ -6,30 +6,7 @@ from typing import List, Optional, Dict
 from pathlib import Path
 from numpy import ndarray
 from pednstream.ltm.node import Node, NodeConfig
-from pednstream.ltm.link import LinkConfig, Link
-from pednstream.ltm.od_manager import ODManager
-
-# @dataclass
-# class SimulationParameters:
-#     """Simulation parameters."""
-#     params: dict = field(default_factory=dict) # Dictionary to hold various simulation parameters, can be extended as needed.
-
-
-# @dataclass [My code]
-# class NetworkConfig:
-#     """Data class for collecting data related to the network configuration."""
-#     adjacency_matrix: ndarray # represent the interconnections between nodes in the network.
-#     links: List[LinkConfig] # List of configuration objects representing the links in the network
-#     nodes: List[NodeConfig] # List of configuration objects representing the nodes in the network
-#     origin_nodes: list # 
-#     destination_nodes: list = field(default_factory=list) # List of destination nodes, can be empty if not specified
-#     od_flows: dict = field(default_factory=dict) # Dictionary to hold origin-destination flow information, from yaml file
-#     positions: dict = field(default_factory=dict) # Dictionary to hold node positions, from yaml file
-#     demand : dict = field(default_factory=dict) # Dictionary to hold demand information, from yaml file
-#     # TODO: consider moving simulation steps to here, as a global parameter for the network, instead of being part of the link configuration. This would make it easier to manage and change simulation steps for the entire network.
-
-
-
+from pednstream.ltm.link import LinkConfig, Link, RegularCreator, SeparatorCreator
 
 @dataclass
 class NetworkConfig:
@@ -52,7 +29,8 @@ class Network:
         self.config = config
         # Stores nodes and links for the network
         self.nodes: Dict[int, Node] = {} # Dictionary to hold Node objects, keyed by node ID. Ids match the ones in the adjacency matrix.
-        self.links: Dict[str, LinkConfig] = {} # Dictionary to hold LinkConfig objects, keyed by link ID
+        self.links: Dict[tuple[int, int], Link] = {} # Dictionary to hold Link objects, keyed by link ID (start, end)
+        self._simulation_steps: Optional[int] = None # Set by allocate(); the topology does not depend on it.
         self._controllers: List[int] = [] # List to hold IDs of nodes that are controllers, can be populated based on node configurations. Used by the PathFinder. TODO: consider implementing dependency inversion.
         self._controller_gaters: List[int] = [] # Info passed by the user. TODO: Consider removing it.  
 
@@ -76,6 +54,20 @@ class Network:
         # TODO: consider removing it. 
         return self._controller_gaters
  
+    @property
+    def simulation_steps(self) -> int:
+        """Number of steps the network state is currently allocated for."""
+        if self._simulation_steps is None:
+            raise RuntimeError(
+                "Network state is not allocated; call Network.allocate(simulation_steps) first."
+            )
+        return self._simulation_steps
+
+    @property
+    def is_allocated(self) -> bool:
+        """Whether the time-series state has been allocated."""
+        return self._simulation_steps is not None
+
     @property
     def log_level(self) -> int:
         """Get the log level."""
@@ -131,64 +123,128 @@ class Network:
 
         return logger
     
-
     def _create_nodes(self) -> dict[int, Node]:
-        """Create Node objects based on the provided node configurations."""
+        """Create Node objects (topology only) based on the provided node configurations.
+
+        Origin/destination nodes get a pair of virtual links. No simulation state is
+        allocated here, see allocate().
+        """
         import numpy as np
         nodes = {}
+        od_nodes = set(self.config.origin_nodes) | set(self.config.destination_nodes)
 
-        
         for node_config in self.config.nodes:
-            
-            # FIXME: could this be done by the node instantiation?
-            id = node_config.id
-            incoming_links = np.sum(self.config.adjacency_matrix[:, id])
-            outgoing_links = np.sum(self.config.adjacency_matrix[id, :])
+            node_id = node_config.id
+            incoming_links = np.sum(self.config.adjacency_matrix[:, node_id])
+            outgoing_links = np.sum(self.config.adjacency_matrix[node_id, :])
+            is_od = node_id in od_nodes
 
-            # create node 
             node = Node(node_config)
-       
-            # Rules to set  note types
-            if incoming_links >= 2 and outgoing_links >= 2:
-                
-                if id in self.config.origin_nodes or id in self.config.destination_nodes:
-                    node.type = "regular"
-                    # follow up steps:
-                    #  1. Create virtual Link
-                    # TODO: CONTINUE HERE: decide how to pass parametes to 
-                    # create_virtual_links. 
-                    node.create_virtual_links()
 
-                    # 2. Assigne demand to the virtual link.
-                    self._create_origin_destination(node_config) # replace this by the steps above
-                else:  # do not create virtual links 
-                    node.type = "onetoone"  
-            elif incoming_links == 1 and outgoing_links ==1:
-                node.type = "onetoone"
-                # create virtual link
-                self._create_origin_destination(node_config)
-     
-            # create the Node object
-            node = Node(node_config)
+            # Node type rules (same as depricated_network.Network._create_nodes).
+            # FIXME: the type setter on Node expects a tuple; types should come from NodeConfig (see node.py).
+            if incoming_links == 2 and outgoing_links == 2:
+                node._type = "regular" if is_od else "onetoone"
+                create_virtual = is_od
+            elif incoming_links == 1 and outgoing_links == 1:
+                node._type = "onetoone"
+                create_virtual = True
+            else:
+                node._type = "regular"
+                create_virtual = is_od
+
+            if create_virtual:
+                node.create_virtual_links()
+
             nodes[node.id] = node
         return nodes
-    
-    def _create_links(self) -> dict[tuple[int,int], Link]:
-        """Create LinkConfig objects based on the provided link configurations."""
+
+    def _create_links(self) -> dict[tuple[int, int], Link]:
+        """Create Link objects based on the provided link configurations."""
         links = {}
         for link_config in self.config.links:
-            links[link_config.link_id] = link_config
+            creator = SeparatorCreator() if link_config.is_controller else RegularCreator()
+            links[link_config.link_id] = creator.create_link(link_config)
+
+        # Pair forward and reverse links
+        for (i, j), link in links.items():
+            reverse = links.get((j, i))
+            if reverse is not None:
+                link.reverse_link = reverse
         return links
-    
-    
-    def create(self) -> None: 
-        """Create the network based on the provided configuration and parameters."""
-        nodes = self._create_nodes()
-        links = self._create_links()
 
-        # assemble the network
+    def create(self) -> None:
+        """Create the network topology (nodes and links).
 
+        The time horizon is not needed here. Call allocate(simulation_steps) before
+        running a simulation.
+        """
+        self.nodes = self._create_nodes()
+        self.links = self._create_links()
 
+        # assemble the network: attach physical links to their nodes
+        for (i, j), link in self.links.items():
+            self.nodes[i].outgoing_links.append(link)
+            self.nodes[j].incoming_links.append(link)
+
+        for node in self.nodes.values():
+            node.init_mask()
+        return None
+
+    def _all_links(self):
+        """Yield physical and virtual links of the network."""
+        yield from self.links.values()
+        for node in self.nodes.values():
+            for v_link in (node.virtual_incoming_link, node.virtual_outgoing_link):
+                if v_link is not None:
+                    yield v_link
+
+    def allocate(self, simulation_steps: int) -> None:
+        """Allocate (or reset) the time-series state of all links and nodes for a run.
+
+        Calling it again discards previous results, so one network can be reused for
+        several simulations, possibly with different horizons. Demand is reset to zeros;
+        assign origin demand afterwards with set_demand().
+
+        Args:
+            simulation_steps (int): number of simulation steps of the run.
+        """
+        import numpy as np
+        if not self.nodes:
+            raise RuntimeError("Network is empty; call Network.create() before allocate().")
+
+        for link in self._all_links():
+            link.allocate_state(simulation_steps)
+
+        for node in self.nodes.values():
+            if node.virtual_incoming_link is not None:
+                node.demand = np.zeros(simulation_steps + 1)
+
+        self._simulation_steps = simulation_steps
+        return None
+
+    def set_demand(self, node_id: int, demand: ndarray) -> None:
+        """Assign the demand profile of an origin node for the allocated run.
+
+        Args:
+            node_id (int): id of an origin node (it must have virtual links).
+            demand (ndarray): demand per time step, of length simulation_steps or
+                simulation_steps + 1 (DemandGenerator patterns produce either). It is
+                stored zero-padded to simulation_steps + 1, like the link arrays.
+        """
+        import numpy as np
+        steps = self.simulation_steps  # raises if not allocated
+        node = self.nodes[node_id]
+        if node.virtual_incoming_link is None:
+            raise ValueError(f"Node {node_id} has no virtual links; it is not an origin node.")
+        demand = np.asarray(demand, dtype=float)
+        if demand.ndim != 1 or len(demand) not in (steps, steps + 1):
+            raise ValueError(
+                f"Demand for node {node_id} must be 1-D with length {steps} or {steps + 1} "
+                f"(simulation_steps = {steps}), got shape {demand.shape}."
+            )
+        node.demand = np.pad(demand, (0, steps + 1 - len(demand)))
+        return None
 
 
 if __name__ == "__main__":

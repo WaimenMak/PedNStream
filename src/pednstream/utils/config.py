@@ -37,7 +37,6 @@ class PathFinderParams:
         for k, v in kwargs.items():
             setattr(self, k, v)
 
-
 class DemandParams:
     """Dataclass for demand parameters."""
 
@@ -385,7 +384,6 @@ def _build_link_configs(
     adjacency_matrix: np.ndarray,
     default_link: Dict[str, Any],
     links_overrides: Mapping[tuple[int, int], Mapping[str, Any]],
-    simulation_steps: int,
     unit_time: int,
     controller_links: frozenset[tuple[int, int]] = frozenset(),
 ) -> list:
@@ -399,7 +397,6 @@ def _build_link_configs(
         adjacency_matrix: NxN numpy array of 0s and 1s.
         default_link: Default link parameters from YAML (length, width, etc.)
         links_overrides: Link-specific overrides, keyed by (i, j) tuples.
-        simulation_steps: Number of simulation steps.
         unit_time: Unit time for the simulation.
         controller_links: Set of controller links as (i, j) tuples, e.g. {(1, 2)}.
 
@@ -437,7 +434,6 @@ def _build_link_configs(
                 start_node=i,
                 end_node=j,
                 link_id=(i, j),
-                simulation_steps=simulation_steps,
                 unit_time=unit_time,
                 is_controller=is_controller,
                 length=merged_params["length"],
@@ -459,7 +455,6 @@ def _build_link_configs(
                 start_node=j,
                 end_node=i,
                 link_id=(j, i),
-                simulation_steps=simulation_steps,
                 unit_time=unit_time,
                 is_controller=is_controller,
                 length=merged_params["length"],
@@ -545,8 +540,6 @@ def build_configs(params: ScenarioParams, positions=None) -> dict[str, NetworkCo
     Args:
         params: ScenarioParams dataclass containing the normalized scenario parameters.
         positions: Optional dictionary of node positions. 
-        THIS IS NOT USED HERE, but can be populated later from node_positions.json. 
-        This is odd and should be refactored to be more consistent.
 
     Returns:
         dict: A dictionary containing 'network' and 'simulation' keys with their respective dataclass instances.
@@ -563,7 +556,6 @@ def build_configs(params: ScenarioParams, positions=None) -> dict[str, NetworkCo
         adjacency_matrix=adjacency_matrix,
         default_link=params.default_link,
         links_overrides=params.link_overrides,
-        simulation_steps=simulation_steps,
         unit_time=unit_time,
         controller_links=controller_links,
     )
@@ -633,4 +625,9 @@ def load_config(path: str) -> dict:
 if __name__ == "__main__":
     # Example usage
     config_path = "tests/data/delft/sim_params.yaml"
-    load_config(config_path)
+    configs =load_config(config_path)
+    print(type(configs))
+    print(type(configs["network"]))
+    print(type(configs["simulation"]))
+
+

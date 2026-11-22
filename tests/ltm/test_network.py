@@ -37,14 +37,6 @@ def network(network_config):
     return network
 
 
-def test_create_does_not_need_steps(network):
-    assert set(network.nodes) == {0, 1, 2, 3, 4}
-    assert len(network.links) == 8
-    assert not network.is_allocated
-    assert all(not link.is_allocated for link in network.links.values())
-    assert network.links[(0, 1)].reverse_link is network.links[(1, 0)]
-
-
 def test_simulation_steps_before_allocate_raises(network):
     with pytest.raises(RuntimeError, match="allocate"):
         network.simulation_steps

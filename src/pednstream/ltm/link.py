@@ -22,7 +22,6 @@ class LinkConfig:
     link_id: tuple[int, int] # Format "startNodeId-endNodeId", e.g. "1-2" for a link from node 1 to node 2. For virtual links, the format can be "virtual_in_nodeId" or "virtual_out_nodeId". 
     start_node: int  
     end_node : int  
-    simulation_steps : int 
     unit_time: int
     length: float
     width: float
@@ -55,6 +54,32 @@ class LinkConfig:
             raise ValueError("k_jam must be greater than k_critical " \
             "to avoid division by zero")
         
+
+def virtual_link_config(node_id: int, direction: str, unit_time: float = 1) -> LinkConfig:
+    """Build the LinkConfig of a virtual (origin/destination) link attached to a node.
+
+    Virtual links only carry flows in and out of the network, so their physical
+    parameters are neutral placeholders that are never used for density or speed.
+
+    Args:
+        node_id (int): id of the node the virtual link is attached to.
+        direction (str): "in" (flow entering the network at the node) or "out".
+        unit_time (float): unit time of the simulation.
+    """
+    if direction not in ("in", "out"):
+        raise ValueError("Direction must be either 'in' or 'out'.")
+    return LinkConfig(
+        link_id=f"virtual_{direction}_{node_id}",
+        start_node=None if direction == "in" else node_id,
+        end_node=node_id if direction == "in" else None,
+        unit_time=unit_time,
+        length=1.0,
+        width=1.0,
+        free_flow_speed=1.0,
+        k_critical=1.0,
+        k_jam=2.0,
+    )
+
 
 class LinkCreator(ABC):
     """Abstract base class for creating different types of links."""
@@ -97,19 +122,9 @@ class Link(ABC):
         self.link_id = config.link_id
         self.start_node = config.start_node
         self.end_node = config.end_node
-        self.simulation_steps = config.simulation_steps
         self._is_controller = config.is_controller
-        # Dynamic attributes
-        self.inflow = np.zeros(self.simulation_steps + 1)  # adjust index
-        self.outflow = np.zeros(self.simulation_steps + 1)
-        self.cumulative_inflow = np.zeros(self.simulation_steps + 1)
-        self.cumulative_outflow = np.zeros(self.simulation_steps + 1)
-        self.sending_flow = -1 * np.ones(self.simulation_steps + 1)
-        self.receiving_flow = -1 * np.ones(self.simulation_steps + 1)
-        self.num_pedestrians = np.zeros(self.simulation_steps + 1, dtype=np.float32)
-        self.density = np.zeros(self.simulation_steps + 1, dtype=np.float32)
-        self.speed = np.zeros(self.simulation_steps + 1, dtype=np.float32)
-        self.link_flow = np.zeros(self.simulation_steps + 1, dtype=np.float32)
+        # Time-series state is allocated per simulation run, see allocate_state().
+        self.simulation_steps: int | None = None
         self.gamma = config.gamma  
         self._reverse_link: Link | None = None # TODO: Consider having this only Regular Links
         self.activity_probability = config.activity_probability
@@ -127,12 +142,6 @@ class Link(ABC):
         )  # Jam threshold, equivalent to speed of 0.01 m/s
         self._front_gate_width = config.front_gate_width
         self._back_gate_width = config.back_gate_width
-        self.back_gate_width_data = self._back_gate_width * np.ones(
-            self.simulation_steps + 1
-        )
-        self.front_gate_width_data = self._front_gate_width * np.ones(
-            self.simulation_steps + 1
-        )
         self.speed_density_fd = BiDirectionalFd(
             v_f=self.free_flow_speed,
             k_critical=self.k_critical,
@@ -143,9 +152,49 @@ class Link(ABC):
         self._exponent = (
             0.8  # private attribute for the releasing factor exponent, default is 1
         )
-        self._travel_time_running_sum = self.travel_time[0]
+        self.free_flow_travel_time = min(
+            self.length / self.free_flow_speed, self.max_travel_time
+        )
+        self._travel_time_running_sum = self.free_flow_travel_time
         self.unit_time = config.unit_time
-        self.free_flow_tau = round(self.travel_time[0] / self.unit_time)
+        self.free_flow_tau = round(self.free_flow_travel_time / self.unit_time)
+
+    @property
+    def is_allocated(self) -> bool:
+        """Whether the time-series state has been allocated."""
+        return self.simulation_steps is not None
+
+    def allocate_state(self, simulation_steps: int) -> None:
+        """Allocate (or reset) the time-series state for a simulation run.
+
+        Arrays have length ``simulation_steps + 1`` so that they can be indexed
+        by time step, with index 0 holding the initial state. Calling this again
+        discards previous results, so one link can be reused across runs.
+
+        Args:
+            simulation_steps (int): number of simulation steps of the run.
+        """
+        if simulation_steps < 1:
+            raise ValueError("simulation_steps must be a positive integer.")
+        self.simulation_steps = simulation_steps
+        size = simulation_steps + 1
+        self.inflow = np.zeros(size)
+        self.outflow = np.zeros(size)
+        self.cumulative_inflow = np.zeros(size)
+        self.cumulative_outflow = np.zeros(size)
+        self.sending_flow = -1 * np.ones(size)
+        self.receiving_flow = -1 * np.ones(size)
+        self.num_pedestrians = np.zeros(size, dtype=np.float32)
+        self.density = np.zeros(size, dtype=np.float32)
+        self.speed = np.zeros(size, dtype=np.float32)
+        self.link_flow = np.zeros(size, dtype=np.float32)
+        self.travel_time = np.zeros(size, dtype=np.float32)
+        self.travel_time[0] = self.free_flow_travel_time
+        self.avg_travel_time = np.full(size, self.free_flow_travel_time, dtype=np.float32)
+        self._travel_time_running_sum = self.free_flow_travel_time
+        self.back_gate_width_data = self._back_gate_width * np.ones(size)
+        self.front_gate_width_data = self._front_gate_width * np.ones(size)
+        return None
 
     @property
     def reverse_link(self) -> Link | None:
@@ -179,21 +228,6 @@ class Link(ABC):
         """Average travel time window."""
         # Using moving average for efficiency
         return round(100 / self.unit_time)
-
-    @property
-    def avg_travel_time(self) -> ndarray:
-        """Average travel time."""
-        # FIXME: DO NOT COMPUTE THIS IN EVERY TIME STEP. This should be a constant set at initialization.  
-        avg = np.ones(self.simulation_steps + 1, dtype=np.float32) * self.travel_time[0] 
-        return avg 
-
-    @property
-    def travel_time(self) -> ndarray:
-        """Travel time."""
-        _time = np.zeros(self.simulation_steps + 1, dtype=np.float32)
-
-        _time[0] = min(self.length / self.free_flow_speed, self.max_travel_time)
-        return _time
 
     @property
     def width(self):
@@ -468,9 +502,14 @@ class Separator(Link):
         self._separator_width =  separator_width
         self._front_gate_width = separator_width
         self._back_gate_width = separator_width
-        # FIXME: Is the link collecting simulations results? Then maybe should be move to a component responsible for the results collection.
-        self.separator_width_data = separator_width * np.ones(config.simulation_steps + 1)
         self.is_controller = True  # A separator shall alway be a controller.
+
+    def allocate_state(self, simulation_steps: int) -> None:
+        """Allocate (or reset) time-series state, including separator width history."""
+        super().allocate_state(simulation_steps)
+        # FIXME: Is the link collecting simulations results? Then maybe should be move to a component responsible for the results collection.
+        self.separator_width_data = self._separator_width * np.ones(simulation_steps + 1)
+        return None
 
     @property
     def area(self) -> float:

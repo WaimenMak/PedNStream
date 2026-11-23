@@ -129,10 +129,10 @@ class NetworkVisualizer:
                 G.add_edge(u, v, value=value)
         else:
             # Original logic for direct network object
-            for node in self.network.nodes:
+            for node in self.network.nodes.values():
                 total_flow = sum(link.cumulative_inflow[time_step] 
                                for link in node.incoming_links)
-                G.add_node(node.node_id, size=total_flow)
+                G.add_node(node.id, size=total_flow)
             
             for (u, v), link in self.network.links.items():
                 if edge_property == 'density':
@@ -319,10 +319,10 @@ class NetworkVisualizer:
                     value = link_info['num_pedestrians'][time_step]
                 G.add_edge(u, v, value=value)
         else:
-            for node in self.network.nodes:
+            for node in self.network.nodes.values():
                 total_flow = sum(link.cumulative_inflow[time_step] 
                                for link in node.incoming_links)
-                G.add_node(node.node_id, size=total_flow)
+                G.add_node(node.id, size=total_flow)
             
             for (u, v), link in self.network.links.items():
                 if edge_property == 'density':

@@ -10,6 +10,7 @@ from .link import Link, Separator, LinkConfig
 from .od_manager import ODManager, DemandGenerator
 from .path_finder import PathFinder
 from .solver import solve as NodeFlowSolver
+from .simulation import Simulation
 
 
 __all__ = [
@@ -21,5 +22,6 @@ __all__ = [
     'ODManager',
     'PathFinder',
     'NodeFlowSolver',
-    'DemandGenerator'
+    'DemandGenerator',
+    'Simulation',
 ]

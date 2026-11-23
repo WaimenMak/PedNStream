@@ -165,3 +165,34 @@ class TestLinkStateAllocation:
         from pednstream.ltm.link import Regular
         with pytest.raises(ValueError):
             Regular(link_config).allocate_state(0)
+
+
+def _regular_pair(steps=10):
+    from pednstream.ltm.link import Regular
+    common = dict(unit_time=1, length=12, width=2, free_flow_speed=1.4, k_critical=0.5, k_jam=5.0)
+    forward = Regular(LinkConfig(link_id=(1, 2), start_node=1, end_node=2, **common))
+    reverse = Regular(LinkConfig(link_id=(2, 1), start_node=2, end_node=1, **common))
+    forward.reverse_link, reverse.reverse_link = reverse, forward
+    for link in (forward, reverse):
+        link.allocate_state(steps)
+    return forward, reverse
+
+
+class TestLinkFlowInterface:
+    """Interface used by the node model."""
+
+    def test_receiving_flow_is_stored(self):
+        forward, reverse = _regular_pair()
+        reverse.calculate_sending_flow(1)
+        value = forward.calculate_receiving_flow(1, with_reverse=True)
+        assert forward.receiving_flow[0] == value
+        assert value >= 0
+
+    def test_reverse_sending_flow_must_be_computed_first(self):
+        forward, _ = _regular_pair()
+        with pytest.raises(Warning, match="reverse sending flow"):
+            forward.calculate_receiving_flow(1, with_reverse=True)
+
+    def test_endpoints_are_node_ids(self):
+        forward, _ = _regular_pair()
+        assert (forward.start_node, forward.end_node) == (1, 2)

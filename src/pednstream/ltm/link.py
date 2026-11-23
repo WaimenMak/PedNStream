@@ -1,28 +1,34 @@
-"""Representation for links in a transportation network."""
+"""Representation for links in a transportation network.
+
+Class structure:
+    BaseLink          identity, endpoints, flow bookkeeping (inflow/outflow arrays)
+    ├── VirtualLink   entry/exit point of origin/destination nodes
+    └── Link          physical link: geometry, fundamental diagram, gates, travel time
+        ├── Regular   bidirectional link, interacts with its reverse link
+        └── Separator controllable link, the corridor width is split with its reverse link
+
+The flow model (sending/receiving flows) lives in link_flow.py.
+"""
 
 import numpy as np
+from pednstream.ltm import link_flow
 from pednstream.utils.functions import BiDirectionalFd, cal_link_flow_kv
-from typing import Any
-from numpy import ndarray
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
-from typing import Optional
+from dataclasses import dataclass
 
-
-# TODO: Double check how computation are using time_step. Check correct logic.
-# time steps variables are used in two contexts, one as time keeper for the simulation, and one as index for accessing arrays. 
-# However the shift between the two can cause confusion and bugs. For example, indexes usually start at 0, but time steps might start at 1. 
-# - previous_step: time step before the current time step, that is time_step - 1
+# Time-step convention: methods take the current step t. Flows (sending/receiving) are
+# computed from the state at t - 1 and stored at index t - 1; cumulative flows, density
+# and speed are stored at index t. Index 0 holds the initial state.
 
 
 @dataclass
 class LinkConfig:
     """Configuration dataclass for Link parameters."""
 
-    link_id: tuple[int, int] # Format "startNodeId-endNodeId", e.g. "1-2" for a link from node 1 to node 2. For virtual links, the format can be "virtual_in_nodeId" or "virtual_out_nodeId". 
-    start_node: int  
-    end_node : int  
-    unit_time: int
+    link_id: tuple[int, int] | str  # (start_node, end_node), e.g. (1, 2); virtual links: "virtual_in_<node>" / "virtual_out_<node>"
+    start_node: int | None  # node id; None for the outside end of a virtual link
+    end_node: int | None
+    unit_time: float
     length: float
     width: float
     free_flow_speed: float
@@ -112,52 +118,20 @@ class VirtualLinkCreator(LinkCreator):
         return VirtualLink(config)  
 
 
-class Link(ABC):
-    """Interface for different Link types."""
+class BaseLink(ABC):
+    """Common part of all links: identity, endpoints and flow bookkeeping."""
 
     def __init__(self, config: LinkConfig) -> None:
-        """Initializes a Link with specific configurations."""
+        """Initializes a link with its configuration."""
         self.config = config
-
         self.link_id = config.link_id
+        # Endpoints are node ids (None for the outside end of a virtual link). Links do
+        # not hold Node objects; the Network wires links to nodes.
         self.start_node = config.start_node
         self.end_node = config.end_node
-        self._is_controller = config.is_controller
+        self.unit_time = config.unit_time
         # Time-series state is allocated per simulation run, see allocate_state().
         self.simulation_steps: int | None = None
-        self.gamma = config.gamma  
-        self._reverse_link: Link | None = None # TODO: Consider having this only Regular Links
-        self.activity_probability = config.activity_probability
-        # Physical attributes
-        self.length = config.length
-        self._width = config.width  # width of link
-        self.free_flow_speed = config.free_flow_speed
-        self.capacity = self.free_flow_speed * config.k_critical
-        self.k_jam = config.k_jam
-        self.k_critical = config.k_critical
-        self.shockwave_speed = self.capacity / (self.k_jam - self.k_critical)
-        self.current_speed = self.free_flow_speed
-        self.max_travel_time = (
-            self.length / 0.05
-        )  # Jam threshold, equivalent to speed of 0.01 m/s
-        self._front_gate_width = config.front_gate_width
-        self._back_gate_width = config.back_gate_width
-        self.speed_density_fd = BiDirectionalFd(
-            v_f=self.free_flow_speed,
-            k_critical=self.k_critical,
-            k_jam=self.k_jam,
-            bi_factor=config.bi_factor,
-            model_type=config.fd_type,
-            noise_std=config.speed_noise_std)
-        self._exponent = (
-            0.8  # private attribute for the releasing factor exponent, default is 1
-        )
-        self.free_flow_travel_time = min(
-            self.length / self.free_flow_speed, self.max_travel_time
-        )
-        self._travel_time_running_sum = self.free_flow_travel_time
-        self.unit_time = config.unit_time
-        self.free_flow_tau = round(self.free_flow_travel_time / self.unit_time)
 
     @property
     def is_allocated(self) -> bool:
@@ -182,8 +156,89 @@ class Link(ABC):
         self.outflow = np.zeros(size)
         self.cumulative_inflow = np.zeros(size)
         self.cumulative_outflow = np.zeros(size)
-        self.sending_flow = -1 * np.ones(size)
+        self.sending_flow = -1 * np.ones(size)  # -1: not computed yet
         self.receiving_flow = -1 * np.ones(size)
+        return None
+
+    def update_cum_outflow(self, q_j: float, time_step: int) -> None:
+        """Update commulative outflow for given time step.
+
+        Args:
+            q_j (float): flow for outflow at time step
+            time_step (int): time step
+
+        Returns:
+            None
+        """
+        PREVIOUS_STEP = time_step - 1
+        self.outflow[time_step] = q_j
+        self.cumulative_outflow[time_step] = (
+            self.cumulative_outflow[PREVIOUS_STEP] + q_j
+        )
+        return None
+
+    def update_cum_inflow(self, q_i: float, time_step: int) -> None:
+        """Update commulative inflow for given time step.
+
+        Args:
+            q_i (float): flow for inflow at time step
+            time_step (int): time step
+
+        Returns:
+            None
+        """
+        PREVIOUS_STEP = time_step - 1
+        self.inflow[time_step] = q_i
+        self.cumulative_inflow[time_step] = self.cumulative_inflow[PREVIOUS_STEP] + q_i
+        return None
+
+
+class Link(BaseLink):
+    """Physical link: geometry, fundamental diagram, gates and travel time.
+
+    Subclasses define the area and how the link interacts with its reverse link through
+    the hooks get_density, _fd_speed, _reverse_occupancy, _reverse_sending_flow and
+    _record_gates.
+    """
+
+    def __init__(self, config: LinkConfig) -> None:
+        """Initializes a Link with specific configurations."""
+        super().__init__(config)
+        self._is_controller = config.is_controller
+        self.gamma = config.gamma
+        self._reverse_link: Link | None = None
+        self.activity_probability = config.activity_probability
+        # Physical attributes
+        self.length = config.length
+        self._width = config.width  # width of link
+        self.free_flow_speed = config.free_flow_speed
+        self.capacity = self.free_flow_speed * config.k_critical
+        self.k_jam = config.k_jam
+        self.k_critical = config.k_critical
+        self.shockwave_speed = self.capacity / (self.k_jam - self.k_critical)
+        self.current_speed = self.free_flow_speed
+        self.max_travel_time = (
+            self.length / 0.05
+        )  # Jam threshold, equivalent to speed of 0.01 m/s
+        self._front_gate_width = config.front_gate_width
+        self._back_gate_width = config.back_gate_width
+        self.speed_density_fd = BiDirectionalFd(
+            v_f=self.free_flow_speed,
+            k_critical=self.k_critical,
+            k_jam=self.k_jam,
+            bi_factor=config.bi_factor,
+            model_type=config.fd_type,
+            noise_std=config.speed_noise_std)
+        self.free_flow_travel_time = min(
+            self.length / self.free_flow_speed, self.max_travel_time
+        )
+        self._travel_time_running_sum = self.free_flow_travel_time
+        self.free_flow_tau = round(self.free_flow_travel_time / self.unit_time)
+
+    def allocate_state(self, simulation_steps: int) -> None:
+        """Allocate (or reset) flow, density, speed, travel time and gate time series."""
+        super().allocate_state(simulation_steps)
+        size = simulation_steps + 1
         self.num_pedestrians = np.zeros(size, dtype=np.float32)
         self.density = np.zeros(size, dtype=np.float32)
         self.speed = np.zeros(size, dtype=np.float32)
@@ -200,11 +255,11 @@ class Link(ABC):
     def reverse_link(self) -> Link | None:
         """Gets the reverse link."""
         return self._reverse_link
-    
+
     @reverse_link.setter
     def reverse_link(self, link: Link | None) -> None:
         """Sets the reverse link.
-        
+
         Args:
             link (Link | None): the reverse link to set. If None, unsets the reverse link.
         """
@@ -217,7 +272,7 @@ class Link(ABC):
     def is_controller(self) -> bool:
         """If link is a controller."""
         return self._is_controller
-    
+
     @is_controller.setter
     def is_controller(self, value: bool) -> None:
         """Sets the value for is_controller."""
@@ -237,7 +292,7 @@ class Link(ABC):
     @property
     def front_gate_width(self):
         """Width of the front gate."""
-        return self._back_gate_width
+        return self._front_gate_width
 
     @front_gate_width.setter
     def front_gate_width(self, value: float):
@@ -258,40 +313,8 @@ class Link(ABC):
         """Area of the link."""
         pass
 
-    def update_cum_outflow(self, q_j: float, time_step: int) -> None:
-        """Update commulative outflow for given time step.
-        
-        Args:
-            q_j (float): flow for outflow at time step
-            time_step (int): time step
-
-        Returns:
-            None
-        """
-        PREVIOUS_STEP = time_step - 1
-        self.outflow[time_step] = q_j
-        self.cumulative_outflow[time_step] = (
-            self.cumulative_outflow[PREVIOUS_STEP] + q_j
-        )
-        return None
-
-    def update_cum_inflow(self, q_i: float, time_step: int) -> None:
-        """Update commulative inflow for given time step.
-        
-        Args:
-            q_i (float): flow for inflow at time step
-            time_step (int): time step
-
-        Returns:
-            None
-        """
-        PREVIOUS_STEP = time_step - 1
-        self.inflow[time_step] = q_i
-        self.cumulative_inflow[time_step] = self.cumulative_inflow[PREVIOUS_STEP] + q_i
-        return None
-
     def update_density_flow(self, time_step: int) -> None:
-        """Updates the link density flow.
+        """Updates the number of pedestrians and the density of the link.
 
         Args:
             time_step (int): current time step
@@ -304,51 +327,9 @@ class Link(ABC):
         self.num_pedestrians[time_step] = self.num_pedestrians[PREVIOUS_STEP] + num_peds
         self.density[time_step] = self.num_pedestrians[time_step] / self.area
         return None
-    
-    def compute_density(self, time_step: int) -> float:
-        """Computes the density of the link for the current time step.
-
-        Args:
-            time_step (int): time step
-
-        Returns:
-            float: density value
-        """
-        reverse_num_peds = 0
-        if self.reverse_link is not None:
-            reverse_num_peds = self.reverse_link.num_pedestrians[time_step]
-        return (self.num_pedestrians[time_step] + reverse_num_peds) / self.area
-
-    def compute_outflow(self, time_step: int, tau: int) -> int:
-        """Computes outflow with diffusion behavior for the current time step.
-
-        Args:
-            time_step (int): current time step
-            tau (int): tau
-
-        Returns:
-            int: outflow value
-        """
-        PREVIOUS_STEP = time_step - 1
-        travel_time = self.avg_travel_time[
-            PREVIOUS_STEP
-        ]  # use average travel time to calculate
-
-        F = 1 / (1 + self.gamma * travel_time)
-
-        num_recursive_layers = 4  # define the number of recursive layers, by default is 4
-        idx = min(max(0, time_step + 1 - tau), len(self.inflow) - 1)
-        
-        sending_flow = 0
-        for i in range(num_recursive_layers):
-            layer_idx = max(0, idx - i)
-            sending_flow += F * (1 - F) ** i * self.inflow[layer_idx]
-
-        return max(np.ceil(sending_flow), 0)
-
 
     def calculate_sending_flow(self, time_step: int) -> float:
-        """Calculate the sending flow of the link at a given time step.
+        """Calculate the sending flow of the link, stored at ``time_step - 1``.
 
         Args:
             time_step (int): Current time step
@@ -356,150 +337,108 @@ class Link(ABC):
         Returns:
             float: sending flow
         """
-        PREVIOUS_STEP = time_step - 1
-        # get the total density
-        density = self.get_density(PREVIOUS_STEP)
+        return link_flow.sending_flow(self, time_step)
 
-        tau = round(
-            self.avg_travel_time[PREVIOUS_STEP] / self.unit_time
-        )  # use average travel time to calculate tau
-
-        """ for the initial stage """
-        # if time_step - tau < 0:
-        if PREVIOUS_STEP <= self.free_flow_tau:
-            self.sending_flow[PREVIOUS_STEP] = 0
-            return self.sending_flow[PREVIOUS_STEP]
-
-        else:
-            # if time_step - tau + 1 < 0: # congestion stage
-            """ for the normal stage or the congestion stage """
-
-            idx = min(max(0, PREVIOUS_STEP - tau), len(self.cumulative_inflow) - 1)
-
-            # congestion_factor = np.clip(self.density[time_step] / self.k_jam, 0, 1)
-            congestion_factor = np.clip(
-                (self.density[PREVIOUS_STEP] - self.k_critical)
-                / (self.k_jam - self.k_critical),
-                0,
-                1,
-            )  # this one is theoratically more realistic for unidirectional condition
-
-            boundary_congestion = self.num_pedestrians[PREVIOUS_STEP] / self.area
-            boundary_freeflow = max(
-                0, self.cumulative_inflow[idx] - self.cumulative_outflow[PREVIOUS_STEP]
-            )
-
-            sending_flow_boundary = (
-                congestion_factor * boundary_congestion
-                + (1 - congestion_factor) * boundary_freeflow
-            )
-
-            sending_flow_max = (
-                self.front_gate_width
-                * self.k_critical
-                * self.free_flow_speed
-                * self.unit_time
-            )
-            sending_flow = min(sending_flow_boundary, sending_flow_max)
-            # TODO: fix the flow release logic: if sending flow >0, then use diffusion flow
-
-        """ The purpose is to mitigate the maximum sending flow to avoid unrealistic high flow (Added)"""
-        # TODO: split this into more manageble and testable pieces.
-        original_sending_flow = sending_flow
-        if sending_flow > 0:
-            releasing_factor = np.clip(density / self.k_jam, 0, 1)
-            releasing_prob = 0.7 + (0.85 - 0.7) * releasing_factor**self._exponent
-
-            # free flow stage
-            if density <= self.k_critical:
-                diffusion_flow = self.compute_outflow(time_step, tau)
-                #     # If diffusion flow is active, it represents the arrival of a platoon.
-                if diffusion_flow > 0:
-                    weight = 0.8
-                    sending_flow = int(
-                        np.floor(
-                            min(
-                                weight * diffusion_flow + (1 - weight) * sending_flow,
-                                sending_flow,
-                            )
-                        )
-                    )
-
-                else:  # Prevent maximum flow when the inflow is 0, therefore duffusion flow is 0
-                    num_passing_peds = int(np.floor(sending_flow))
-                    num_leave = np.random.binomial(
-                        n=num_passing_peds, p=releasing_prob
-                    )  # 70% of the people will leave
-                    sending_flow = num_leave
-            else:
-                num_passing_peds = int(np.floor(sending_flow))
-                num_leave = np.random.binomial(
-                    n=num_passing_peds, p=releasing_prob
-                )  # 70% of the people will leave
-                sending_flow = num_leave
-            if sending_flow < 0:
-                raise ValueError(
-                    f"Negative sending flow detected, {sending_flow} at {time_step}"
-                )
-
-        """ Stochastic model for pedestrians performing activities (Added)"""
-        if self.activity_probability > 0 and sending_flow > 1:
-            # Number of pedestrians who could potentially leave
-            potential_leavers = int(np.floor(sending_flow))
-            # Each pedestrian has an independent probability of staying for an "activity".
-            # We use a binomial distribution to find out how many stay.
-            num_staying = np.random.binomial(
-                n=potential_leavers, p=self.activity_probability
-            )
-            # Reduce the sending flow by the number of people who decided to stay
-            sending_flow -= num_staying
-
-        """ Smooth the sending flow to avoid unrealistic high flow (Added) """
-        sending_flow = max(0, sending_flow)
-        sending_flow = min(
-            np.floor(0.8 * sending_flow + 0.2 * self.sending_flow[PREVIOUS_STEP]),
-            original_sending_flow,
-        )
-        if sending_flow < 0:
-            raise ValueError(
-                "Negative sending flow detected, sending flow more than original flow"
-            )
-        self.sending_flow[PREVIOUS_STEP] = sending_flow
-        return self.sending_flow[PREVIOUS_STEP]
-    
-    @abstractmethod
-    def get_density(self, time_step: int) -> float:
-        """Get density for a time step."""
-        pass
-    
-    @abstractmethod
-    def update_speeds(self, time_step: int) -> None:
-        """Update the speeds of the link based on the density."""
-        pass
-
-    @abstractmethod
     def calculate_receiving_flow(self, time_step: int, with_reverse: bool = False) -> float:
-        """Calculate the receiving flow of the link at a given time step.
-        
+        """Calculate the receiving flow of the link, stored at ``time_step - 1``.
+
+        With ``with_reverse``, the reverse link's sending flow at ``time_step - 1`` is
+        subtracted, so it must be computed first (the node computes the sending flows of
+        its incoming links, which include these reverse links, before the receiving flows).
+
         Args:
             time_step (int): current time step
-            with_reverse (bool): whether to consider reverse link interaction. Default is False.
+            with_reverse (bool): whether to subtract the reverse link's sending flow. Default is False.
+
+        Returns:
+            float: receiving flow
         """
+        PREVIOUS_STEP = time_step - 1
+        # Order matters: the occupancy may draw a random number.
+        reverse_occupancy = self._reverse_occupancy(PREVIOUS_STEP)
+        reverse_sending_flow = self._reverse_sending_flow(PREVIOUS_STEP) if with_reverse else 0
+        self.receiving_flow[PREVIOUS_STEP] = link_flow.receiving_flow(
+            self,
+            time_step,
+            reverse_occupancy=reverse_occupancy,
+            reverse_sending_flow=reverse_sending_flow,
+            with_reverse=with_reverse,
+        )
+        return self.receiving_flow[PREVIOUS_STEP]
+
+    def update_speeds(self, time_step: int) -> None:
+        """Update speed, travel time and link flow from the density at ``time_step``.
+
+        Args:
+            time_step (int): current time step.
+
+        Returns:
+            None
+        """
+        speed = self._fd_speed(time_step)
+        self.speed[time_step] = speed
+        self.travel_time[time_step] = (
+            self.length / speed if speed > 0 else self.max_travel_time
+        )  # avoid infinite travel time
+        self.link_flow[time_step] = cal_link_flow_kv(
+            self.density[time_step], self.speed[time_step]
+        )
+        self._update_avg_travel_time(time_step)
+        self._record_gates(time_step)
+        return None
+
+    def _update_avg_travel_time(self, time_step: int) -> None:
+        """Moving average of the travel time over avg_travel_time_window steps."""
+        self._travel_time_running_sum += self.travel_time[time_step]
+        if time_step >= self.avg_travel_time_window:
+            self._travel_time_running_sum -= self.travel_time[
+                time_step - self.avg_travel_time_window
+            ]
+            self.avg_travel_time[time_step] = (
+                self._travel_time_running_sum / self.avg_travel_time_window
+            )
+
+    @abstractmethod
+    def get_density(self, time_step: int) -> float:
+        """Density used by the flow model at a time step."""
         pass
 
+    @abstractmethod
+    def _fd_speed(self, time_step: int) -> float:
+        """Speed from the fundamental diagram at a time step."""
+        pass
+
+    @abstractmethod
+    def _reverse_occupancy(self, previous_step: int) -> float:
+        """Pedestrians of the reverse link occupying space in this link."""
+        pass
+
+    @abstractmethod
+    def _reverse_sending_flow(self, previous_step: int) -> float:
+        """Sending flow of the reverse link competing for this link's capacity."""
+        pass
+
+    @abstractmethod
+    def _record_gates(self, time_step: int) -> None:
+        """Record gate (and separator) widths at a time step, for outputs and visualization."""
+        pass
 
 
 class Separator(Link):
-    """Represents a separator link in a transportation network."""
+    """Represents a separator link in a transportation network.
+
+    The corridor width is split between the link and its reverse link; the separator
+    width is the control variable.
+    """
 
     def __init__(self, config: LinkConfig) -> None:
         """Initializes a Separator link with specific configurations."""
         super().__init__(config)
 
         # Original width must be kept for downstream calculations.
-        separator_width = self._width / 2    
+        separator_width = self._width / 2
         # Modify values specific to separator
-        self._separator_width =  separator_width
+        self._separator_width = separator_width
         self._front_gate_width = separator_width
         self._back_gate_width = separator_width
         self.is_controller = True  # A separator shall alway be a controller.
@@ -515,7 +454,7 @@ class Separator(Link):
     def area(self) -> float:
         """Area of the separator link."""
         return self.length * self.separator_width
-    
+
     @property
     def separator_width(self):
         """Width of the separator."""
@@ -523,49 +462,33 @@ class Separator(Link):
 
     @separator_width.setter
     def separator_width(self, value: float):
+        """Set the separator width; the reverse link gets the rest of the corridor width."""
         self._separator_width = value
+        self._front_gate_width = value
+        self._back_gate_width = value
+
+        if self.reverse_link:
+            self.reverse_link._separator_width = self._width - value
+            self.reverse_link._front_gate_width = self._width - value
+            self.reverse_link._back_gate_width = self._width - value
 
     def get_density(self, time_step: int) -> float:
-        """Get density for a time step.
-
-        Args:
-            time_step (int): time step
-
-        Returns:
-            float: density value
-        """
+        """Density of this lane only; the separator isolates it from the reverse link."""
         return self.density[time_step]
-    
-    def update_speeds(self, time_step: int) -> None:
-        """Update the speed of the link based on the density.
 
-        Args:
-            time_step (int): current time step.
+    def _fd_speed(self, time_step: int) -> float:
+        """Speed from the fundamental diagram, without opposing flow."""
+        return self.speed_density_fd(self.density[time_step], 0)
 
-        Returns:
-            None 
-        """
-        k_self = self.density[time_step]
-        speed = self.speed_density_fd(k_self, 0)
-        # Update travel time and speed
-        self.speed[time_step] = speed
-        self.travel_time[time_step] = (
-            self.length / speed if speed > 0 else self.max_travel_time
-        )  # avoid infinite travel time
+    def _reverse_occupancy(self, previous_step: int) -> float:
+        """The reverse lane is separated, so it takes no space here."""
+        return 0
 
-        self.link_flow[time_step] = cal_link_flow_kv(
-            self.density[time_step], self.speed[time_step]
-        )
+    def _reverse_sending_flow(self, previous_step: int) -> float:
+        """The reverse lane is separated, so it does not compete for capacity."""
+        return 0
 
-        self._travel_time_running_sum += self.travel_time[time_step]
-        if time_step >= self.avg_travel_time_window:
-            self._travel_time_running_sum -= self.travel_time[
-                time_step - self.avg_travel_time_window
-            ]
-            self.avg_travel_time[time_step] = (
-                self._travel_time_running_sum / self.avg_travel_time_window
-            )
-
+    def _record_gates(self, time_step: int) -> None:
         self.separator_width_data[time_step] = (
             self._separator_width
         )  # for visualization of the separator width
@@ -574,69 +497,17 @@ class Separator(Link):
         )  # for visualization of the back gate width
 
 
-    def calculate_receiving_flow(self, time_step: int, with_reverse: bool = False) -> float:
-        """Calculate the receiving flow of the link at a given time step.
-
-        Args:
-            time_step (int): current time step
-            with_reverse (bool): whether to consider reverse link interaction. Default is False.
-        
-        Returns:
-            float: recieving flow
-        """
-        PREVIOUS_STEP = time_step - 1
-
-        # TODO: is using length the correct way to calculate receiving flow?
-        tau_shockwave = round(self.length / (self.shockwave_speed * self.unit_time))
-
-        if time_step - tau_shockwave < 0:
-            receiving_flow_boundary = self.k_jam * self.area
-
-        else:
-            receiving_flow_boundary = (
-                self.cumulative_outflow[time_step - tau_shockwave]
-                + self.k_jam * self.area
-                - self.cumulative_inflow[PREVIOUS_STEP] 
-            )
-
-        receiving_flow_max = (
-            self.back_gate_width
-            * self.k_critical
-            * self.free_flow_speed
-            * self.unit_time
-        )
-        receiving_flow = min(receiving_flow_boundary, receiving_flow_max)
-        if receiving_flow < 0:
-            print(f"Negative receiving flow detected, {receiving_flow} at {time_step}")
-        receiving_flow = max(receiving_flow, 0)
-
-        """smooth the receiving flow (Optional when we use the mitigation method)"""
-        if self.receiving_flow[PREVIOUS_STEP] >= 0:
-            receiving_flow = min(
-                np.floor(
-                    receiving_flow * 0.8 + self.receiving_flow[PREVIOUS_STEP] * 0.2
-                ),
-                receiving_flow,
-            )
-
-        if with_reverse:
-            # For separator, we do not consider the reverse sending flow
-            return max(receiving_flow, 0)
-        else:
-            return receiving_flow
-    
-
 class Regular(Link):
-    """Represents a regular link in a transportation network."""
+    """Represents a regular (bidirectional) link in a transportation network."""
 
     @property
     def area(self) -> float:
-        """Area of the separator link."""
+        """Area of the link."""
         return self.length * self.width
-    
-    def get_density(self, time_step: int):
-        """Get the density of the link.
-        
+
+    def get_density(self, time_step: int) -> float:
+        """Density of both directions together.
+
         Args:
             time_step (int): time step
 
@@ -648,196 +519,64 @@ class Regular(Link):
             reverse_num_peds = self.reverse_link.num_pedestrians[time_step]
         return (self.num_pedestrians[time_step] + reverse_num_peds) / self.area
 
-    def update_speeds(self, time_step: int) -> None:
-        """Update the speed of the link based on the density.
-
-        Args:
-            time_step (int): current simulation time step
-
-        Returns:
-            None 
-        """
-        k_self = self.density[time_step]
+    def _fd_speed(self, time_step: int) -> float:
+        """Speed from the bidirectional fundamental diagram (own and opposing density)."""
         k_opp = 0
         if self.reverse_link:
             k_opp = self.reverse_link.density[time_step]
+        return self.speed_density_fd(self.density[time_step], k_opp)
 
-        speed = self.speed_density_fd(
-            k_self, k_opp
-        )  # speed for actual link speed derived from FD, speed_eff for the sending flow calculation
-        # Update travel time and speed
-        self.speed[time_step] = speed
-        self.travel_time[time_step] = (
-            self.length / speed if speed > 0 else self.max_travel_time
-        )  # avoid infinite travel time
-        self.link_flow[time_step] = cal_link_flow_kv(
-            self.density[time_step], self.speed[time_step]
-        )
+    def _reverse_occupancy(self, previous_step: int) -> float:
+        """Random share of the reverse link's pedestrians occupying space in this link."""
+        reverse_peds = self.reverse_link.num_pedestrians[previous_step]
+        return np.random.binomial(n=reverse_peds, p=link_flow.REVERSE_OCCUPANCY_PROB)
 
-        self._travel_time_running_sum += self.travel_time[time_step]
-        if time_step >= self.avg_travel_time_window:
-            self._travel_time_running_sum -= self.travel_time[
-                time_step - self.avg_travel_time_window
-            ]
-            self.avg_travel_time[time_step] = (
-                self._travel_time_running_sum / self.avg_travel_time_window
+    def _reverse_sending_flow(self, previous_step: int) -> float:
+        """Sending flow of the reverse link, which competes for this link's capacity.
+
+        Raises:
+            Warning: if it is negative, i.e. not computed yet for this step.
+        """
+        reverse_sending_flow = self.reverse_link.sending_flow[previous_step]
+        if reverse_sending_flow < 0:
+            raise Warning(
+                f"Negative reverse sending flow detected at time step {previous_step + 1} "
+                f"for link {self.link_id}: {reverse_sending_flow}"
             )
-        # update the back_gate_width_data
+        return reverse_sending_flow
+
+    def _record_gates(self, time_step: int) -> None:
         self.back_gate_width_data[time_step] = self.back_gate_width
         self.front_gate_width_data[time_step] = self.front_gate_width
 
-    def calculate_receiving_flow(self, time_step: int, with_reverse: bool = False) -> float:
-        """Calculate the receiving flow of the link at a given time step.
 
-        Args:
-            time_step (int): current simulation time step
-            with_reverse (bool): whether to consider reverse link interaction. Default is False.
+class VirtualLink(BaseLink):
+    """Virtual link of an origin/destination node: where pedestrians enter or leave the network.
 
-        Returns:
-            float: recieving flow
-        """
-        PREVIOUS_STEP = time_step - 1
-        # TODO: is using length the correct way to calculate receiving flow?
-        tau_shockwave = round(self.length / (self.shockwave_speed * self.unit_time))
-        reverse_peds = self.reverse_link.num_pedestrians[PREVIOUS_STEP]
-        reverse_peds_rand = np.random.binomial(n=reverse_peds, p=0.9)
-
-        if time_step - tau_shockwave < 0:
-            receiving_flow_boundary = self.k_jam * self.area - reverse_peds_rand
-        else:
-            receiving_flow_boundary = max(
-                0,
-                self.cumulative_outflow[time_step - tau_shockwave]
-                + self.k_jam * self.area
-                - reverse_peds_rand
-                - self.cumulative_inflow[PREVIOUS_STEP],
-            )
-
-        receiving_flow_max = (
-            self.back_gate_width
-            * self.k_critical
-            * self.free_flow_speed
-            * self.unit_time
-        )
-        receiving_flow = min(receiving_flow_boundary, receiving_flow_max)
-        if receiving_flow < 0:
-            print(f"Negative receiving flow detected, {receiving_flow} at {time_step}")
-        receiving_flow = max(receiving_flow, 0)
-
-        """smooth the receiving flow (Optional when we use the mitigation method)"""
-        if self.receiving_flow[PREVIOUS_STEP] >= 0:
-            receiving_flow = min(
-                np.floor(
-                    receiving_flow * 0.8 + self.receiving_flow[PREVIOUS_STEP] * 0.2
-                ),
-                receiving_flow,
-            )
-
-        if with_reverse:
-            reverse_sending_flow = self.reverse_link.sending_flow[PREVIOUS_STEP].copy()
-
-            receiving_flow = receiving_flow - reverse_sending_flow
-            return max(receiving_flow, 0)
-        else:
-            return receiving_flow
-
-
-class VirtualLink(Link):
-    """Represents a virtual link in a transportation network."""
+    It only carries flows; it has no geometry or speed. The demand profile lives on the
+    node (see Network.set_demand).
+    """
 
     def __init__(self, config: LinkConfig) -> None:
         """Initializes a Virtual link with specific configurations."""
-        from pednstream.ltm import DemandGenerator
-        import logging
         super().__init__(config)
         self._direction: str = ""
-        # FIXME: these belong to the node.
-        
+
     @property
     def direction(self) -> str:
         """Get the direction of the virtual link."""
         return self._direction
-    
+
     @direction.setter
     def direction(self, value: str) -> None:
         """Set the direction of the virtual link.
-        
+
         Args:
             value (str): The direction to set. Should be either "in" or "out".
-        
+
         Raises:
             ValueError: If the provided value is not "in" or "out".
         """
         if value not in ["in", "out"]:
             raise ValueError("Direction must be either 'in' or 'out'.")
         self._direction = value
-
-    @property
-    def demand(self) -> np.ndarray:
-        """Get the demand of the virtual link."""
-        return self._demand
-    
-    @demand.setter
-    def demand(self, origin_config: dict) -> None:
-        """Set the demand of the virtual link.
-
-        Args:
-            origin_config (dict): A dictionary containing the demand values 
-            for an origin node. The keys should be in the format "origin_<node_id>" and the values should be dictionaries containing the demand parameters.
-        
-        Example:
-            {origin_<node_id>: {"pattern": "sudden_demand", "peak_lambda": 20, "base_lambda": 5}}
-        """
-        node_id = next(iter(origin_config)).split("_")[-1]   # Extract node_id from the key
-        pattern = origin_config[f"origin_{node_id}"]["pattern"]
-        self._demand = self.generator.generate_custom(origin_id=node_id, pattern=pattern) 
-        
-
-    def demand_generator(self, node_id, pattern):
-        """Generate demand based on the specified pattern."""
-        # FIXME: a demand generator is only RELEVANT FOR VIRTUAL LINKS. 
-        pass
-
-    
-    @property
-    def area(self) -> float:
-        """Area of the virtual link."""
-        # FIXME: 
-        raise NotImplementedError("Not implemented.")
-    
-    def get_density(self, time_step: int):
-        """Get the density of the virtual link.
-
-        Args:
-            time_step (int): time step
-
-        Returns:
-            float: density value
-        """
-        # FIXME: 
-        raise NotImplementedError("Not implemented.")
-
-    def update_speeds(self, time_step: int) -> None:
-        """Update the speed of the virtual link based on the density.
-
-        Args:
-            time_step (int): current simulation time step
-
-        Returns:
-            None 
-        """
-         # FIXME: 
-        raise NotImplementedError("Not implemented.")
-    
-    def calculate_receiving_flow(self, time_step: int, with_reverse: bool = False) -> float:
-        """Calculate the receiving flow of the virtual link at a given time step.
-
-        Args:
-            time_step (int): current simulation time step
-            with_reverse (bool): whether to consider reverse link interaction. Default is False.
-
-        Returns:
-            float: recieving flow
-        """
-        #FIXME:
-        raise NotImplementedError("Not implemented.")

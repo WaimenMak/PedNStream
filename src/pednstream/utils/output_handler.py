@@ -1,10 +1,16 @@
+from __future__ import annotations
+
 import inspect
 import json
 import pandas as pd
 from datetime import datetime
 from pathlib import Path
-from pednstream.ltm.network import Network
+from typing import TYPE_CHECKING
+
 from pednstream.ltm.link import Separator
+
+if TYPE_CHECKING:  # imported for type hints only, avoids an import cycle with pednstream.ltm
+    from pednstream.ltm.simulation import Simulation
 
 
 class OutputHandler:
@@ -33,11 +39,13 @@ class OutputHandler:
         # Create output directories if they don't exist
         self.simulation_dir.mkdir(parents=True, exist_ok=True)
         
-    def save_network_state(self, network: Network):
+    def save_network_state(self, simulation: Simulation):
         """
         Save complete network state including link and node data
-        network: Network object
+        simulation: Simulation object (its network holds the state, the run holds the parameters)
         """
+        network = simulation.network
+        controller_gaters = set(simulation.controller_gaters)
         # Save link data
         link_data = {}
         for (u, v), link in network.links.items():
@@ -63,13 +71,13 @@ class OutputHandler:
             }
             
             # Save gate_width data for outgoing links from gater nodes (for visualization)
-            if hasattr(network, 'controller_gaters') and u in network.controller_gaters:
+            if u in controller_gaters:
                 link_entry['back_gate_width'] = link.back_gate_width_data.tolist()
                 link_entry['front_gate_width'] = link.front_gate_width_data.tolist()
             
             # Save front_gate_width for incoming links to gater nodes (for visualization)
             # This captures the front gate of link (v->u) where u is a gater node
-            if hasattr(network, 'controller_gaters') and v in network.controller_gaters:
+            if v in controller_gaters:
                 if 'front_gate_width' not in link_entry:
                     link_entry['front_gate_width'] = link.front_gate_width_data.tolist()
                 if 'back_gate_width' not in link_entry:
@@ -91,22 +99,22 @@ class OutputHandler:
                 'outgoing_links': [link.link_id for link in node.outgoing_links]
             }
             # save the total demand of origin and total outflow of destination
-            if node_id in network.origin_nodes:
+            if node_id in simulation.origin_nodes:
                 node_data[node_id]['total_demand'] = network.nodes[node_id].virtual_incoming_link.cumulative_outflow[-1]
-            if node_id in network.destination_nodes:
+            if node_id in simulation.destination_nodes:
                 node_data[node_id]['total_outflow'] = network.nodes[node_id].virtual_outgoing_link.cumulative_inflow[-1]
         
         # Save network parameters
         network_params = {
-            'simulation_steps': network.simulation_steps,
-            'unit_time': network.unit_time,
-            'destination_nodes': network.destination_nodes,
-            'origin_nodes': network.origin_nodes,
+            'simulation_steps': simulation.simulation_steps,
+            'unit_time': simulation.unit_time,
+            'destination_nodes': simulation.destination_nodes,
+            'origin_nodes': simulation.origin_nodes,
             # Add other relevant network parameters
             # save the od paths
             'od_paths': (
-                {f"{k[0]}-{k[1]}": v for k, v in network.path_finder.od_paths.items()}
-                if getattr(network, 'path_finder', None) is not None else {}
+                {f"{k[0]}-{k[1]}": v for k, v in simulation.path_finder.od_paths.items()}
+                if simulation.path_finder is not None else {}
             )
         }
         
@@ -115,15 +123,16 @@ class OutputHandler:
         self._save_json(node_data, 'node_data.json')
         self._save_json(network_params, 'network_params.json')
         
-    def save_time_series(self, network: Network):
+    def save_time_series(self, simulation: Simulation):
         """
         Save time series data in CSV format for easy analysis
-        network: Network object
+        simulation: Simulation object
         """
+        network = simulation.network
         # Prepare link time series data
         link_series = []
         for (u, v), link in network.links.items():
-            for t in range(network.simulation_steps):
+            for t in range(simulation.simulation_steps):
                 link_series.append({
                     'time_step': t,
                     'link_id': f"{u}-{v}",

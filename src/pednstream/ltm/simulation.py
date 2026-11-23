@@ -97,6 +97,11 @@ class Simulation:
         return list(self.network.config.destination_nodes)
 
     @property
+    def controller_gaters(self) -> list:
+        """Nodes configured as controllers (gate control), without the separator link ends."""
+        return [node.id for node in self.network.nodes.values() if node.is_controller]
+
+    @property
     def params(self) -> dict:
         """Flat parameter dict, the format DemandGenerator and PathFinder expect.
 

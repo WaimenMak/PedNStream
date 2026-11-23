@@ -65,6 +65,11 @@ class Network:
         return self._simulation_steps
 
     @property
+    def loading_order(self) -> List[int]:
+        """Order in which nodes are processed each time step (see _discovery_order)."""
+        return list(self._loading_order)
+
+    @property
     def is_allocated(self) -> bool:
         """Whether the time-series state has been allocated."""
         return self._simulation_steps is not None

@@ -137,3 +137,61 @@ def test_one_way_network_is_rejected():
     )
     with pytest.raises(ValueError, match="symmetric"):
         Network(config).create()
+
+
+def test_discovery_order_follows_reference():
+    # 0 - 1 - 2 - 3, plus 1 - 4: node 4 is discovered from node 1, before node 3.
+    assert Network._discovery_order(ADJ) == [0, 1, 2, 4, 3]
+
+
+def test_network_loading_requires_allocation(network):
+    with pytest.raises(RuntimeError, match="allocate"):
+        network.network_loading(1)
+    network.allocate(10)
+    with pytest.raises(ValueError):
+        network.network_loading(11)
+
+
+def _conserved(network, step):
+    nodes = network.nodes.values()
+    entered = sum(n.virtual_incoming_link.cumulative_outflow[step] for n in nodes if n.virtual_incoming_link)
+    left = sum(n.virtual_outgoing_link.cumulative_inflow[step] for n in nodes if n.virtual_outgoing_link)
+    on_links = sum(link.num_pedestrians[step] for link in network.links.values())
+    return entered, left, on_links
+
+
+def test_network_loading_without_path_finder(network):
+    steps = 300  # a 50 m link takes ~45 steps at free flow
+    np.random.seed(0)
+    network.allocate(steps)
+    network.set_demand(0, np.r_[np.full(30, 2.0), np.zeros(steps - 29)])
+    for t in range(1, steps):
+        network.network_loading(t)
+
+    entered, left, on_links = _conserved(network, steps - 1)
+    assert entered > 0 and left > 0
+    assert entered - left == pytest.approx(on_links)
+    for link in network.links.values():
+        assert link.num_pedestrians.min() >= 0
+        assert link.sending_flow[: steps - 1].min() >= 0  # every node assigns flows
+
+
+def test_network_loading_with_path_finder(network):
+    from pednstream.ltm import ODManager, PathFinder
+
+    steps = 300  # a 50 m link takes ~45 steps at free flow
+    np.random.seed(0)
+    network.allocate(steps)
+    for origin in (0, 2):
+        network.set_demand(origin, np.r_[np.full(30, 2.0), np.zeros(steps - 29)])
+    od_manager = ODManager(steps)
+    od_manager.init_od_flows([0, 2], [3])
+    path_finder = PathFinder(network.links, params={"path_finder": {}})
+    path_finder.find_od_paths(od_pairs=od_manager.od_flows.keys(), nodes=network.nodes)
+    for t in range(1, steps):
+        network.network_loading(t, path_finder=path_finder, od_manager=od_manager)
+
+    entered, left, on_links = _conserved(network, steps - 1)
+    assert left > 0  # pedestrians reach destination 3
+    assert entered - left == pytest.approx(on_links)
+    assert network.nodes[3].virtual_outgoing_link.cumulative_inflow[steps - 1] == left

@@ -31,6 +31,7 @@ class Network:
         self.nodes: Dict[int, Node] = {} # Dictionary to hold Node objects, keyed by node ID. Ids match the ones in the adjacency matrix.
         self.links: Dict[tuple[int, int], Link] = {} # Dictionary to hold Link objects, keyed by link ID (start, end)
         self._simulation_steps: Optional[int] = None # Set by allocate(); the topology does not depend on it.
+        self._loading_order: List[int] = [] # Order in which nodes are processed each step, see _discovery_order().
         self._controllers: List[int] = [] # List to hold IDs of nodes that are controllers, can be populated based on node configurations. Used by the PathFinder. TODO: consider implementing dependency inversion.
         self._controller_gaters: List[int] = [] # Info passed by the user. TODO: Consider removing it.  
 
@@ -210,7 +211,31 @@ class Network:
 
         for node in self.nodes.values():
             node.init_mask()
+
+        self._loading_order = self._discovery_order(adjacency_matrix)
         return None
+
+    @staticmethod
+    def _discovery_order(adjacency_matrix) -> List[int]:
+        """Order in which network_loading processes the nodes.
+
+        Nodes are visited in the order the reference implementation (92fa2a3 /
+        v0.0.2-alpha) created them while scanning the upper triangle of the adjacency
+        matrix: node i, then each not yet seen neighbour j > i. Each node draws random
+        numbers when assigning flows, so this order keeps seeded runs reproducible.
+        """
+        order: List[int] = []
+        seen = set()
+        num_nodes = adjacency_matrix.shape[0]
+        for i in range(num_nodes):
+            if i not in seen:
+                seen.add(i)
+                order.append(i)
+            for j in range(i + 1, num_nodes):
+                if adjacency_matrix[i, j] == 1 and j not in seen:
+                    seen.add(j)
+                    order.append(j)
+        return order
 
     def _all_links(self):
         """Yield physical and virtual links of the network."""
@@ -265,6 +290,63 @@ class Network:
                 f"(simulation_steps = {steps}), got shape {demand.shape}."
             )
         node.demand = np.pad(demand, (0, steps + 1 - len(demand)))
+        return None
+
+    def update_link_states(self, time_step: int) -> None:
+        """Update densities, then speeds, of all physical links for a time step.
+
+        All densities are updated before any speed, because a link's speed depends on
+        the density of its reverse link.
+        """
+        for link in self.links.values():
+            link.update_density_flow(time_step)
+        for link in self.links.values():
+            link.update_speeds(time_step)
+        return None
+
+    def network_loading(
+        self,
+        time_step: int,
+        path_finder=None,
+        od_manager=None,
+        assign_flows_type: str = "classic",
+    ) -> None:
+        """Advance the network by one time step (node model, then link states).
+
+        Args:
+            time_step (int): current time step, from 1 to simulation_steps.
+            path_finder (PathFinder | None): route choice; when given with an
+                od_manager, turning fractions are updated from the OD flows and only
+                nodes on OD paths assign flows. Without it every node assigns flows
+                with its current turning fractions.
+            od_manager (ODManager | None): OD flows used by the path finder.
+            assign_flows_type (str): solver for regular nodes, "classic" or "optimal".
+        """
+        import numpy as np
+        steps = self.simulation_steps  # raises if not allocated
+        if not 1 <= time_step <= steps:
+            raise ValueError(f"time_step must be between 1 and {steps}, got {time_step}.")
+
+        for node_id in self._loading_order:
+            node = self.nodes[node_id]
+            if node.turning_fractions is None:  # default: equal split
+                phi = 1 / (node.dest_num - 1)
+                node.turning_fractions = np.ones(node.edge_num) * phi
+
+            if path_finder is not None and od_manager is not None:
+                path_finder.calculate_node_turning_fractions(
+                    time_step=time_step, od_manager=od_manager, node=node
+                )
+
+            if path_finder is None or node.id in path_finder.nodes_in_paths:
+                if node.type == "onetoone":
+                    node.assign_flows(time_step)
+                else:  # regular node
+                    if node.A_ub is None:
+                        node.get_matrix_A()
+                    node.assign_flows(time_step, type=assign_flows_type)
+
+        self.update_link_states(time_step)
         return None
 
 

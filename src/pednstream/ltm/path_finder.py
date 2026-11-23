@@ -350,7 +350,7 @@ class PathFinder:
         Returns:
             list: New paths added for this OD pair
         """
-        current_node_id = current_node.node_id
+        current_node_id = current_node.id
         origin, dest = od_pair
         paths = self.od_paths[od_pair]
         new_paths = []
@@ -365,7 +365,7 @@ class PathFinder:
         all_outgoing_neighbors = set()
         for link in current_node.outgoing_links:
             if link.end_node is not None:
-                all_outgoing_neighbors.add(link.end_node.node_id)
+                all_outgoing_neighbors.add(link.end_node)
 
         # Create a modified graph that encourages exploration away from existing OD paths
         # This is computed once per OD pair as it depends only on existing OD paths
@@ -528,7 +528,7 @@ class PathFinder:
     def calculate_turn_probabilities(self, current_node):
         """Calculate turn probabilities including special cases for origin/destination nodes, this function is called only once at the initialization of the simulation"""
         # node = self.graph.nodes[current_node]
-        current_node_id = current_node.node_id
+        current_node_id = current_node.id
         relevant_od_pairs = self.node_to_od_pairs.get(current_node_id, set())
         for od_pair in relevant_od_pairs:
             paths = self.od_paths[od_pair]
@@ -655,7 +655,7 @@ class PathFinder:
         if node.current_turn_probs_step.get(od_pair) == time_step:
             return node.node_turn_probs
 
-        node_id = node.node_id
+        node_id = node.id
         density_cache = self._link_density_cache
         capacity_cache = self._link_capacity_cache
         alpha = self.alpha
@@ -768,11 +768,11 @@ class PathFinder:
 
         # Calculate final turning fractions
         upstream_nodes = [
-            link.start_node.node_id if link.start_node is not None else -1
+            link.start_node if link.start_node is not None else -1
             for link in node.incoming_links
         ]
         downstream_nodes = [
-            link.end_node.node_id if link.end_node is not None else -1
+            link.end_node if link.end_node is not None else -1
             for link in node.outgoing_links
         ]
 
@@ -857,7 +857,7 @@ class PathFinder:
         """
         # TODO: consider if this can  extracted from here. Maybe not.
         # Only process nodes that appear in paths
-        if node.node_id in self.nodes_in_paths:
+        if node.id in self.nodes_in_paths:
             if node.source_num > 2:  # only process intersection nodes
                 # Pre-fetch OD flows once per timestep (shared across all nodes)
                 self._ensure_od_flow_cache(time_step, od_manager)

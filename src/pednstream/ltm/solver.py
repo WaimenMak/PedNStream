@@ -7,7 +7,7 @@ def solve(node, s: np.ndarray, r: np.ndarray, type: str = "classic") -> np.ndarr
     Compute the flow vector q for the given node.
 
     Args:
-        node: The Node instance (must have .node_type and relevant attributes).
+        node: The Node instance (must have .type and relevant attributes).
         s: Sending flow array of shape (source_num,).
         r: Receiving flow array of shape (dest_num,).
         type: Solver variant — "classic" or "optimal" (only used for regular nodes).
@@ -15,12 +15,12 @@ def solve(node, s: np.ndarray, r: np.ndarray, type: str = "classic") -> np.ndarr
     Returns:
         q: Flow vector of shape (source_num + dest_num,).
     """
-    if node.node_type == "onetoone":
+    if node.type == "onetoone":
         return _solve_onetoone(node, s, r)
-    elif node.node_type == "regular":
+    elif node.type == "regular":
         return _solve_regular(node, s, r, type=type)
     else:
-        raise ValueError(f"Unknown node type: {node.node_type}")
+        raise ValueError(f"Unknown node type: {node.type}")
 
 # ------------------------------------------------------------------
 # One-to-one node solver

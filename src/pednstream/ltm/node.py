@@ -1,12 +1,11 @@
+"""Nodes of the network: where links meet and flows are assigned (node model)."""
+
 import numpy as np
 from collections import defaultdict
-from scipy.optimize import linprog
-# from .link import BaseLink
-# from .solver import NodeFlowSolver
-from collections import defaultdict
 from dataclasses import dataclass
-from typing import Optional, List
 from typing import Optional
+from pednstream.ltm import solver
+from pednstream.ltm.link import VirtualLink, VirtualLinkCreator, virtual_link_config
 
 @dataclass(frozen=True)
 class NodeConfig:
@@ -114,15 +113,9 @@ class Node:
     def get_outgoing_link_to(self, down_node_id):
         """Return the outgoing link from this node to a downstream node id."""
         for link in self.outgoing_links:
-            if link.end_node is not None and link.end_node.node_id == down_node_id:
+            if link.end_node is not None and link.end_node == down_node_id:
                 return link
         return None
-
-        # Path finder attributes — pre-initialized to avoid hasattr checks in hot path
-        self.node_turn_probs = {}  # {(o,d): {(up_node, down_node): prob}}
-        self.turns_distances = {}  # {(o,d): {up_node: {down_node: distance}}}
-        self.up_od_probs = defaultdict(lambda: defaultdict(int))  # {up_node: {od_pair: prob}}
-        self.current_turn_probs_step = {}  # {od_pair: last_computed_timestep}
 
     def create_virtual_links(self) -> None:
         """Create a pair of virtual links (in/out) for an origin/destination node.
@@ -135,8 +128,6 @@ class Node:
         Returns:
            None.
         """
-        from pednstream.ltm.link import VirtualLinkCreator, virtual_link_config
-
         for direction, is_incoming in (("in", True), ("out", False)):
             v_link = VirtualLinkCreator().create_link(virtual_link_config(self.id, direction))
             v_link.direction = direction
@@ -290,12 +281,13 @@ class Node:
                     od_pairs[od_pair] = 1.0 / n_pairs if n_pairs > 0 else 0
 
         # Calculate final turning fractions
+        # Link endpoints are node ids; -1 stands for the outside of a virtual link.
         upstream_nodes = [
-            link.start_node.node_id if link.start_node is not None else -1
+            link.start_node if link.start_node is not None else -1
             for link in self.incoming_links
         ]
         downstream_nodes = [
-            link.end_node.node_id if link.end_node is not None else -1
+            link.end_node if link.end_node is not None else -1
             for link in self.outgoing_links
         ]
 
@@ -348,7 +340,7 @@ class Node:
                     # Normalize by sum - preserves relative probabilities
                     fract[i] = fract[i] / row_sum
                     print(
-                        f"Warning: turning fractions at node {self.node_id} for downstream {i} do not sum to 1. Normalizing."
+                        f"Warning: turning fractions at node {self.id} for downstream {i} do not sum to 1. Normalizing."
                     )
                 else:
                     # No information available - use equal probabilities
@@ -369,51 +361,38 @@ class Node:
             self.check_fractions()
 
     def assign_flows(self, time_step: int, type="classic"):
-        """
-        Get the sending and receiving flows constraints. time_step starts from 1.
+        """Assign flows through the node for a time step (time_step starts from 1).
+
+        Sending flows of the incoming links are computed first, then receiving flows
+        of the outgoing links: a receiving flow subtracts the reverse link's sending
+        flow, and the reverse links of the outgoing links are incoming links here.
+        Virtual links carry the node's demand (in) and the destination penalty M (out).
+
+        Args:
+            time_step (int): current time step.
+            type (str): solver variant for regular nodes, "classic" or "optimal".
         """
         s = np.zeros(self.source_num)
         r = np.zeros(self.dest_num)
 
-        # Calculate sending flows
-        for i, l in enumerate(self.incoming_links):
-            if (
-                hasattr(self, "virtual_incoming_link") # TODO: this can be substituted by a type check for VituralLink
-                and l == self.virtual_incoming_link
-            ):
+        for i, link in enumerate(self.incoming_links):
+            if isinstance(link, VirtualLink):
                 s[i] = self.demand[time_step - 1]
             else:
-                s[i] = l.cal_sending_flow(time_step - 1)
+                s[i] = link.calculate_sending_flow(time_step)
 
-        # Calculate receiving flows
-        for j, l in enumerate(self.outgoing_links):
-            if (
-                hasattr(self, "virtual_outgoing_link") # TODO: this can be substituted by a type check for VituralLink
-                and l == self.virtual_outgoing_link
-            ):
+        for j, link in enumerate(self.outgoing_links):
+            if isinstance(link, VirtualLink):
                 r[j] = self.M
             else:
-                reverse_sending_flow = l.reverse_link.sending_flow[time_step - 1].copy()
-                # raise Warning if reverse_sending_flow is negative
-                if reverse_sending_flow < 0:
-                    print(reverse_sending_flow)
-                    raise Warning(
-                        f"Negative reverse sending flow detected at time step {time_step}: {reverse_sending_flow}"
-                    )
+                r[j] = link.calculate_receiving_flow(time_step, with_reverse=True)
 
-                r[j] = l.cal_receiving_flow_with_reverse(
-                    time_step - 1, reverse_sending_flow
-                )
-                l.receiving_flow[time_step - 1] = r[j]
-
-        # raise Warining if s and r has negative values
         if np.any(s < 0) or np.any(r < 0):
             raise Warning(
                 f"Negative flows detected at time step {time_step}: s={s}, r={r}"
             )
 
-        # Delegate flow computation to the standalone solver
-        q = NodeFlowSolver.solve(self, s, r, type=type)
-        if q is not None:
+        q = solver.solve(self, s, r, type=type)
+        if q is not None:  # the optimal solver keeps the previous flows if it fails
             self.q = q
         self.update_links(time_step)

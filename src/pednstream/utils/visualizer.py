@@ -10,23 +10,27 @@ import numpy as np
 from pednstream.ltm.link import Separator
 
 class NetworkVisualizer:
-    def __init__(self, network=None, simulation_dir=None, pos=None):
+    def __init__(self, simulation=None, simulation_dir=None, pos=None):
         """
-        Initialize visualizer with either a network instance or simulation data
-        :param network: Direct network object (optional)
+        Initialize visualizer with either a simulation instance or saved simulation data
+        :param simulation: Simulation object (optional); its network is drawn
         :param simulation_dir: Directory containing saved simulation data (optional)
+        :param pos: node positions; defaults to the network's configured positions, if any
         """
-        if network is not None:
-            self.network = network
-            self.node_data = network.nodes
-            self.link_data = network.links
+        self.simulation = simulation
+        if simulation is not None:
+            self.network = simulation.network
+            self.node_data = self.network.nodes
+            self.link_data = self.network.links
             self.from_saved = False
+            if pos is None:
+                pos = self.network.config.positions or None
         elif simulation_dir is not None:
             self.load_simulation_data(simulation_dir)
             self.from_saved = True
             self.network = None
         else:
-            raise ValueError("Either network object or simulation_dir must be provided")
+            raise ValueError("Either a simulation object or simulation_dir must be provided")
         
         # Initialize fixed position for nodes
         self.pos = pos
@@ -159,8 +163,8 @@ class NetworkVisualizer:
                           else 'pink' if int(node) in self.network_params['destination_nodes'] 
                           else 'lightblue' for node in G.nodes()]
         else:
-            node_colors = ['red' if int(node) in self.network.origin_nodes 
-                          else 'pink' if int(node) in self.network.destination_nodes
+            node_colors = ['red' if int(node) in self.simulation.origin_nodes 
+                          else 'pink' if int(node) in self.simulation.destination_nodes
                           else 'lightblue' for node in G.nodes()]
         nx.draw_networkx_nodes(G, self.pos, node_size=node_sizes,
                              node_color=node_colors,
@@ -404,8 +408,8 @@ class NetworkVisualizer:
             origin_nodes = self.network_params['origin_nodes']
             dest_nodes = self.network_params['destination_nodes']
         else:
-            origin_nodes = self.network.origin_nodes
-            dest_nodes = self.network.destination_nodes
+            origin_nodes = self.simulation.origin_nodes
+            dest_nodes = self.simulation.destination_nodes
         
         # Draw nodes
         for node in G.nodes():
@@ -696,7 +700,7 @@ class NetworkVisualizer:
             if self.from_saved:
                 end_time = self.network_params['simulation_steps']
             else:
-                end_time = self.network.simulation_steps
+                end_time = self.simulation.simulation_steps
         
         # Create initial figure
         fig, ax = plt.subplots(figsize=figsize, facecolor='lightgrey')
@@ -787,8 +791,8 @@ class NetworkVisualizer:
                 else 'pink' if int(node) in self.network_params['destination_nodes'] 
                 else 'lightblue' for node in self.G.nodes()]
             else:
-                node_colors = ['red' if int(node) in self.network.origin_nodes 
-                else 'pink' if int(node) in self.network.destination_nodes
+                node_colors = ['red' if int(node) in self.simulation.origin_nodes 
+                else 'pink' if int(node) in self.simulation.destination_nodes
                 else 'lightblue' for node in self.G.nodes()]
             # print(self.pos)
             # self.pos = nx.spring_layout(G, k=1, iterations=50, seed=42)
@@ -977,8 +981,8 @@ class NetworkVisualizer:
         """Plot the OD paths"""
         if self.from_saved:
             od_paths = self.od_paths
-        elif self.network is not None:
-            od_paths = self.network.path_finder.od_paths
+        elif self.simulation is not None and self.simulation.path_finder is not None:
+            od_paths = self.simulation.path_finder.od_paths
         else:
             raise ValueError("No OD paths found")
         
@@ -998,8 +1002,6 @@ class NetworkVisualizer:
 
         # Resolve positions
         pos = self.pos
-        if pos is None and hasattr(self.network, 'pos') and self.network.pos is not None:
-            pos = self.network.pos
         if pos is None:
             pos = nx.spring_layout(graph, k=1, iterations=50, seed=42)
 
@@ -1096,11 +1098,8 @@ class NetworkVisualizer:
 
                 # Draw each segment with arrows and slight arc for bidirectional pairs
                 for u, v in zip(processed_path[:-1], processed_path[1:]):
-                    if isinstance(u, int):
-                        u = str(u)
-        
-                    if isinstance(v, int):
-                        v = str(v)
+                    if self.from_saved:  # saved graphs use str node ids, live ones int
+                        u, v = str(u), str(v)
 
                     has_reverse = (v, u) in graph.edges()
                     nx.draw_networkx_edges(
@@ -1112,7 +1111,7 @@ class NetworkVisualizer:
                         width=4.0,
                         alpha=0.8,
                         ax=ax,
-                        connectionstyle=("arc3,rad=0.2" if has_reverse else None)
+                        connectionstyle=("arc3,rad=0.2" if has_reverse else "arc3")
                     )
 
         # Legend
@@ -1172,7 +1171,7 @@ class NetworkVisualizer:
             
             for link_id in link_ids:
                 link = self.network.links[link_id]
-                time = range(self.network.simulation_steps)
+                time = range(self.simulation.simulation_steps + 1)
                 
                 ax1.plot(time, link.density, label=f'Link {link_id}')
                 ax1.set_ylabel('Density')
@@ -1231,23 +1230,21 @@ class NetworkVisualizer:
         else:
             if self.network is None:
                 return
-            gater_nodes = set()
-            if hasattr(self.network, 'controller_gaters'):
-                gater_nodes = set(str(n) for n in self.network.controller_gaters)
+            # Live graphs (and their positions) use int node ids; saved ones use str.
+            gater_nodes = set(self.simulation.controller_gaters)
 
             for (u, v), link in self.network.links.items():
-                u_str, v_str = str(u), str(v)
-                if u_str in gater_nodes:
+                if u in gater_nodes:
                     front_gw = getattr(link, 'front_gate_width_data', [None] * (time_step + 1))[time_step]
                     back_gw = getattr(link, 'back_gate_width_data', [None] * (time_step + 1))[time_step]
-                    link_gate_data[(u_str, v_str)] = (front_gw, back_gw)
+                    link_gate_data[(u, v)] = (front_gw, back_gw)
 
             # Build lookup for front gates of ALL links
             # Key is (src, dst) - we need this to find front gate of incoming link (v->u) to gater node u
             all_front_gates = {}
             for (src, dst), link in self.network.links.items():
                 if hasattr(link, 'front_gate_width_data'):
-                    all_front_gates[(str(src), str(dst))] = link.front_gate_width_data[time_step]
+                    all_front_gates[(src, dst)] = link.front_gate_width_data[time_step]
 
         # Determine graph coordinate scale to make sizes invariant
         x_coords = [coord[0] for coord in self.pos.values()]

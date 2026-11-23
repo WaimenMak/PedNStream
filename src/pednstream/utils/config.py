@@ -527,7 +527,8 @@ def _build_node_configs(
             
         node_config = NodeConfig(
             id=node_id,
-            type=node_type
+            type=node_type,
+            is_controller=node_id in controller_nodes,
         )
         node_configs.append(node_config)
 

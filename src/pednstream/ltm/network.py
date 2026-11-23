@@ -133,11 +133,23 @@ class Network:
         nodes = {}
         od_nodes = set(self.config.origin_nodes) | set(self.config.destination_nodes)
 
+        adjacency_matrix = self.config.adjacency_matrix
         for node_config in self.config.nodes:
             node_id = node_config.id
-            incoming_links = np.sum(self.config.adjacency_matrix[:, node_id])
-            outgoing_links = np.sum(self.config.adjacency_matrix[node_id, :])
+            incoming_links = np.sum(adjacency_matrix[:, node_id])
+            outgoing_links = np.sum(adjacency_matrix[node_id, :])
             is_od = node_id in od_nodes
+
+            # A dead end is a node with a single neighbour. Count distinct neighbours,
+            # not links: "1 in, 1 out" is a dead end only when both links go to the
+            # same neighbour (0 ⇄ 1), not in a pass-through like 0 → 1 → 2.
+            # Dead ends need virtual links: U-turns are not allowed by the node model,
+            # so without them pedestrians reaching a dead end could never leave it
+            # (the node would have zero turning movements).
+            neighbours = set(np.flatnonzero(adjacency_matrix[node_id, :])) | set(
+                np.flatnonzero(adjacency_matrix[:, node_id])
+            )
+            is_dead_end = len(neighbours) == 1
 
             node = Node(node_config)
 
@@ -145,15 +157,13 @@ class Network:
             # FIXME: the type setter on Node expects a tuple; types should come from NodeConfig (see node.py).
             if incoming_links == 2 and outgoing_links == 2:
                 node._type = "regular" if is_od else "onetoone"
-                create_virtual = is_od
             elif incoming_links == 1 and outgoing_links == 1:
                 node._type = "onetoone"
-                create_virtual = True
             else:
                 node._type = "regular"
-                create_virtual = is_od
 
-            if create_virtual:
+            # Virtual links act as entry/exit points: for origins/destinations and dead ends.
+            if is_od or is_dead_end:
                 node.create_virtual_links()
 
             nodes[node.id] = node
@@ -178,7 +188,18 @@ class Network:
 
         The time horizon is not needed here. Call allocate(simulation_steps) before
         running a simulation.
+
+        Raises:
+            ValueError: if the adjacency matrix is not symmetric. Every link needs a
+                reverse link, since the node model reads the reverse link's sending flow.
         """
+        import numpy as np
+        adjacency_matrix = np.asarray(self.config.adjacency_matrix)
+        if not np.array_equal(adjacency_matrix, adjacency_matrix.T):
+            raise ValueError(
+                "Adjacency matrix must be symmetric: every link needs a reverse link."
+            )
+
         self.nodes = self._create_nodes()
         self.links = self._create_links()
 
@@ -248,16 +269,55 @@ class Network:
 
 
 if __name__ == "__main__":
+    import numpy as np
+
     # Example usage
+    # A simple 3-node corridor: 0 ⇄ 1 ⇄ 2. Every street is two links, one per direction,
+    # so the adjacency matrix is symmetric.
+    adjacency_matrix = np.array([
+        [0, 1, 0],
+        [1, 0, 1],
+        [0, 1, 0]
+    ])
+
+    link_configs = [
+        LinkConfig(
+            link_id=(i, j),
+            start_node=i,
+            end_node=j,
+            unit_time=1.0,
+            length=100.0,
+            width=3.5,
+            free_flow_speed=15.0,
+            k_critical=20.0,
+            k_jam=140.0
+        )
+        for i, j in [(0, 1), (1, 0), (1, 2), (2, 1)]
+    ]
+
+    node_configs = [
+        NodeConfig(id=0, type="origin", is_controller=False),
+        NodeConfig(id=1, type="regular", is_controller=False),
+        NodeConfig(id=2, type="destination", is_controller=False)
+    ]
+
+    positions = {0: (0, 0), 1: (100, 0), 2: (200, 0)}
+
     config = NetworkConfig(
-        adjacency_matrix=None,  # Replace with actual adjacency matrix
-        links=[],  # Replace with actual link configurations
-        nodes=[],  # Replace with actual node configurations
-        origin_nodes=[],  # Replace with actual origin nodes
-        destination_nodes=[],  # Replace with actual destination nodes
-        od_flows={},  # Replace with actual OD flows
-        positions={}  # Replace with actual node positions
+        adjacency_matrix=adjacency_matrix,
+        links=link_configs,
+        nodes=node_configs,
+        origin_nodes=[0],
+        destination_nodes=[2],
+        positions=positions
     )
-    
+
+    # create(), allocate() and set_demand() modify the network in place and return None.
     network = Network(config)
     network.create()
+    network.allocate(simulation_steps=100)
+    network.set_demand(node_id=0, demand=[10] * 101)
+
+    with_virtual = [nid for nid, n in network.nodes.items() if n.virtual_incoming_link is not None]
+    print(f"links: {list(network.links)}")
+    print(f"nodes with virtual links: {with_virtual}")  # [0, 2]: the two dead ends

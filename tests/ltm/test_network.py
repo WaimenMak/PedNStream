@@ -83,3 +83,57 @@ def test_set_demand(network):
 def test_allocate_before_create_raises(network_config):
     with pytest.raises(RuntimeError, match="create"):
         Network(network_config).allocate(10)
+
+
+def _hand_built_config(adjacency_matrix, link_pairs, origin_nodes, destination_nodes):
+    from pednstream.ltm.link import LinkConfig
+    from pednstream.ltm.network import NetworkConfig
+    from pednstream.ltm.node import NodeConfig
+
+    links = [
+        LinkConfig(link_id=(i, j), start_node=i, end_node=j, unit_time=1.0, length=10.0,
+                   width=2.0, free_flow_speed=1.0, k_critical=1.0, k_jam=5.0)
+        for i, j in link_pairs
+    ]
+    nodes = [NodeConfig(id=n) for n in range(len(adjacency_matrix))]
+    return NetworkConfig(
+        adjacency_matrix=np.array(adjacency_matrix), links=links, nodes=nodes,
+        origin_nodes=origin_nodes, destination_nodes=destination_nodes,
+    )
+
+
+def test_pass_through_node_has_no_virtual_links():
+    # 0 ⇄ 1 ⇄ 2: node 1 is a pass-through (two neighbours), so no virtual links.
+    config = _hand_built_config(
+        [[0, 1, 0], [1, 0, 1], [0, 1, 0]],
+        [(0, 1), (1, 0), (1, 2), (2, 1)],
+        origin_nodes=[0], destination_nodes=[2],
+    )
+    network = Network(config)
+    network.create()
+    with_virtual = {nid for nid, n in network.nodes.items() if n.virtual_incoming_link is not None}
+    assert with_virtual == {0, 2}
+
+
+def test_non_od_dead_end_gets_virtual_links():
+    # 0 ⇄ 1 ⇄ 2: node 0 is a dead end even though it is not an origin/destination.
+    config = _hand_built_config(
+        [[0, 1, 0], [1, 0, 1], [0, 1, 0]],
+        [(0, 1), (1, 0), (1, 2), (2, 1)],
+        origin_nodes=[2], destination_nodes=[2],
+    )
+    network = Network(config)
+    network.create()
+    assert network.nodes[0].virtual_incoming_link is not None
+    assert network.nodes[1].virtual_incoming_link is None
+
+
+def test_one_way_network_is_rejected():
+    # 0 → 1 → 2 has no reverse links, which the node model cannot simulate.
+    config = _hand_built_config(
+        [[0, 1, 0], [0, 0, 1], [0, 0, 0]],
+        [(0, 1), (1, 2)],
+        origin_nodes=[0], destination_nodes=[2],
+    )
+    with pytest.raises(ValueError, match="symmetric"):
+        Network(config).create()

@@ -802,28 +802,6 @@ class PathFinder:
                 idx += 1
 
         return turning_fractions
-        """Delegate turn probability updates to the node."""
-        return node.update_node_turn_probs(
-            od_pair,
-            time_step,
-            alpha=self.alpha,
-            beta=self.beta,
-            omega=self.omega,
-            temp=self.temp,
-            std_dev=self.std_dev,
-        )
-
-    def update_turning_fractions(self, node, time_step: int, od_manager):
-        """Delegate turning fraction updates to the node."""
-        return node.update_turning_fractions(
-            time_step,
-            od_manager,
-            alpha=self.alpha,
-            beta=self.beta,
-            omega=self.omega,
-            temp=self.temp,
-            std_dev=self.std_dev,
-        )
 
     @staticmethod
     def check_fractions(node):

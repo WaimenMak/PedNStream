@@ -92,7 +92,6 @@ class Node:
                 self._type = "onetoone"
                 # create virtual Node
                 # self._create_origin_destination(node_config)
-            # CONTINUE HERE: test this works as expected.
             return None
 
     @property

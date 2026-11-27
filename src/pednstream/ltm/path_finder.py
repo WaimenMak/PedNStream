@@ -7,6 +7,7 @@ from heapq import heappush, heappop
 from pednstream.ltm.node import Node
 
 
+
 def k_shortest_paths(graph, origin, dest, k):
     """
     Find k shortest paths using Yen's algorithm with priority queue.
@@ -724,14 +725,22 @@ class PathFinder:
         node.current_turn_probs_step[od_pair] = time_step
         return node.node_turn_probs
 
-    def update_turning_fractions(self, node, time_step: int, od_manager):
-        """Calculate turning fractions using stored turn probabilities: node_turn_probs,
-        Return turning_fractions: np.array
+    def update_turning_fractions(self, node, time_step: int, od_manager) -> np.ndarray:
+        """Calculate turning fractions using stored turn probabilities: node_turn_probs.
+
+        Args:
+            node: Node instance for which to calculate turning fractions
+            time_step: Current time step
+            od_manager: ODManager instance to fetch OD flows
+
+        Returns:
+            np.ndarray: Array of turning fractions for all outgoing links of the node
 
         Optimized to:
         - Cache link attributes once per timestep before processing
         - Batch-update all OD pairs' turn probs before assembling fractions
         - Use pre-fetched OD flow values
+
         """
         # Ensure link caches are fresh for this timestep
         self._cache_link_attributes(time_step)
@@ -821,19 +830,18 @@ class PathFinder:
                 )
             self._od_cache_step = time_step
 
-    def calculate_node_turning_fractions(self, time_step: int, od_manager, node):
-        """
-        Calculate turning fractions only for nodes that appear in OD paths.
+    def calculate_node_turning_fractions(self, time_step: int, od_manager, node) -> None:
+        """Calculate turning fractions only for nodes that appear in OD paths.
 
         Args:
             nodes: List of all network nodes
             time_step: Current time step
             od_manager: ODManager instance
+            node: Node instance for which to calculate turning fractions
 
         Returns:
-            np.array: Turning fractions for the node
+            None: Updates node.turning_fractions in place
         """
-        # TODO: consider if this can  extracted from here. Maybe not.
         # Only process nodes that appear in paths
         if node.id in self.nodes_in_paths:
             if node.source_num > 2:  # only process intersection nodes

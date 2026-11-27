@@ -35,7 +35,7 @@ class Simulation:
         network_config: NetworkConfig,
         simulation_config,
         demand_patterns: Optional[Iterable[Callable]] = None,
-        logger: Optional[logging.Logger] = None,
+        logger: Optional[logging.Logger]= None
     ):
         """Build the network and prepare the run (demand, OD flows, paths).
 
@@ -48,7 +48,7 @@ class Simulation:
             logger (logging.Logger | None): logger for the demand generator and path finder.
         """
         self.config = simulation_config
-        self.logger = logger
+        self.logger = logging.getLogger("pednstream.simulation") if logger is None else logger
         self.time_step = 0  # last simulated time step
 
         self.network = Network(network_config)
@@ -56,7 +56,7 @@ class Simulation:
         self.network.allocate(simulation_config.simulation_steps)
 
         self.demand_generator = DemandGenerator(
-            simulation_config.simulation_steps, self.params, logger
+            simulation_config.simulation_steps, self.params, self.logger
         )
         for func in demand_patterns or []:
             self.demand_generator.register_pattern(func.__name__, func)
